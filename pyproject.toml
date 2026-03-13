@@ -1,0 +1,88 @@
+# ----------------------------------------------------------------------------------
+# Project: CrystalSweep
+# File: pyproject.toml
+# ----------------------------------------------------------------------------------
+# Purpose:
+# This file is used to specify the project configuration and dependencies.
+# ----------------------------------------------------------------------------------
+# Author: Christofanis Skordas
+#
+# Copyright (c) 2026 GSECARS, The University of Chicago, USA
+# Copyright (c) 2026 NSF SEES, USA
+# ----------------------------------------------------------------------------------
+
+[project]
+name = "crystalsweep"
+version = "0.1.0"
+authors = [
+    {name = "Christofanis Skordas", email = "55315750+skordaschristofanis@users.noreply.github.com"}
+]
+maintainers = [
+    {name = "Christofanis Skordas", email = "55315750+skordaschristofanis@users.noreply.github.com"}
+]
+description = "CrystalSweep is beamline control and data acquisition software for single-crystal X-ray diffraction experiments."
+readme = {file = "README.md", content-type = "text/markdown"}
+license = {file = "LICENSE"}
+classifiers = [
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: MIT License"
+]
+requires-python = "==3.14.*"
+dependencies = [
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.15.6",
+    "ty>=0.0.23",
+]
+
+[project.scripts]
+crystalsweep = "crystalsweep:main"
+
+[project.urls]
+Homepage = "https://github.com/GSECARS/CrystalSweep"
+Issues = "https://github.com/GSECARS/CrystalSweep/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["crystalsweep"]
+
+[tool.ruff]
+exclude = [
+    ".eggs",
+    ".git",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".venv",
+    ".vscode",
+    "build",
+    "dist",
+]
+line-length = 160
+indent-width = 4
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+ignore = []
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = false
+docstring-code-line-length = "dynamic"
