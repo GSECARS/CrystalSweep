@@ -15,6 +15,7 @@
 
 import wx
 
+from crystalsweep.model import MainModel
 from crystalsweep.view import MainView
 
 __all__ = ["MainController"]
@@ -27,6 +28,7 @@ class MainController:
         """Initializes the main controller."""
         # Create the core app and views
         self._app = wx.App(False)
+        self._model = MainModel()
         self._view = MainView(version=version)
 
     def run(self) -> None:
