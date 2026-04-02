@@ -12,6 +12,12 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from crystalsweep.ui.controller import UIApplication
+__all__ = ["start_ui"]
 
-__all__ = ["UIApplication"]
+
+def start_ui() -> None:
+    """Starts the CrystalSweep UI."""
+    # Lazy import to avoid loading wx on CLI mode
+    from crystalsweep.ui.controller import UIApplication
+
+    UIApplication()
