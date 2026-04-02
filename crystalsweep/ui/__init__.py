@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/model/main_model.py
+# File: crystalsweep/ui/__init__.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# This file is used to implement the main model for the CrystalSweep application.
+# This file is used to initialize the CrystalSweep UI.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -12,15 +12,6 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
+from crystalsweep.ui.controller import UIApplication
 
-from crystalsweep.model.config_model import ConfigModel
-
-__all__ = ["MainModel"]
-
-
-@dataclass(frozen=True)
-class MainModel:
-    """Implements the main model for the CrystalSweep application."""
-
-    config: ConfigModel = field(init=False, compare=False, repr=False, default_factory=ConfigModel)
+__all__ = ["UIApplication"]

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/controller/main_controller.py
+# File: crystalsweep/ui/controller/main_controller.py
 # ----------------------------------------------------------------------------------
 # Purpose:
 # This file is used to implement the main controller for the CrystalSweep
@@ -16,7 +16,7 @@
 import wx
 
 from crystalsweep.model import MainModel
-from crystalsweep.view import MainView
+from crystalsweep.ui.view import MainView
 
 __all__ = ["MainController"]
 

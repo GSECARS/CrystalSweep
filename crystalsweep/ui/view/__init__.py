@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/view/__init__.py
+# File: crystalsweep/ui/view/__init__.py
 # ----------------------------------------------------------------------------------
 # Purpose:
 # This file is used to initialize the CrystalSweep views.
@@ -12,6 +12,6 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from crystalsweep.view.main_view import MainView
+from crystalsweep.ui.view.main_view import MainView
 
 __all__ = ["MainView"]

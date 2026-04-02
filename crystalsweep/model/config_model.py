@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/controller/__init__.py
+# File: crystalsweep/model/config_model.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# This file is used to initialize the CrystalSweep controller.
+# This file is used to implement the Config model.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -12,11 +12,17 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from importlib.metadata import version
+from dataclasses import dataclass
 
-from crystalsweep.controller.main_controller import MainController
+import dotenv
 
-__all__ = ["GUIApplication"]
+__all__ = ["ConfigModel"]
 
 
-GUIApplication = MainController(version=version("crystalsweep")).run
+@dataclass(frozen=True)
+class ConfigModel:
+    """Implements the Config model."""
+
+    # Reads the .env file and sets the config variables
+    def __post_init__(self) -> None:
+        dotenv.load_dotenv()

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/view/main_view.py
+# File: crystalsweep/ui/view/main_view.py
 # ----------------------------------------------------------------------------------
 # Purpose:
 # This file is used to implement the main view for the CrystalSweep application.

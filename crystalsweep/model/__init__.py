@@ -12,6 +12,7 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+from crystalsweep.model.config_model import ConfigModel
 from crystalsweep.model.main_model import MainModel
 
-__all__ = ["MainModel"]
+__all__ = ["ConfigModel", "MainModel"]

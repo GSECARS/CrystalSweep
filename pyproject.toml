@@ -33,6 +33,7 @@ classifiers = [
 ]
 requires-python = "==3.14.*"
 dependencies = [
+    "python-dotenv>=1.2.2",
     "wxpython>=4.2.5",
     "wxutils>=2026.1.0",
 ]
