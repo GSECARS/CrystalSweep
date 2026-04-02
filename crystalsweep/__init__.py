@@ -14,8 +14,6 @@
 
 from argparse import ArgumentParser
 
-from crystalsweep.ui import start_ui
-
 
 def main() -> None:
     """Main entry point for `crystalsweep` console script."""
@@ -25,6 +23,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.gui:
+        # Lazy import to avoid loading wx on CLI mode
+        from crystalsweep.ui import start_ui
+
         start_ui()
     else:
         parser.print_help()
