@@ -30,7 +30,13 @@ class ImageCanvas(wx.Panel):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
 
-        self._canvas = scene.SceneCanvas(keys=None, parent=self, app="wx")
+        self._canvas = scene.SceneCanvas(
+            keys=None,
+            parent=self,
+            app="wx",
+            vsync=True,
+            config={"samples": 4, "double_buffer": True, "depth_size": 0, "stencil_size": 0},
+        )
         self._view = self._canvas.central_widget.add_view()
         self._view.camera = scene.PanZoomCamera(aspect=1)
         self._view.camera.flip = (0, 1, 0)
