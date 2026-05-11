@@ -20,7 +20,7 @@ import numpy as np
 import wx
 
 from crystalsweep.ui.view.custom.icons import draw_folder
-from crystalsweep.ui.view.custom.theme import LIVE_H, LIVE_W, PONI_LOADED, PONI_MISSING
+from crystalsweep.ui.view.custom.theme import LIVE_H, LIVE_W, PONI_LOADED, PONI_MISSING, scaled_font
 from crystalsweep.ui.view.custom.widgets import LiveToggle
 
 __all__ = ["IntegrationPlot"]
@@ -382,11 +382,11 @@ class IntegrationPlot(wx.Panel):
         gc.StrokeLine(ml, mt + ph, ml + pw, mt + ph)
         gc.StrokeLine(ml, mt, ml, mt + ph)
 
-        font_small = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        font_small = scaled_font(10, weight=wx.FONTWEIGHT_BOLD)
         ranges = self._data_ranges()
 
         if ranges is None:
-            gc.SetFont(wx.Font(13, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD), self._EMPTY_TEXT)
+            gc.SetFont(scaled_font(13, weight=wx.FONTWEIGHT_BOLD), self._EMPTY_TEXT)
             msg = "Draw an ROI on the image to see the integration profile"
             tw, th = gc.GetTextExtent(msg)
             gc.DrawText(msg, ml + pw / 2 - tw / 2, mt + ph / 2 - th / 2)
@@ -478,7 +478,7 @@ class IntegrationPlot(wx.Panel):
         total_w = len(_UNIT_KEYS) * _UNIT_BTN_W + (len(_UNIT_KEYS) - 1) * _UNIT_BTN_GAP
         start_x = W - self._MR - total_w
         self._unit_btn_rects = []
-        font = wx.Font(9, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        font = scaled_font(9, weight=wx.FONTWEIGHT_BOLD)
         for i, (key, label) in enumerate(zip(_UNIT_KEYS, _UNIT_LABELS)):
             x = start_x + i * (_UNIT_BTN_W + _UNIT_BTN_GAP)
             r = wx.Rect(x, 2, _UNIT_BTN_W, _UNIT_BTN_H)
@@ -513,12 +513,12 @@ class IntegrationPlot(wx.Panel):
         draw_folder(gc, _ICON_SIZE)
         gc.PopState()
 
-        font = wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL)
+        font = scaled_font(11, style=wx.FONTSTYLE_ITALIC)
         gc.SetFont(font, self._poni_colour)
         tw, th = gc.GetTextExtent(self._poni_text)
         gc.DrawText(self._poni_text, br.x - tw - self._BTN_PAD, br.y + (br.height - th) / 2)
 
-        info_font = wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        info_font = scaled_font(11, weight=wx.FONTWEIGHT_BOLD)
         gc.SetFont(info_font, wx.Colour(72, 199, 116))
         x = self._BTN_PAD
         if self._ys is not None:

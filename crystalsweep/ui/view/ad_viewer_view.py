@@ -13,6 +13,7 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+import sys
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -377,7 +378,7 @@ class ADViewerView(wx.Panel):
         with wx.FileDialog(
             self,
             "Open image file",
-            wildcard="HDF5 files (*.h5;*.hdf5)|*.h5;*.hdf5|*.*",
+            wildcard="HDF5 files (*.h5;*.hdf5)|*.h5;*.hdf5" + ("|All files (*.*)|*.*" if sys.platform == "win32" else ""),
             style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
         ) as dlg:
             if dlg.ShowModal() == wx.ID_CANCEL:
@@ -390,7 +391,7 @@ class ADViewerView(wx.Panel):
         with wx.FileDialog(
             self,
             "Open .poni calibration file",
-            wildcard="PONI files (*.poni)|*.poni|*.*",
+            wildcard="PONI files (*.poni)|*.poni" + ("|All files (*.*)|*.*" if sys.platform == "win32" else ""),
             style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
         ) as dlg:
             if dlg.ShowModal() == wx.ID_CANCEL:

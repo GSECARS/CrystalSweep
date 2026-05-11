@@ -13,6 +13,8 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+import sys
+
 import wx
 
 from crystalsweep.model import MainModel
@@ -27,7 +29,13 @@ class MainController:
 
     def __init__(self, version: str) -> None:
         """Initializes the main controller."""
-        # Create the core app and views
+        if sys.platform == "win32":
+            try:
+                wx.App.SetDPIAwareness(wx.DPI_AWARENESS_CTX_PER_MONITOR_AWARE_V2)
+            except AttributeError:
+                import ctypes
+                ctypes.windll.shcore.SetProcessDpiAwareness(2)
+
         self._app = wx.App(False)
         self._model = MainModel()
         self._view = MainView(version=version)

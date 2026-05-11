@@ -37,6 +37,7 @@ from crystalsweep.ui.view.custom.theme import (
     POPUP_BTN_HOVER,
     POPUP_BTN_PRESS,
     SEP_COLOUR,
+    scaled_font,
 )
 
 __all__ = ["FlatButton", "FrameLabel", "LiveToggle", "IconButton", "DarkTextCtrl", "DarkToggle", "DarkCombo"]
@@ -75,7 +76,7 @@ class FlatButton(wx.Control):
         gc.SetBrush(wx.Brush(bg))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRoundedRectangle(0, 0, w, h, 4)
-        font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        font = scaled_font(12)
         gc.SetFont(font, FG_PRIMARY)
         tw, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, (w - tw) / 2, (h - th) / 2)
@@ -128,7 +129,7 @@ class FrameLabel(wx.Control):
         gc.SetBrush(wx.Brush(BG_ELEVATED))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRoundedRectangle(0, 0, w, h, 3)
-        font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
         gc.SetFont(font, FG_PRIMARY)
         tw, th = gc.GetTextExtent(self._value)
         gc.DrawText(self._value, (w - tw) / 2, (h - th) / 2)
@@ -176,7 +177,7 @@ class LiveToggle(wx.Control):
         gc.SetPen(wx.Pen(colour, 1))
         gc.SetBrush(wx.TRANSPARENT_BRUSH)
         gc.DrawRoundedRectangle(1, 1, w - 2, h - 2, 3)
-        font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        font = scaled_font(10, weight=wx.FONTWEIGHT_BOLD)
         gc.SetFont(font, colour)
         _, ch_h = gc.GetTextExtent("L")
         y = (h - (4 * ch_h + 6)) / 2
@@ -289,7 +290,7 @@ class DarkTextCtrl(wx.Panel):
         self._editing = False
         self._callback_enter: Callable | None = None
         self._callback_kill: Callable | None = None
-        self._font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        self._font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
         self._ctrl = wx.TextCtrl(self, value=value, style=wx.TE_PROCESS_ENTER | wx.TE_CENTER | wx.BORDER_NONE)
         self._ctrl.SetBackgroundColour(BG_ELEVATED)
         self._ctrl.SetForegroundColour(FG_PRIMARY)
@@ -387,7 +388,7 @@ class DarkToggle(wx.Panel):
 
     def DoGetBestSize(self) -> wx.Size:
         dc = wx.ClientDC(self)
-        dc.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        dc.SetFont(scaled_font(12))
         tw, th = dc.GetTextExtent(self._label)
         return wx.Size(self._BOX_W + 8 + tw + 8, max(26, self._BOX_H + 8))
 
@@ -428,7 +429,7 @@ class DarkToggle(wx.Panel):
             path.AddLineToPoint(bx + self._BOX_W * 0.42, by + self._BOX_H - 3.5)
             path.AddLineToPoint(bx + self._BOX_W - 3, by + 3)
             gc.StrokePath(path)
-        font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        font = scaled_font(12)
         gc.SetFont(font, FG_PRIMARY if not self._hovered else ACCENT_HOVER)
         _, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, bx + self._BOX_W + 8, cy - th / 2)
@@ -461,7 +462,7 @@ class DarkCombo(wx.Panel):
 
     def DoGetBestSize(self) -> wx.Size:
         dc = wx.ClientDC(self)
-        dc.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        dc.SetFont(scaled_font(12))
         max_w = max((dc.GetTextExtent(c)[0] for c in self._choices), default=60)
         return wx.Size(max_w + 40, self._H)
 
@@ -485,7 +486,7 @@ class DarkCombo(wx.Panel):
         gc.SetBrush(wx.Brush(BTN_HOVER_BG if self._hovered else BG_ELEVATED))
         gc.SetPen(wx.Pen(SEP_COLOUR, 1))
         gc.DrawRoundedRectangle(0, 0, w, h, 4)
-        font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        font = scaled_font(12)
         gc.SetFont(font, FG_PRIMARY)
         label = self.GetStringSelection()
         _, th = gc.GetTextExtent(label)

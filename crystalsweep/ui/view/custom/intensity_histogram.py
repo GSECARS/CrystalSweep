@@ -20,6 +20,7 @@ from vispy.color import get_colormap
 
 from crystalsweep.ui.view.custom.colormaps import CUSTOM_COLORMAPS
 from crystalsweep.ui.view.custom.histogram_utils import compute_histogram_data
+from crystalsweep.ui.view.custom.theme import scaled_font
 
 __all__ = ["IntensityHistogramWidget"]
 
@@ -209,7 +210,7 @@ class IntensityHistogramWidget(wx.Panel):
             gc.SetPen(wx.Pen(wx.Colour(18, 18, 18), 1))
             gc.DrawEllipse(x - r, gy + gh // 2 - r, r * 2, r * 2)
 
-        font = wx.Font(9, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        font = scaled_font(9, weight=wx.FONTWEIGHT_BOLD)
 
         def _fmt(v: float) -> str:
             if v == 0:

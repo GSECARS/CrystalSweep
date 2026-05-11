@@ -17,7 +17,7 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.colormaps import COLORMAP_NAMES
-from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR
+from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
 from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle, FlatButton
 
 __all__ = ["ImageSettingsPopup"]
@@ -94,7 +94,7 @@ class ImageSettingsPopup(wx.Frame):
         contrast_min: float,
         contrast_max: float,
     ) -> None:
-        font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        font = scaled_font(12)
 
         def _lbl(text: str) -> wx.StaticText:
             w = wx.StaticText(parent, label=text)
