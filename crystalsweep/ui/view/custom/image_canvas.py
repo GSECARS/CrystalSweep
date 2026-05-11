@@ -203,6 +203,10 @@ class ImageCanvas(wx.Panel):
     def set_overlay_motion_callback(self, callback: Callable[[int, int], None] | None) -> None:
         self._overlay_motion_callback = callback
 
+    @property
+    def native(self) -> wx.Window:
+        return self._canvas.native
+
     def _compute_auto_clim(self, img: np.ndarray) -> tuple[float, float]:
         if self._filter_gaps:
             nonzero = img[img > 0]

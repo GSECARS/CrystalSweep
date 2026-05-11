@@ -84,26 +84,29 @@ class ADViewerView(wx.Panel):
         self._canvas_panel.SetBackgroundColour(BG_SURFACE)
         self._image_canvas = ImageCanvas(self._canvas_panel)
 
-        self._load_file_btn = IconButton(self._canvas_panel, draw_folder, tooltip="Load image file")
+        # Parent overlay buttons to the VisPy native widget so they render above it on Windows
+        overlay_parent = self._image_canvas.native
+
+        self._load_file_btn = IconButton(overlay_parent, draw_folder, tooltip="Load image file")
         self._load_file_btn.Bind(wx.EVT_BUTTON, lambda _: self._trigger_load_file())
 
-        self._prev_btn = IconButton(self._canvas_panel, draw_chevron_left, tooltip="Previous frame")
+        self._prev_btn = IconButton(overlay_parent, draw_chevron_left, tooltip="Previous frame")
         self._prev_btn.Bind(wx.EVT_BUTTON, self._on_prev_frame)
         self._prev_btn.Hide()
 
-        self._next_btn = IconButton(self._canvas_panel, draw_chevron_right, tooltip="Next frame")
+        self._next_btn = IconButton(overlay_parent, draw_chevron_right, tooltip="Next frame")
         self._next_btn.Bind(wx.EVT_BUTTON, self._on_next_frame)
         self._next_btn.Hide()
 
-        self._frame_ctrl = DarkTextCtrl(self._canvas_panel, value="0")
+        self._frame_ctrl = DarkTextCtrl(overlay_parent, value="0")
         self._frame_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_frame_ctrl_enter)
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_ctrl_enter)
         self._frame_ctrl.Hide()
 
-        self._settings_btn = IconButton(self._canvas_panel, draw_cog, tooltip="Image settings")
+        self._settings_btn = IconButton(overlay_parent, draw_cog, tooltip="Image settings")
         self._settings_btn.Bind(wx.EVT_BUTTON, self._on_settings_btn)
 
-        self._live_toggle = LiveToggle(self._canvas_panel, live=self._live_updates)
+        self._live_toggle = LiveToggle(overlay_parent, live=self._live_updates)
         self._live_toggle.set_toggled_callback(self._apply_live_updates)
 
         canvas_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -111,9 +114,10 @@ class ADViewerView(wx.Panel):
         self._canvas_panel.SetSizer(canvas_sizer)
         self._canvas_panel.SetMinSize((-1, 200))
 
-        self._canvas_panel.Bind(wx.EVT_SIZE, self._on_canvas_panel_size)
-        self._canvas_panel.Bind(wx.EVT_MOTION, self._on_canvas_panel_motion)
-        self._canvas_panel.Bind(wx.EVT_LEAVE_WINDOW, self._on_canvas_panel_leave)
+        # Track size changes on the native VisPy widget so overlays reposition whenever the canvas resizes
+        overlay_parent.Bind(wx.EVT_SIZE, self._on_overlay_parent_size)
+        overlay_parent.Bind(wx.EVT_MOTION, self._on_canvas_panel_motion)
+        overlay_parent.Bind(wx.EVT_LEAVE_WINDOW, self._on_canvas_panel_leave)
 
         inner = wx.BoxSizer(wx.VERTICAL)
         inner.Add(self._intensity_histogram, 0, wx.EXPAND)
@@ -129,6 +133,8 @@ class ADViewerView(wx.Panel):
         self._integration_plot.set_live_integration_callback(self._on_roi_live_integration_toggled)
         self._image_canvas.set_overlay_motion_callback(self._on_canvas_panel_motion_xy)
         self._image_canvas.set_filter_gaps(self._filter_gaps)
+
+        self._reposition_overlay_buttons()
 
     def bind_load_file(self, callback: _FileLoadCallback) -> None:
         self._load_file_cb = callback
@@ -214,7 +220,6 @@ class ADViewerView(wx.Panel):
         if visible:
             self._frame_ctrl.SetValue(str(current_index))
         self._reposition_overlay_buttons()
-        self._canvas_panel.Refresh()
 
     def _on_roi_or_line_cleared(self) -> None:
         self._integration_plot.clear()
@@ -233,18 +238,19 @@ class ADViewerView(wx.Panel):
         self._auto_scale = False
         self._image_canvas.set_contrast(min_val, max_val)
 
-    def _on_canvas_panel_size(self, event: wx.SizeEvent) -> None:
+    def _on_overlay_parent_size(self, event: wx.SizeEvent) -> None:
         event.Skip()
         self._reposition_overlay_buttons()
 
     def _reposition_overlay_buttons(self) -> None:
-        panel_w, _ = self._canvas_panel.GetClientSize()
+        # Coordinates are now relative to the native VisPy widget (overlay parent)
+        panel_w, _ = self._image_canvas.native.GetClientSize()
         cog_sz = self._settings_btn.GetBestSize()
         x = panel_w - cog_sz.width - 4
         self._settings_btn.SetPosition(wx.Point(x, 4))
         self._settings_btn.Raise()
 
-        lw, lh = self._live_toggle.GetSize()
+        lw, _lh = self._live_toggle.GetSize()
         self._live_toggle.SetPosition(wx.Point(x + (cog_sz.width - lw) // 2, 4 + cog_sz.height + 4))
         self._live_toggle.Raise()
 
@@ -291,8 +297,10 @@ class ADViewerView(wx.Panel):
         self._update_overlay_hover(wx.Point(x, y))
 
     def _on_canvas_panel_leave(self, event: wx.MouseEvent) -> None:
+        pos = wx.GetMousePosition()
         for btn in self._overlay_buttons():
-            btn.set_hovered(False)
+            if not btn.GetScreenRect().Contains(pos):
+                btn.set_hovered(False)
         event.Skip()
 
     def _on_settings_btn(self, event: wx.CommandEvent) -> None:
@@ -368,7 +376,6 @@ class ADViewerView(wx.Panel):
             self._next_btn.Hide()
             self._frame_ctrl.Hide()
             self._reposition_overlay_buttons()
-            self._canvas_panel.Refresh()
 
     def _apply_reset_view(self) -> None:
         self._image_canvas.reset_view()
