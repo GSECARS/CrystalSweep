@@ -4,7 +4,7 @@
 # File: crystalsweep/ui/view/__init__.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# This file is used to initialize the CrystalSweep views.
+# Public view exports.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -12,6 +12,24 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+from crystalsweep.ui.view.ad_viewer_view import ADViewerView
+from crystalsweep.ui.view.custom import (
+    COLORMAP_NAMES,
+    CUSTOM_COLORMAPS,
+    ImageCanvas,
+    IntegrationPlot,
+    IntensityHistogramWidget,
+    colormap_color,
+)
 from crystalsweep.ui.view.main_view import MainView
 
-__all__ = ["MainView"]
+__all__ = [
+    "ADViewerView",
+    "COLORMAP_NAMES",
+    "CUSTOM_COLORMAPS",
+    "colormap_color",
+    "ImageCanvas",
+    "IntegrationPlot",
+    "IntensityHistogramWidget",
+    "MainView",
+]

@@ -16,6 +16,7 @@
 import wx
 
 from crystalsweep.model import MainModel
+from crystalsweep.ui.controller.ad_viewer_controller import ADViewerController
 from crystalsweep.ui.view import MainView
 
 __all__ = ["MainController"]
@@ -30,6 +31,9 @@ class MainController:
         self._app = wx.App(False)
         self._model = MainModel()
         self._view = MainView(version=version)
+
+        # Initialize the AD Viewer controller
+        self._ad_viewer_controller = ADViewerController(model=self._model, view=self._view)
 
     def run(self) -> None:
         """Starts the main application loop."""

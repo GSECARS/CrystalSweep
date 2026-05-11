@@ -13,6 +13,8 @@
 # ----------------------------------------------------------------------------------
 
 from crystalsweep.model.config_model import ConfigModel
+from crystalsweep.model.image_loader_model import ImageLoaderModel
+from crystalsweep.model.integration_model import IntegrationModel
 from crystalsweep.model.main_model import MainModel
 
-__all__ = ["ConfigModel", "MainModel"]
+__all__ = ["ConfigModel", "ImageLoaderModel", "IntegrationModel", "MainModel"]

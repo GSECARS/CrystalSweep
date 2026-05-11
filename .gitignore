@@ -40,3 +40,6 @@ Desktop.ini
 # Tools
 .ruff_cache/
 .pytest_cache/
+
+# Environment configuration
+.env

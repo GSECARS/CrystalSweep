@@ -33,7 +33,14 @@ classifiers = [
 ]
 requires-python = "==3.14.*"
 dependencies = [
+    "h5py>=3.12.1",
+    "hdf5plugin>=6.0.0",
+    "numpy>=2.4.4",
+    "p4p>=4.2.2",
+    "pillow>=11.2.0",
+    "pyfai>=2026.3.0",
     "python-dotenv>=1.2.2",
+    "vispy>=0.14.3",
     "wxpython>=4.2.5",
     "wxutils>=2026.1.0",
 ]
