@@ -36,6 +36,8 @@ class IntegrationModel:
 
     _ai: "pyFAI.AzimuthalIntegrator | None" = field(init=False, compare=False, repr=False, default=None)
     _poni_path: Path | None = field(init=False, compare=False, repr=False, default=None)
+    _tth_rad_array: np.ndarray | None = field(init=False, compare=False, repr=False, default=None)
+    _wavelength_angstrom: float | None = field(init=False, compare=False, repr=False, default=None)
 
     @property
     def is_calibrated(self) -> bool:
@@ -54,6 +56,8 @@ class IntegrationModel:
 
         self._ai = pyFAI.load(str(poni_path))
         self._poni_path = poni_path
+        self._tth_rad_array = np.ascontiguousarray(self._ai.center_array(unit="2th_rad"))
+        self._wavelength_angstrom = float(self._ai.wavelength) * 1e10
 
     def integrate1d(
         self,
@@ -134,26 +138,27 @@ class IntegrationModel:
 
     def compute_two_theta(self, ix: int, iy: int) -> float | None:
         """Returns 2θ in degrees for a given image pixel, or None on error."""
-        if self._ai is None:
+        arr = self._tth_rad_array
+        if arr is None:
             return None
-        try:
-            tth_rad = self._ai.center_array(unit="2th_rad")[iy, ix]
-            if tth_rad <= 0:
-                return None
-            return math.degrees(tth_rad)
-        except Exception:
+        h, w = arr.shape
+        if not (0 <= iy < h and 0 <= ix < w):
             return None
+        tth_rad = arr[iy, ix]
+        if tth_rad <= 0:
+            return None
+        return math.degrees(tth_rad)
 
     def compute_d_spacing(self, ix: int, iy: int) -> float | None:
         """Returns d-spacing in Angstroms for a given image pixel, or None on error."""
-        if self._ai is None:
+        arr = self._tth_rad_array
+        wl = self._wavelength_angstrom
+        if arr is None or wl is None:
             return None
-        try:
-            wavelength_m = self._ai.wavelength
-            tth = self._ai.center_array(unit="2th_rad")[iy, ix]
-            if tth <= 0:
-                return None
-            d_m = wavelength_m / (2.0 * math.sin(tth / 2.0))
-            return d_m * 1e10
-        except Exception:
+        h, w = arr.shape
+        if not (0 <= iy < h and 0 <= ix < w):
             return None
+        tth = arr[iy, ix]
+        if tth <= 0:
+            return None
+        return wl / (2.0 * math.sin(tth * 0.5))

@@ -13,6 +13,7 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+import time
 from typing import Callable
 
 import numpy as np
@@ -80,6 +81,8 @@ class ImageCanvas(wx.Panel):
         self._two_theta_func: Callable | None = None
         self._overlay_motion_callback: Callable[[int, int], None] | None = None
         self._last_pixel_info_text: str = ""
+        self._last_pixel_info_time: float = 0.0
+        self._pixel_info_min_interval: float = 1.0 / 60.0
 
         self._roi_line = scene.visuals.Line(
             pos=np.array([[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]], dtype=np.float32),
@@ -262,6 +265,10 @@ class ImageCanvas(wx.Panel):
         self._line_coords = None
 
     def _update_pixel_info(self, sx: int, sy: int) -> None:
+        now = time.perf_counter()
+        if now - self._last_pixel_info_time < self._pixel_info_min_interval:
+            return
+        self._last_pixel_info_time = now
         img_pos = self._screen_to_image(sx, sy)
         if img_pos is None or self._raw_image is None:
             if self._pixel_info_text.visible:
