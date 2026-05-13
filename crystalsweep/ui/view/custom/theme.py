@@ -16,7 +16,6 @@ import sys
 
 import wx
 
-
 _PT_TO_PX = {9: 10, 10: 11, 11: 12, 12: 13, 13: 14}
 _WIN_PX_ADJUST = -3
 
@@ -52,6 +51,10 @@ POPUP_BTN_PRESS = wx.Colour(85, 85, 95)
 
 PONI_LOADED = wx.Colour(72, 199, 116)
 PONI_MISSING = wx.Colour(110, 110, 120)
+
+DANGER = wx.Colour(180, 40, 40)
+DANGER_HOVER = wx.Colour(210, 55, 55)
+DANGER_PRESS = wx.Colour(150, 30, 30)
 
 ICON_FG = wx.Colour(200, 200, 210)
 ICON_SIZE = 20

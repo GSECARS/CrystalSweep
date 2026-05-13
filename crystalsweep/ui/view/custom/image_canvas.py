@@ -443,6 +443,8 @@ class ImageCanvas(wx.Panel):
         if self._raw_image is not None:
             h, w = self._raw_image.shape
             self._view.camera.set_range(x=(0, w), y=(0, h))
+        self._roi_img_coords = None
+        self._roi_line.visible = False
         self._hide_line_visual()
         self._canvas.update()
         if self._on_roi_cleared:

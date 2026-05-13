@@ -1,0 +1,217 @@
+#!/usr/bin/python
+# ----------------------------------------------------------------------------------
+# Project: Crystalsweep
+# File: crystalsweep/model/beamline_config_model.py
+# ----------------------------------------------------------------------------------
+# Purpose:
+# This files is used to define the load/save TOML configuration files describing the
+# beamline name, a list of detectors (one of which is active), and a list of motors.
+# ----------------------------------------------------------------------------------
+# Author: Christofanis Skordas
+#
+# Copyright (c) 2026 GSECARS, The University of Chicago, USA
+# Copyright (c) 2026 NSF SEES, USA
+# ----------------------------------------------------------------------------------
+
+import tomllib
+from contextlib import suppress
+from dataclasses import dataclass, field, replace
+from pathlib import Path
+
+import tomli_w
+
+__all__ = ["BeamlineConfig", "BeamlineConfigModel", "DetectorConfig", "MotorConfig"]
+
+_ACTIVE_FILE_NAME = ".active"
+
+
+@dataclass(frozen=True, slots=True)
+class MotorConfig:
+    """Single motor entry: short hand, variable name, and EPICS PV."""
+
+    shorthand: str
+    name: str
+    pv: str
+
+
+@dataclass(frozen=True, slots=True)
+class DetectorConfig:
+    """Detector identity and EPICS prefix; the PVA image PV is derived from the prefix."""
+
+    name: str = ""
+    pv_prefix: str = ""
+
+    @property
+    def image_pv(self) -> str:
+        """Derive the PVA NTNDArray image PV from the detector prefix."""
+        prefix = self.pv_prefix.strip()
+        if not prefix:
+            return ""
+        if not prefix.endswith(":"):
+            prefix = f"{prefix}:"
+        return f"{prefix}Pva1:Image"
+
+
+@dataclass(frozen=True, slots=True)
+class BeamlineConfig:
+    """In-memory representation of a beamline TOML configuration."""
+
+    name: str = ""
+    beamline: str = ""
+    detectors: tuple[DetectorConfig, ...] = field(default_factory=tuple)
+    active_detector: int = -1
+    motors: tuple[MotorConfig, ...] = field(default_factory=tuple)
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.name and not self.beamline and not self.detectors and not self.motors
+
+    @property
+    def active_detector_config(self) -> DetectorConfig | None:
+        """Return the active DetectorConfig, or None if there is no valid selection."""
+        if 0 <= self.active_detector < len(self.detectors):
+            return self.detectors[self.active_detector]
+        return None
+
+    def with_motors(self, motors: list[MotorConfig] | tuple[MotorConfig, ...]) -> "BeamlineConfig":
+        return replace(self, motors=tuple(motors))
+
+
+class BeamlineConfigModel:
+    """Loads, lists, and saves beamline configuration files (TOML) under a directory."""
+
+    def __init__(self, directory: Path | str = "configs") -> None:
+        self._directory = Path(directory)
+        self._directory.mkdir(parents=True, exist_ok=True)
+        self._active: BeamlineConfig = BeamlineConfig()
+
+    @property
+    def directory(self) -> Path:
+        return self._directory
+
+    @property
+    def active(self) -> BeamlineConfig:
+        return self._active
+
+    @property
+    def has_active(self) -> bool:
+        return bool(self._active.name) and not self._active.is_empty
+
+    def list_config_names(self) -> list[str]:
+        """Return all available config names (TOML file stems) sorted alphabetically."""
+        return sorted(p.stem for p in self._directory.glob("*.toml"))
+
+    def path_for(self, name: str) -> Path:
+        return self._directory / f"{name}.toml"
+
+    def exists(self, name: str) -> bool:
+        return self.path_for(name).is_file()
+
+    def get_remembered_active_name(self) -> str:
+        """Return the previously remembered active config name (or empty if none)."""
+        marker = self._directory / _ACTIVE_FILE_NAME
+        if not marker.is_file():
+            return ""
+
+        with suppress(OSError):
+            return marker.read_text(encoding="utf-8").strip()
+
+    def remember_active(self, name: str) -> None:
+        """Persist the active configuration name to a marker file."""
+        marker = self._directory / _ACTIVE_FILE_NAME
+        with suppress(OSError):
+            if name:
+                marker.write_text(name, encoding="utf-8")
+            elif marker.is_file():
+                marker.unlink()
+
+    def clear_active(self) -> None:
+        """Drop the in-memory active config and remove the marker file."""
+        self._active = BeamlineConfig()
+        self.remember_active("")
+
+    def load(self, name: str) -> BeamlineConfig:
+        """Load a config by name. Returns a fresh empty config (with the given name) if missing."""
+        path = self.path_for(name)
+        if not path.is_file():
+            cfg = BeamlineConfig(name=name)
+            self._active = cfg
+            return cfg
+
+        with path.open("rb") as fh:
+            data = tomllib.load(fh)
+
+        detectors_data = data.get("detectors", []) or []
+        detectors: list[DetectorConfig] = []
+        active_detector = -1
+        for entry in detectors_data:
+            detector = DetectorConfig(
+                name=str(entry.get("name", "")),
+                pv_prefix=str(entry.get("pv_prefix", "")),
+            )
+            if entry.get("active") and active_detector == -1:
+                active_detector = len(detectors)
+            detectors.append(detector)
+
+        if not detectors and isinstance(data.get("detector"), dict):
+            legacy = data["detector"]
+            detectors.append(
+                DetectorConfig(
+                    name=str(legacy.get("name", "")),
+                    pv_prefix=str(legacy.get("pv_prefix", "")),
+                )
+            )
+            active_detector = 0
+
+        if detectors and active_detector == -1:
+            active_detector = 0
+
+        motors_data = data.get("motors", []) or []
+        motors = tuple(
+            MotorConfig(
+                shorthand=str(m.get("shorthand", "")),
+                name=str(m.get("name", "")),
+                pv=str(m.get("pv", "")),
+            )
+            for m in motors_data
+        )
+
+        cfg = BeamlineConfig(
+            name=name,
+            beamline=str(data.get("beamline", "")),
+            detectors=tuple(detectors),
+            active_detector=active_detector,
+            motors=motors,
+        )
+        self._active = cfg
+        return cfg
+
+    def save(self, config: BeamlineConfig) -> Path:
+        """Persist a config to directory/name.toml; returns the file path."""
+        if not config.name.strip():
+            raise ValueError("Configuration name is required to save.")
+
+        payload: dict = {
+            "beamline": config.beamline,
+            "detectors": [
+                {
+                    "name": d.name,
+                    "pv_prefix": d.pv_prefix,
+                    "active": idx == config.active_detector,
+                }
+                for idx, d in enumerate(config.detectors)
+            ],
+            "motors": [{"shorthand": m.shorthand, "name": m.name, "pv": m.pv} for m in config.motors],
+        }
+
+        path = self.path_for(config.name)
+        with path.open("wb") as fh:
+            tomli_w.dump(payload, fh)
+        self._active = config
+        return path
+
+    def create_blank(self, name: str) -> BeamlineConfig:
+        """Create and persist a blank named config (no detectors or motors)."""
+        cfg = BeamlineConfig(name=name)
+        self.save(cfg)
+        return cfg

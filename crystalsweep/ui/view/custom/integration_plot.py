@@ -114,7 +114,7 @@ class IntegrationPlot(wx.Panel):
 
         self._reposition_live_toggle()
 
-    def set_poni_info(self, text: str, *, success: bool) -> None:
+    def set_poni_info(self, text: str, success: bool) -> None:
         self._poni_text = text
         self._poni_colour = PONI_LOADED if success else PONI_MISSING
         self.Refresh()
@@ -279,11 +279,16 @@ class IntegrationPlot(wx.Panel):
 
     def _on_leave(self, event: wx.MouseEvent) -> None:
         changed = self._btn_hovered or self._btn_pressed or self._unit_btn_hovered != -1 or self._hover_data_x is not None
-        self._btn_hovered = self._btn_pressed = False
-        self._unit_btn_hovered = self._unit_btn_pressed = -1
-        self._hover_data_x = self._hover_data_y = None
+        self._btn_hovered = False
+        self._btn_pressed = False
+        self._unit_btn_hovered = -1
+        self._unit_btn_pressed = -1
+        self._hover_data_x = None
+        self._hover_data_y = None
         self._panning = False
-        self._pan_last_pt = self._drag_start = self._drag_end = None
+        self._pan_last_pt = None
+        self._drag_start = None
+        self._drag_end = None
         if changed:
             self.Refresh()
         event.Skip()

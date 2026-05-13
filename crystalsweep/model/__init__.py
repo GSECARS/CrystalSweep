@@ -12,9 +12,10 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from crystalsweep.model.config_model import ConfigModel
+from crystalsweep.model.ad_viewer_model import ADViewerModel
+from crystalsweep.model.beamline_config_model import BeamlineConfig, BeamlineConfigModel, DetectorConfig, MotorConfig
 from crystalsweep.model.image_loader_model import ImageLoaderModel
 from crystalsweep.model.integration_model import IntegrationModel
 from crystalsweep.model.main_model import MainModel
 
-__all__ = ["ConfigModel", "ImageLoaderModel", "IntegrationModel", "MainModel"]
+__all__ = ["ADViewerModel", "BeamlineConfig", "BeamlineConfigModel", "DetectorConfig", "ImageLoaderModel", "IntegrationModel", "MainModel", "MotorConfig"]

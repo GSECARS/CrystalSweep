@@ -12,11 +12,14 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+import logging
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+
+_log = logging.getLogger(__name__)
 
 try:
     import pyFAI
@@ -120,18 +123,20 @@ class IntegrationModel:
         fy = yi - yi0
 
         img = frame.astype(np.float64)
-        intensities = img[yi0, xi0] * (1 - fx) * (1 - fy) + img[yi0, xi1] * fx * (1 - fy) + img[yi1, xi0] * (1 - fx) * fy + img[yi1, xi1] * fx * fy
+        wx_00 = (1 - fx) * (1 - fy)
+        wx_10 = fx * (1 - fy)
+        wx_01 = (1 - fx) * fy
+        wx_11 = fx * fy
+        intensities = img[yi0, xi0] * wx_00 + img[yi0, xi1] * wx_10 + img[yi1, xi0] * wx_01 + img[yi1, xi1] * wx_11
 
         if self._ai is not None:
             try:
                 radial_map = self._ai.center_array(unit=unit)
-                radial_vals = (
-                    radial_map[yi0, xi0] * (1 - fx) * (1 - fy) + radial_map[yi0, xi1] * fx * (1 - fy) + radial_map[yi1, xi0] * (1 - fx) * fy + radial_map[yi1, xi1] * fx * fy
-                )
+                radial_vals = radial_map[yi0, xi0] * wx_00 + radial_map[yi0, xi1] * wx_10 + radial_map[yi1, xi0] * wx_01 + radial_map[yi1, xi1] * wx_11
                 x_label = UNIT_LABELS.get(unit, unit)
                 return radial_vals, intensities, x_label
             except Exception:
-                pass
+                _log.exception("Failed to map radial coordinates for unit=%s", unit)
 
         pixel_dist = ts * length
         return pixel_dist, intensities, "Pixel"

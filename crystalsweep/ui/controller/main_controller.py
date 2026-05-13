@@ -19,6 +19,7 @@ import wx
 
 from crystalsweep.model import MainModel
 from crystalsweep.ui.controller.ad_viewer_controller import ADViewerController
+from crystalsweep.ui.controller.beamline_config_controller import BeamlineConfigController
 from crystalsweep.ui.view import MainView
 
 __all__ = ["MainController"]
@@ -34,16 +35,24 @@ class MainController:
                 wx.App.SetDPIAwareness(wx.DPI_AWARENESS_CTX_PER_MONITOR_AWARE_V2)
             except AttributeError:
                 import ctypes
+
                 ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
         self._app = wx.App(False)
         self._model = MainModel()
         self._view = MainView(version=version)
 
-        # Initialize the AD Viewer controller
+        # Initialize controllers
         self._ad_viewer_controller = ADViewerController(model=self._model, view=self._view)
+        self._beamline_config_controller = BeamlineConfigController(
+            model=self._model,
+            view=self._view,
+            on_config_applied=lambda _cfg: self._ad_viewer_controller.resubscribe_detector(),
+        )
 
     def run(self) -> None:
         """Starts the main application loop."""
         self._view.display_window()
+        if not self._beamline_config_controller.has_active_config():
+            wx.CallAfter(self._beamline_config_controller.open_dialog)
         self._app.MainLoop()

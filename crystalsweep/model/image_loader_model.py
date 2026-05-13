@@ -90,7 +90,7 @@ class ImageLoaderModel:
         return frame.astype(np.float32)
 
     @staticmethod
-    def _find_dataset(f) -> "h5py.Dataset | None":
+    def _find_dataset(f: "h5py.File") -> "h5py.Dataset | None":
         """Searches an HDF5 file for the first suitable 2D+ dataset."""
         common_paths = [
             "data",
@@ -108,7 +108,7 @@ class ImageLoaderModel:
             obj = f[key]
             if isinstance(obj, h5py.Dataset) and len(obj.shape) >= 2:
                 return obj
-            elif isinstance(obj, h5py.Group):
+            if isinstance(obj, h5py.Group):
                 for subkey in obj.keys():
                     subobj = obj[subkey]
                     if isinstance(subobj, h5py.Dataset) and len(subobj.shape) >= 2:

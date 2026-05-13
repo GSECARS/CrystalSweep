@@ -24,6 +24,15 @@ from crystalsweep.ui.view.custom.theme import scaled_font
 
 __all__ = ["IntensityHistogramWidget"]
 
+_BG = wx.Colour(0, 0, 0)
+_HIST_LINE = wx.Colour(99, 179, 237)
+_HIST_FILL = wx.Colour(99, 179, 237, 35)
+_REGION_FILL = wx.Colour(99, 179, 237, 45)
+_REGION_HOVER = wx.Colour(130, 200, 255, 70)
+_HANDLE_MIN = wx.Colour(252, 110, 81)
+_HANDLE_MAX = wx.Colour(72, 199, 116)
+_BAR_BORDER = wx.Colour(55, 55, 60)
+
 
 class IntensityHistogramWidget(wx.Panel):
     """Horizontal intensity histogram + colorbar strip with draggable contrast handles."""
@@ -143,15 +152,6 @@ class IntensityHistogramWidget(wx.Panel):
         pl, pt, pw, ph = self._plot_rect()
         gx, gy, gw, gh = self._gradient_rect()
 
-        _BG = wx.Colour(0, 0, 0)
-        _HIST_LINE = wx.Colour(99, 179, 237)
-        _HIST_FILL = wx.Colour(99, 179, 237, 35)
-        _REGION_FILL = wx.Colour(99, 179, 237, 45)
-        _REGION_HOVER = wx.Colour(130, 200, 255, 70)
-        _HANDLE_MIN = wx.Colour(252, 110, 81)
-        _HANDLE_MAX = wx.Colour(72, 199, 116)
-        _BAR_BORDER = wx.Colour(55, 55, 60)
-
         gc.SetBrush(wx.Brush(_BG))
         gc.DrawRectangle(0, 0, w, h)
 
@@ -173,7 +173,10 @@ class IntensityHistogramWidget(wx.Panel):
             count_range = (self._log_counts.max() - self._log_counts.min()) or 1.0
             count_min = self._log_counts.min()
 
-            pts = [(pl + max(0.0, min(1.0, (bc - log_min) / log_range)) * pw, pt + ph - (lc - count_min) / count_range * ph) for bc, lc in zip(self._bin_centers, self._log_counts)]
+            pts = [
+                (pl + max(0.0, min(1.0, (bc - log_min) / log_range)) * pw, pt + ph - (lc - count_min) / count_range * ph)
+                for bc, lc in zip(self._bin_centers, self._log_counts)
+            ]
 
             fill = gc.CreatePath()
             fill.MoveToPoint(pts[0][0], pt + ph)

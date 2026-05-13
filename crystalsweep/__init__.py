@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/ui/__init__.py
+# File: crystalsweep/__init__.py
 # ----------------------------------------------------------------------------------
 # Purpose:
 # This file is used to initialize the CrystalSweep package.

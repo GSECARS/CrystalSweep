@@ -13,6 +13,7 @@
 # ----------------------------------------------------------------------------------
 
 from crystalsweep.ui.view.ad_viewer_view import ADViewerView
+from crystalsweep.ui.view.beamline_config_view import BeamlineConfigDialog, BeamlineConfigView
 from crystalsweep.ui.view.custom import (
     COLORMAP_NAMES,
     CUSTOM_COLORMAPS,
@@ -25,6 +26,8 @@ from crystalsweep.ui.view.main_view import MainView
 
 __all__ = [
     "ADViewerView",
+    "BeamlineConfigDialog",
+    "BeamlineConfigView",
     "COLORMAP_NAMES",
     "CUSTOM_COLORMAPS",
     "colormap_color",

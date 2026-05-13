@@ -31,17 +31,10 @@ _log = logging.getLogger(__name__)
 class ADViewerController:
     """Bridges the AD Viewer model and view."""
 
-    __slots__ = ("_model", "_view")
-
     def __init__(self, model: MainModel, view: MainView) -> None:
         """Initialises the controller, wires up bindings, and starts the PV stream."""
         self._model = model
         self._view = view
-
-        self._model.ad_viewer.subscribe(
-            pv_name=self._model.config.ad_viewer_pv_name,
-            frame_callback=self._on_new_frame,
-        )
 
         self._view.ad_viewer.bind_load_file(self._on_load_file)
         self._view.ad_viewer.bind_load_poni(self._on_load_poni)
@@ -50,6 +43,23 @@ class ADViewerController:
         self._view.ad_viewer.bind_line_changed(self._on_line_changed)
         self._view.ad_viewer.bind_frame_navigation(self._on_navigate_frame)
         self._view.ad_viewer.bind_roi_live_integration(self._on_roi_live_integration_changed)
+
+        self.resubscribe_detector()
+
+    def resubscribe_detector(self) -> None:
+        """(Re)subscribe to the active detector's image PV, or unsubscribe if none."""
+        active = self._model.beamline.active.active_detector_config
+        pv_name = active.image_pv if active is not None else ""
+        if not pv_name:
+            _log.info("No active detector configured; AD viewer is idle.")
+            self._model.ad_viewer.unsubscribe()
+            self._view.ad_viewer.set_status_overlay("No detector configured")
+            return
+        self._view.ad_viewer.set_status_overlay("")
+        self._model.ad_viewer.subscribe(
+            pv_name=pv_name,
+            frame_callback=self._on_new_frame,
+        )
 
     def _on_new_frame(self, frame: np.ndarray) -> None:
         """Deliver a detector frame to the view on the GUI thread."""
@@ -170,7 +180,7 @@ class ADViewerController:
         """React to an ROI draw or clear event from the canvas."""
         current_frame = self._view.ad_viewer.current_frame
 
-        if x1 is None or current_frame is None:
+        if x1 is None or y1 is None or x2 is None or y2 is None or current_frame is None:
             self._view.ad_viewer.clear_integration_plot()
             return
 

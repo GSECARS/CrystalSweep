@@ -18,10 +18,14 @@ import wx
 
 from crystalsweep.ui.view.custom.theme import (
     ACCENT_HOVER,
+    BG_CARD,
     BG_ELEVATED,
     BG_SURFACE,
     BTN_HOVER_BG,
     BTN_PRESS_BG,
+    DANGER,
+    DANGER_HOVER,
+    DANGER_PRESS,
     FG_PRIMARY,
     FG_SECONDARY,
     ICON_SIZE,
@@ -40,18 +44,40 @@ from crystalsweep.ui.view.custom.theme import (
     scaled_font,
 )
 
-__all__ = ["FlatButton", "FrameLabel", "LiveToggle", "IconButton", "DarkTextCtrl", "DarkToggle", "DarkCombo"]
+__all__ = [
+    "DANGER_SCHEME",
+    "DEFAULT_SCHEME",
+    "DarkCombo",
+    "DarkTextCtrl",
+    "DarkToggle",
+    "FlatButton",
+    "FrameLabel",
+    "IconButton",
+    "LiveToggle",
+    "RadioDot",
+]
+
+
+# Colour palettes for FlatButton: (idle, hover, press, foreground).
+DEFAULT_SCHEME = (POPUP_BTN_BG, POPUP_BTN_HOVER, POPUP_BTN_PRESS, FG_PRIMARY)
+DANGER_SCHEME = (POPUP_BTN_BG, DANGER_HOVER, DANGER_PRESS, DANGER)
 
 
 class FlatButton(wx.Control):
     """Flat dark button with hover/press states, used inside popups."""
 
-    def __init__(self, parent: wx.Window, label: str) -> None:
+    def __init__(
+        self,
+        parent: wx.Window,
+        label: str,
+        color_scheme: tuple[wx.Colour, wx.Colour, wx.Colour, wx.Colour] = DEFAULT_SCHEME,
+    ) -> None:
         super().__init__(parent, style=wx.BORDER_NONE | wx.WANTS_CHARS)
         self._label = label
         self._hovered = False
         self._pressed = False
         self._action: Callable[[], None] | None = None
+        self._idle_bg, self._hover_bg, self._press_bg, self._fg = color_scheme
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self.SetMinSize((-1, 26))
         super().Bind(wx.EVT_PAINT, self._on_paint)
@@ -68,16 +94,16 @@ class FlatButton(wx.Control):
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
         if self._pressed:
-            bg = POPUP_BTN_PRESS
+            bg = self._press_bg
         elif self._hovered:
-            bg = POPUP_BTN_HOVER
+            bg = self._hover_bg
         else:
-            bg = POPUP_BTN_BG
+            bg = self._idle_bg
         gc.SetBrush(wx.Brush(bg))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRoundedRectangle(0, 0, w, h, 4)
         font = scaled_font(12)
-        gc.SetFont(font, FG_PRIMARY)
+        gc.SetFont(font, self._fg)
         tw, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, (w - tw) / 2, (h - th) / 2)
 
@@ -101,9 +127,9 @@ class FlatButton(wx.Control):
         was_pressed = self._pressed
         self._pressed = False
         self.Refresh()
-        if was_pressed and self._action is not None:
-            self._action()
         event.Skip()
+        if was_pressed and self._action is not None:
+            wx.CallAfter(self._action)
 
 
 class FrameLabel(wx.Control):
@@ -283,25 +309,39 @@ class IconButton(wx.Panel):
 class DarkTextCtrl(wx.Panel):
     """Custom-painted editable text field, dark-styled with centered text."""
 
-    def __init__(self, parent: wx.Window, value: str = "") -> None:
+    def __init__(self, parent: wx.Window, value: str = "", placeholder: str = "") -> None:
         super().__init__(parent, style=wx.BORDER_NONE, size=wx.Size(80, 32))
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._value = value
+        self._placeholder = placeholder
         self._editing = False
         self._callback_enter: Callable | None = None
         self._callback_kill: Callable | None = None
         self._font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
+        self._placeholder_font = scaled_font(12, style=wx.FONTSTYLE_ITALIC)
         self._ctrl = wx.TextCtrl(self, value=value, style=wx.TE_PROCESS_ENTER | wx.TE_CENTER | wx.BORDER_NONE)
         self._ctrl.SetBackgroundColour(BG_ELEVATED)
         self._ctrl.SetForegroundColour(FG_PRIMARY)
         self._ctrl.SetFont(self._font)
+        if placeholder:
+            self._ctrl.SetHint(placeholder)
         self._ctrl.EnableVisibleFocus(False)
         self._ctrl.Hide()
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_LEFT_DOWN, self._start_edit)
-        self.Bind(wx.EVT_SIZE, lambda e: (self._reposition_ctrl(), self.Refresh(), e.Skip()))
+        self.Bind(wx.EVT_SIZE, self._on_ctrl_size)
         self._ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_enter)
         self._ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_kill)
+
+    def SetPlaceholder(self, text: str) -> None:
+        self._placeholder = text
+        self._ctrl.SetHint(text)
+        self.Refresh()
+
+    def _on_ctrl_size(self, event: wx.SizeEvent) -> None:
+        self._reposition_ctrl()
+        self.Refresh()
+        event.Skip()
 
     def _reposition_ctrl(self) -> None:
         w, h = self.GetClientSize()
@@ -361,10 +401,16 @@ class DarkTextCtrl(wx.Panel):
         gc.SetBrush(wx.Brush(BG_ELEVATED))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRoundedRectangle(0, 0, w, h, 3)
-        if not self._editing:
+        if self._editing:
+            return
+        if self._value:
             gc.SetFont(self._font, FG_PRIMARY)
             tw, th = gc.GetTextExtent(self._value)
             gc.DrawText(self._value, (w - tw) / 2, (h - th) / 2)
+        elif self._placeholder:
+            gc.SetFont(self._placeholder_font, FG_SECONDARY)
+            tw, th = gc.GetTextExtent(self._placeholder)
+            gc.DrawText(self._placeholder, (w - tw) / 2, (h - th) / 2)
 
 
 class DarkToggle(wx.Panel):
@@ -382,9 +428,23 @@ class DarkToggle(wx.Panel):
         self.SetBackgroundColour(POPUP_BG)
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_LEFT_UP, self._on_click)
-        self.Bind(wx.EVT_ENTER_WINDOW, lambda e: (setattr(self, "_hovered", True), self.Refresh(), e.Skip()))
-        self.Bind(wx.EVT_LEAVE_WINDOW, lambda e: (setattr(self, "_hovered", False), self.Refresh(), e.Skip()))
-        self.Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
+        self.Bind(wx.EVT_ENTER_WINDOW, self._on_enter)
+        self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave_toggle)
+        self.Bind(wx.EVT_SIZE, self._on_size)
+
+    def _on_enter(self, event: wx.MouseEvent) -> None:
+        self._hovered = True
+        self.Refresh()
+        event.Skip()
+
+    def _on_leave_toggle(self, event: wx.MouseEvent) -> None:
+        self._hovered = False
+        self.Refresh()
+        event.Skip()
+
+    def _on_size(self, event: wx.SizeEvent) -> None:
+        self.Refresh()
+        event.Skip()
 
     def DoGetBestSize(self) -> wx.Size:
         dc = wx.ClientDC(self)
@@ -457,8 +517,8 @@ class DarkCombo(wx.Panel):
         self.SetBackgroundColour(BG_ELEVATED)
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_LEFT_UP, self._on_click)
-        self.Bind(wx.EVT_ENTER_WINDOW, lambda e: (setattr(self, "_hovered", True), self.Refresh(), e.Skip()))
-        self.Bind(wx.EVT_LEAVE_WINDOW, lambda e: (setattr(self, "_hovered", False), self.Refresh(), e.Skip()))
+        self.Bind(wx.EVT_ENTER_WINDOW, self._on_enter_combo)
+        self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave_combo)
 
     def DoGetBestSize(self) -> wx.Size:
         dc = wx.ClientDC(self)
@@ -473,11 +533,27 @@ class DarkCombo(wx.Panel):
         self._selection = idx
         self.Refresh()
 
+    def SetChoices(self, choices: list[str], selection: int = 0) -> None:
+        self._choices = list(choices)
+        self._selection = max(0, min(selection, len(self._choices) - 1)) if self._choices else 0
+        self.InvalidateBestSize()
+        self.Refresh()
+
     def Bind(self, event, handler, source=None, id=wx.ID_ANY, id2=wx.ID_ANY):
         if event == wx.EVT_CHOICE:
             self._callback = handler
         else:
             super().Bind(event, handler, source, id, id2)
+
+    def _on_enter_combo(self, event: wx.MouseEvent) -> None:
+        self._hovered = True
+        self.Refresh()
+        event.Skip()
+
+    def _on_leave_combo(self, event: wx.MouseEvent) -> None:
+        self._hovered = False
+        self.Refresh()
+        event.Skip()
 
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
@@ -500,14 +576,12 @@ class DarkCombo(wx.Panel):
         gc.StrokePath(path)
 
     def _on_click(self, event: wx.MouseEvent) -> None:
-        menu = wx.Menu()
-        for i, name in enumerate(self._choices):
-            item = menu.AppendRadioItem(wx.ID_ANY, name)
-            if i == self._selection:
-                item.Check(True)
-            self.Bind(wx.EVT_MENU, lambda e, idx=i: self._select(idx), item)
-        self.PopupMenu(menu)
-        menu.Destroy()
+        if not self._choices:
+            event.Skip()
+            return
+        popup = _DarkMenuPopup(self, self._choices, self._selection, on_select=self._select)
+        w, h = self.GetSize()
+        popup.popup_below(self.ClientToScreen(wx.Point(0, h)), w)
         event.Skip()
 
     def _select(self, idx: int) -> None:
@@ -515,3 +589,150 @@ class DarkCombo(wx.Panel):
         self.Refresh()
         if self._callback is not None:
             self._callback(self.GetStringSelection())
+
+
+class _DarkMenuPopup(wx.PopupTransientWindow):
+    """Dark-themed dropdown popup used by DarkCombo."""
+
+    _ROW_H = 26
+
+    def __init__(
+        self,
+        parent: wx.Window,
+        choices: list[str],
+        selection: int,
+        on_select: Callable[[int], None],
+    ) -> None:
+        super().__init__(parent, flags=wx.BORDER_SIMPLE | wx.PU_CONTAINS_CONTROLS)
+        self._choices = list(choices)
+        self._selection = selection
+        self._hover_index = -1
+        self._on_select = on_select
+        self.SetBackgroundColour(POPUP_BG)
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_MOTION, self._on_motion)
+        self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
+        self.Bind(wx.EVT_LEFT_UP, self._on_left_up)
+
+    def popup_below(self, screen_pt: wx.Point, min_width: int) -> None:
+        dc = wx.ClientDC(self)
+        dc.SetFont(scaled_font(12))
+        text_w = max((dc.GetTextExtent(c)[0] for c in self._choices), default=0)
+        width = max(min_width, text_w + 24)
+        height = self._ROW_H * len(self._choices) + 4
+        self.SetSize(width, height)
+        self.Position(screen_pt, (0, 0))
+        self.Popup()
+
+    def _row_at(self, y: int) -> int:
+        idx = (y - 2) // self._ROW_H
+        return int(idx) if 0 <= idx < len(self._choices) else -1
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
+        w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(POPUP_BG))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+        font = scaled_font(12)
+        for i, label in enumerate(self._choices):
+            y = 2 + i * self._ROW_H
+            if i == self._hover_index:
+                gc.SetBrush(wx.Brush(POPUP_BTN_HOVER))
+                gc.SetPen(wx.TRANSPARENT_PEN)
+                gc.DrawRectangle(0, y, w, self._ROW_H)
+            colour = ACCENT_HOVER if i == self._selection else FG_PRIMARY
+            gc.SetFont(font, colour)
+            _, th = gc.GetTextExtent(label)
+            gc.DrawText(label, 10, y + (self._ROW_H - th) / 2)
+
+    def _on_motion(self, event: wx.MouseEvent) -> None:
+        idx = self._row_at(event.GetY())
+        if idx != self._hover_index:
+            self._hover_index = idx
+            self.Refresh()
+        event.Skip()
+
+    def _on_leave(self, event: wx.MouseEvent) -> None:
+        if self._hover_index != -1:
+            self._hover_index = -1
+            self.Refresh()
+        event.Skip()
+
+    def _on_left_up(self, event: wx.MouseEvent) -> None:
+        idx = self._row_at(event.GetY())
+        if idx >= 0:
+            self.Dismiss()
+            wx.CallAfter(self._on_select, idx)
+        else:
+            event.Skip()
+
+
+class RadioDot(wx.Panel):
+    """Small dark-styled radio indicator. Click toggles to selected and fires the callback."""
+
+    _SIZE = 16
+
+    def __init__(self, parent: wx.Window, value: bool = False, tooltip: str = "") -> None:
+        super().__init__(parent, size=wx.Size(self._SIZE + 8, self._SIZE + 8), style=wx.BORDER_NONE)
+        self._value = value
+        self._hovered = False
+        self._callback: Callable[[], None] | None = None
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self.SetBackgroundColour(BG_CARD)
+        if tooltip:
+            self.SetToolTip(tooltip)
+        self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_LEFT_UP, self._on_click)
+        self.Bind(wx.EVT_ENTER_WINDOW, self._on_enter_dot)
+        self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave_dot)
+
+    def set_value(self, value: bool) -> None:
+        if value != self._value:
+            self._value = value
+            self.Refresh()
+
+    def get_value(self) -> bool:
+        return self._value
+
+    def set_action(self, callback: Callable[[], None]) -> None:
+        self._callback = callback
+
+    def _on_enter_dot(self, event: wx.MouseEvent) -> None:
+        self._hovered = True
+        self.Refresh()
+        event.Skip()
+
+    def _on_leave_dot(self, event: wx.MouseEvent) -> None:
+        self._hovered = False
+        self.Refresh()
+        event.Skip()
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
+        w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(self.GetBackgroundColour()))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+        cx, cy = w / 2, h / 2
+        r = self._SIZE / 2
+        ring = ACCENT_HOVER if (self._value or self._hovered) else FG_SECONDARY
+        gc.SetPen(wx.Pen(ring, 2))
+        gc.SetBrush(wx.Brush(BG_ELEVATED))
+        gc.DrawEllipse(cx - r, cy - r, self._SIZE, self._SIZE)
+        if self._value:
+            inner = self._SIZE * 0.45
+            gc.SetPen(wx.TRANSPARENT_PEN)
+            gc.SetBrush(wx.Brush(ACCENT_HOVER))
+            gc.DrawEllipse(cx - inner / 2, cy - inner / 2, inner, inner)
+
+    def _on_click(self, event: wx.MouseEvent) -> None:
+        if not self._value:
+            self._value = True
+            self.Refresh()
+            if self._callback is not None:
+                self._callback()
+        event.Skip()

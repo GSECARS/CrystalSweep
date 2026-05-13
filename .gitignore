@@ -41,5 +41,5 @@ Desktop.ini
 .ruff_cache/
 .pytest_cache/
 
-# Environment configuration
-.env
+# Configuration files
+configs/

@@ -29,7 +29,6 @@ class ImageSettingsPopup(wx.Frame):
     def __init__(
         self,
         parent: wx.Window,
-        *,
         colormap: str,
         auto_scale: bool,
         filter_gaps: bool,

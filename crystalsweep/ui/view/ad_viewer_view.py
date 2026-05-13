@@ -22,7 +22,7 @@ import wx
 
 from crystalsweep.ui.view.custom import IconButton, ImageCanvas, ImageSettingsPopup, IntegrationPlot, IntensityHistogramWidget, LiveToggle
 from crystalsweep.ui.view.custom.icons import draw_chevron_left, draw_chevron_right, draw_cog, draw_folder
-from crystalsweep.ui.view.custom.theme import BG_SURFACE, PONI_LOADED, PONI_MISSING
+from crystalsweep.ui.view.custom.theme import BG_SURFACE, FG_SECONDARY, PONI_LOADED, PONI_MISSING, scaled_font
 from crystalsweep.ui.view.custom.widgets import DarkTextCtrl
 
 __all__ = ["ADViewerView"]
@@ -109,6 +109,12 @@ class ADViewerView(wx.Panel):
         self._live_toggle = LiveToggle(overlay_parent, live=self._live_updates)
         self._live_toggle.set_toggled_callback(self._apply_live_updates)
 
+        self._status_overlay = wx.StaticText(overlay_parent, label="")
+        self._status_overlay.SetBackgroundColour(BG_SURFACE)
+        self._status_overlay.SetForegroundColour(FG_SECONDARY)
+        self._status_overlay.SetFont(scaled_font(13))
+        self._status_overlay.Hide()
+
         canvas_sizer = wx.BoxSizer(wx.VERTICAL)
         canvas_sizer.Add(self._image_canvas, 1, wx.EXPAND)
         self._canvas_panel.SetSizer(canvas_sizer)
@@ -183,7 +189,7 @@ class ADViewerView(wx.Panel):
         self._live_updates = enabled
         self._live_toggle.set_live(enabled)
 
-    def set_poni_label(self, text: str, *, success: bool = True) -> None:
+    def set_poni_label(self, text: str, success: bool = True) -> None:
         self._poni_label_text = text
         self._poni_label_colour = PONI_LOADED if success else PONI_MISSING
         self._integration_plot.set_poni_info(text, success=success)
@@ -209,6 +215,16 @@ class ADViewerView(wx.Panel):
 
     def clear_integration_plot(self) -> None:
         self._integration_plot.clear()
+
+    def set_status_overlay(self, text: str) -> None:
+        """Show a centered status message over the canvas (or hide it when *text* is empty)."""
+        if text:
+            self._status_overlay.SetLabel(text)
+            self._status_overlay.Show()
+            self._status_overlay.Raise()
+            self._reposition_overlay_buttons()
+        else:
+            self._status_overlay.Hide()
 
     def set_frame_navigation(self, total_frames: int, current_index: int = 0) -> None:
         self._total_frames = total_frames
@@ -244,7 +260,12 @@ class ADViewerView(wx.Panel):
 
     def _reposition_overlay_buttons(self) -> None:
         # Coordinates are now relative to the native VisPy widget (overlay parent)
-        panel_w, _ = self._image_canvas.native.GetClientSize()
+        panel_w, panel_h = self._image_canvas.native.GetClientSize()
+        if self._status_overlay.IsShown():
+            self._status_overlay.SetSize(self._status_overlay.GetBestSize())
+            ow, oh = self._status_overlay.GetSize()
+            self._status_overlay.SetPosition(wx.Point(max(0, (panel_w - ow) // 2), max(0, (panel_h - oh) // 2)))
+            self._status_overlay.Raise()
         cog_sz = self._settings_btn.GetBestSize()
         x = panel_w - cog_sz.width - 4
         self._settings_btn.SetPosition(wx.Point(x, 4))
