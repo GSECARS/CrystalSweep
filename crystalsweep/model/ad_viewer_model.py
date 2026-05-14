@@ -12,19 +12,56 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+import ctypes
 import logging
-from contextlib import suppress
+import sys
+import zlib
 from dataclasses import dataclass, field
+from pathlib import Path
 from threading import Event, Thread
 from time import sleep
 from typing import Protocol
 
+import hdf5plugin
 import numpy as np
 from p4p.client.thread import Context, Subscription
 
 __all__ = ["ADViewerModel"]
 
 _log = logging.getLogger(__name__)
+
+_SCALAR_TYPE_MAP: dict[int, tuple[str, int]] = {
+    1: ("int8", 1),
+    2: ("int16", 2),
+    3: ("int32", 4),
+    4: ("int64", 8),
+    5: ("uint8", 1),
+    6: ("uint16", 2),
+    7: ("uint32", 4),
+    8: ("uint64", 8),
+    9: ("float32", 4),
+    10: ("float64", 8),
+}
+
+_PLUGIN_DIR = Path(hdf5plugin.__file__).parent / "plugins"
+_EXT = "dll" if sys.platform == "win32" else ("dylib" if sys.platform == "darwin" else "so")
+
+_HDFPLUGIN_LIBS = {
+    "bitshuffle": str(_PLUGIN_DIR / f"libh5bshuf.{_EXT}"),
+    "blosc": str(_PLUGIN_DIR / f"libh5blosc.{_EXT}"),
+}
+
+_lib_cache: dict[str, ctypes.CDLL] = {}
+
+
+def _load_lib(name: str) -> ctypes.CDLL:
+    """Load a codec shared library bundled with hdf5plugin."""
+    if name in _lib_cache:
+        return _lib_cache[name]
+    path = _HDFPLUGIN_LIBS[name]
+    lib = ctypes.cdll.LoadLibrary(path)
+    _lib_cache[name] = lib
+    return lib
 
 
 class FrameCallback(Protocol):
@@ -35,13 +72,13 @@ class FrameCallback(Protocol):
 
 @dataclass()
 class ADViewerModel:
-    """Streams images from an EPICS PVA NTNDArray PV using p4p."""
+    """Streams images from an EPICS PVA NTNDArray PV using p4p. Compressed streams are decompressed client-side."""
 
     use_polling: bool = field(default=True)
     poll_interval: float = field(default=0.1)
     poll_join_timeout: float = field(default=1.0)
-    default_request: str = field(default="field(value,dimension,uniqueId)")
-    monitor_request: str = field(default="field(value,dimension)")
+    default_request: str = field(default="field(value,codec,compressedSize,uncompressedSize,dimension,uniqueId)")
+    monitor_request: str = field(default="field(value,codec,compressedSize,uncompressedSize,dimension)")
 
     _context: Context = field(init=False, compare=False, repr=False, default_factory=lambda: Context("pva"))
     _pv_name: str = field(init=False, compare=False, repr=False, default="")
@@ -109,19 +146,101 @@ class ADViewerModel:
         _log.debug("New frame received via PV monitor")
         self._process_image(value)
 
+    def _decompress_lz4hdf5(self, data: bytes, dtype: str) -> np.ndarray:
+        """Decompress the lz4hdf5 block format (HDF5 filter 32004)."""
+        lib = _load_lib("bitshuffle")
+        pos = 0
+        orig_size = int.from_bytes(data[pos : pos + 8], "big")
+        pos += 8
+        block_size = int.from_bytes(data[pos : pos + 4], "big")
+        pos += 4
+
+        out = bytearray(orig_size)
+        write_pos = 0
+
+        while write_pos < orig_size:
+            comp_block_size = int.from_bytes(data[pos : pos + 4], "big")
+            pos += 4
+            current_block = min(block_size, orig_size - write_pos)
+
+            if comp_block_size == current_block:
+                out[write_pos : write_pos + current_block] = data[pos : pos + current_block]
+            else:
+                in_block = (ctypes.c_ubyte * comp_block_size).from_buffer_copy(data[pos : pos + comp_block_size])
+                out_block = (ctypes.c_ubyte * current_block).from_buffer(out, write_pos)
+                lib.LZ4_decompress_fast(in_block, out_block, ctypes.c_int(current_block))
+
+            pos += comp_block_size
+            write_pos += current_block
+
+        return np.frombuffer(bytes(out), dtype=dtype)
+
+    def _decompress(self, compressed_bytes: bytes, codec_name: str, scalar_type: int, compressed_size: int, uncompressed_size: int) -> np.ndarray:
+        """Decompress a compressed NTNDArray payload using hdf5plugin bundled libs."""
+        dtype, elem_size = _SCALAR_TYPE_MAP.get(scalar_type, ("uint8", 1))
+
+        if codec_name == "lz4hdf5":
+            return self._decompress_lz4hdf5(compressed_bytes[:compressed_size], dtype)
+
+        if codec_name == "zlib":
+            return np.frombuffer(zlib.decompress(compressed_bytes[:compressed_size]), dtype=dtype)
+
+        in_buf = (ctypes.c_ubyte * compressed_size).from_buffer_copy(compressed_bytes[:compressed_size])
+        out_data = bytearray(uncompressed_size)
+        out_buf = (ctypes.c_ubyte * uncompressed_size).from_buffer(out_data)
+
+        if codec_name == "blosc":
+            lib = _load_lib("blosc")
+            lib.blosc_decompress(in_buf, out_buf, ctypes.c_size_t(uncompressed_size))
+
+        elif codec_name == "lz4":
+            lib = _load_lib("bitshuffle")
+            lib.LZ4_decompress_fast(in_buf, out_buf, ctypes.c_int(uncompressed_size))
+
+        elif codec_name == "bslz4":
+            lib = _load_lib("bitshuffle")
+            n_elem = uncompressed_size // elem_size
+            lib.bshuf_decompress_lz4(in_buf, out_buf, ctypes.c_size_t(n_elem), ctypes.c_size_t(elem_size), ctypes.c_size_t(0))
+
+        else:
+            raise RuntimeError(f"Unsupported codec: {codec_name!r}")
+
+        return np.frombuffer(bytes(out_data), dtype=dtype)
+
     def _process_image(self, value: object) -> None:
         """Decode an NTNDArray *value* and forward the resulting frame to the callback."""
         if self._frame_callback is None:
             return
 
-        with suppress(Exception):
-            flat = np.array(value["value"], copy=False)
-            dims: list[int] = [d["size"] for d in value["dimension"] if d["size"] > 0]
-
-            if not dims or flat.size == 0:
-                _log.debug("Skipping empty NTNDArray (dims=%s, flat.size=%d)", dims, flat.size)
+        try:
+            raw = value["value"]
+            if raw is None:
                 return
+
+            dims: list[int] = [d["size"] for d in value["dimension"] if d["size"] > 0]
+            if not dims:
+                return
+
+            flat = np.array(raw, copy=False)
+            if flat.size == 0:
+                return
+
+            codec_name: str = ""
+            try:
+                codec_name = value["codec"]["name"] or ""
+            except Exception:
+                pass
+
+            if codec_name:
+                compressed_size: int = int(value["compressedSize"])
+                uncompressed_size: int = int(value["uncompressedSize"])
+                raw_param = value["codec"]["parameters"]
+                scalar_type: int = int(raw_param) if raw_param is not None else 5
+                _log.debug("Decompressing codec=%s scalar_type=%d compressed=%d uncompressed=%d", codec_name, scalar_type, compressed_size, uncompressed_size)
+                flat = self._decompress(flat.tobytes(), codec_name, scalar_type, compressed_size, uncompressed_size)
 
             image = flat.reshape(dims[::-1])
             _log.debug("Delivering frame shape=%s dtype=%s", image.shape, image.dtype)
             self._frame_callback(image)
+        except Exception:
+            _log.exception("Error processing NTNDArray frame")
