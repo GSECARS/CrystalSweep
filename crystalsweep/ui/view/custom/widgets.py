@@ -47,6 +47,7 @@ from crystalsweep.ui.view.custom.theme import (
 __all__ = [
     "DANGER_SCHEME",
     "DEFAULT_SCHEME",
+    "MUTED_SCHEME",
     "DarkCombo",
     "DarkTextCtrl",
     "DarkToggle",
@@ -60,7 +61,8 @@ __all__ = [
 
 # Colour palettes for FlatButton: (idle, hover, press, foreground).
 DEFAULT_SCHEME = (POPUP_BTN_BG, POPUP_BTN_HOVER, POPUP_BTN_PRESS, FG_PRIMARY)
-DANGER_SCHEME = (POPUP_BTN_BG, DANGER_HOVER, DANGER_PRESS, DANGER)
+DANGER_SCHEME = (POPUP_BTN_BG, DANGER_HOVER, DANGER_PRESS, wx.Colour(230, 90, 90))
+MUTED_SCHEME = (wx.Colour(38, 38, 44), wx.Colour(55, 60, 75), wx.Colour(30, 35, 55), wx.Colour(120, 150, 190))
 
 
 class FlatButton(wx.Control):
@@ -315,6 +317,10 @@ class DarkTextCtrl(wx.Panel):
         self._value = value
         self._placeholder = placeholder
         self._editing = False
+        self._error = False
+        self._disabled = False
+        self._validator: Callable[[str], str] | None = None
+        self._restrict_to_float = False
         self._callback_enter: Callable | None = None
         self._callback_kill: Callable | None = None
         self._font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
@@ -332,6 +338,68 @@ class DarkTextCtrl(wx.Panel):
         self.Bind(wx.EVT_SIZE, self._on_ctrl_size)
         self._ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_enter)
         self._ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_kill)
+
+    def set_validator(self, validator: Callable[[str], str] | None) -> None:
+        """Set an optional validator called on commit."""
+        self._validator = validator
+
+    def set_restrict_to_float(self, restrict: bool) -> None:
+        """When True, keystroke filtering allows only digits, one '.', and '-' at position 0."""
+        if restrict and not self._restrict_to_float:
+            self._ctrl.Bind(wx.EVT_CHAR, self._on_char_float)
+        elif not restrict and self._restrict_to_float:
+            self._ctrl.Unbind(wx.EVT_CHAR, handler=self._on_char_float)
+        self._restrict_to_float = restrict
+
+    def _on_char_float(self, event: wx.KeyEvent) -> None:
+        if self._disabled:
+            return
+        key = event.GetKeyCode()
+        char = chr(key) if 32 <= key < 127 else None
+
+        if key < 32 or event.ControlDown():
+            event.Skip()
+            return
+
+        if char is None:
+            return
+
+        current = self._ctrl.GetValue()
+        insert_pos = self._ctrl.GetInsertionPoint()
+        sel_from, sel_to = self._ctrl.GetSelection()
+        has_selection = sel_from != sel_to
+        after_replace = current[:sel_from] + current[sel_to:] if has_selection else current
+
+        if char == "-":
+            effective_pos = sel_from if has_selection else insert_pos
+            if effective_pos == 0 and not after_replace.startswith("-"):
+                event.Skip()
+            return
+
+        if char == ".":
+            if "." not in after_replace:
+                event.Skip()
+            return
+
+        if char.isdigit():
+            event.Skip()
+            return
+
+    def set_error(self, error: bool) -> None:
+        if error != self._error:
+            self._error = error
+            bg = wx.Colour(70, 28, 28) if error else BG_ELEVATED
+            self._ctrl.SetBackgroundColour(bg)
+            self.Refresh()
+
+    def set_disabled(self, disabled: bool) -> None:
+        if disabled == self._disabled:
+            return
+        self._disabled = disabled
+        if disabled and self._editing:
+            self._ctrl.Hide()
+            self._editing = False
+        self.Refresh()
 
     def SetPlaceholder(self, text: str) -> None:
         self._placeholder = text
@@ -368,6 +436,8 @@ class DarkTextCtrl(wx.Panel):
             super().Bind(event, handler, source, id, id2)
 
     def _start_edit(self, event: wx.MouseEvent) -> None:
+        if self._disabled:
+            return
         self._editing = True
         self._ctrl.SetValue(self._value)
         self._reposition_ctrl()
@@ -377,8 +447,25 @@ class DarkTextCtrl(wx.Panel):
         self.Refresh()
         event.Skip()
 
+    def _commit(self, raw: str) -> bool:
+        """Validate *raw*, update internal state, and return True on success."""
+        if self._validator is not None:
+            try:
+                canonical = self._validator(raw)
+                self._value = canonical
+                self._ctrl.SetValue(canonical)
+                self.set_error(False)
+            except Exception:
+                self._ctrl.SetValue(self._value)
+                self.set_error(True)
+                return False
+        else:
+            self._value = raw
+        return True
+
     def _on_enter(self, event: wx.Event) -> None:
-        self._value = self._ctrl.GetValue()
+        raw = self._ctrl.GetValue()
+        self._commit(raw)
         self._ctrl.Hide()
         self._editing = False
         self.Refresh()
@@ -386,7 +473,8 @@ class DarkTextCtrl(wx.Panel):
             self._callback_enter(event)
 
     def _on_kill(self, event: wx.FocusEvent) -> None:
-        self._value = self._ctrl.GetValue()
+        raw = self._ctrl.GetValue()
+        self._commit(raw)
         self._ctrl.Hide()
         self._editing = False
         self.Refresh()
@@ -398,16 +486,23 @@ class DarkTextCtrl(wx.Panel):
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(BG_ELEVATED))
+        if self._disabled:
+            bg = BG_SURFACE
+        elif self._error:
+            bg = wx.Colour(70, 28, 28)
+        else:
+            bg = BG_ELEVATED
+        gc.SetBrush(wx.Brush(bg))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRoundedRectangle(0, 0, w, h, 3)
         if self._editing:
             return
+        fg = FG_SECONDARY if self._disabled else FG_PRIMARY
         if self._value:
-            gc.SetFont(self._font, FG_PRIMARY)
+            gc.SetFont(self._font, fg)
             tw, th = gc.GetTextExtent(self._value)
             gc.DrawText(self._value, (w - tw) / 2, (h - th) / 2)
-        elif self._placeholder:
+        elif self._placeholder and not self._disabled:
             gc.SetFont(self._placeholder_font, FG_SECONDARY)
             tw, th = gc.GetTextExtent(self._placeholder)
             gc.DrawText(self._placeholder, (w - tw) / 2, (h - th) / 2)
@@ -507,11 +602,12 @@ class DarkCombo(wx.Panel):
 
     _H = 28
 
-    def __init__(self, parent: wx.Window, choices: list[str], selection: int = 0) -> None:
+    def __init__(self, parent: wx.Window, choices: list[str], selection: int = 0, choice_colours: dict[str, wx.Colour] | None = None) -> None:
         super().__init__(parent, style=wx.BORDER_NONE)
         self._choices = choices
         self._selection = selection
         self._hovered = False
+        self._choice_colours: dict[str, wx.Colour] = choice_colours or {}
         self._callback: Callable[[str], None] | None = None
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self.SetBackgroundColour(BG_ELEVATED)
@@ -563,8 +659,9 @@ class DarkCombo(wx.Panel):
         gc.SetPen(wx.Pen(SEP_COLOUR, 1))
         gc.DrawRoundedRectangle(0, 0, w, h, 4)
         font = scaled_font(12)
-        gc.SetFont(font, FG_PRIMARY)
         label = self.GetStringSelection()
+        colour = self._choice_colours.get(label, FG_PRIMARY)
+        gc.SetFont(font, colour)
         _, th = gc.GetTextExtent(label)
         gc.DrawText(label, 8, (h - th) / 2)
         arrow_x, arrow_y = w - 16, h / 2
@@ -579,7 +676,7 @@ class DarkCombo(wx.Panel):
         if not self._choices:
             event.Skip()
             return
-        popup = _DarkMenuPopup(self, self._choices, self._selection, on_select=self._select)
+        popup = _DarkMenuPopup(self, self._choices, self._selection, on_select=self._select, choice_colours=self._choice_colours)
         w, h = self.GetSize()
         popup.popup_below(self.ClientToScreen(wx.Point(0, h)), w)
         event.Skip()
@@ -602,12 +699,14 @@ class _DarkMenuPopup(wx.PopupTransientWindow):
         choices: list[str],
         selection: int,
         on_select: Callable[[int], None],
+        choice_colours: dict[str, wx.Colour] | None = None,
     ) -> None:
         super().__init__(parent, flags=wx.BORDER_SIMPLE | wx.PU_CONTAINS_CONTROLS)
         self._choices = list(choices)
         self._selection = selection
         self._hover_index = -1
         self._on_select = on_select
+        self._choice_colours: dict[str, wx.Colour] = choice_colours or {}
         self.SetBackgroundColour(POPUP_BG)
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self.Bind(wx.EVT_PAINT, self._on_paint)
@@ -643,7 +742,8 @@ class _DarkMenuPopup(wx.PopupTransientWindow):
                 gc.SetBrush(wx.Brush(POPUP_BTN_HOVER))
                 gc.SetPen(wx.TRANSPARENT_PEN)
                 gc.DrawRectangle(0, y, w, self._ROW_H)
-            colour = ACCENT_HOVER if i == self._selection else FG_PRIMARY
+            base_colour = self._choice_colours.get(label, FG_PRIMARY)
+            colour = ACCENT_HOVER if i == self._selection else base_colour
             gc.SetFont(font, colour)
             _, th = gc.GetTextExtent(label)
             gc.DrawText(label, 10, y + (self._ROW_H - th) / 2)

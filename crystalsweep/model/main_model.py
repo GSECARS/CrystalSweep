@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 
 from crystalsweep.model.ad_viewer_model import ADViewerModel
 from crystalsweep.model.beamline_config_model import BeamlineConfigModel
+from crystalsweep.model.collection_model import CollectionTableModel
 from crystalsweep.model.image_loader_model import ImageLoaderModel
 from crystalsweep.model.integration_model import IntegrationModel
 
@@ -30,6 +31,7 @@ class MainModel:
     ad_viewer: ADViewerModel = field(init=False, compare=False, repr=False, default_factory=ADViewerModel)
     image_loader: ImageLoaderModel = field(init=False, compare=False, repr=False, default_factory=ImageLoaderModel)
     integration: IntegrationModel = field(init=False, compare=False, repr=False, default_factory=IntegrationModel)
+    collection: CollectionTableModel = field(init=False, compare=False, repr=False, default_factory=CollectionTableModel)
 
     def __post_init__(self) -> None:
         """Load the previously remembered active beamline configuration, if available."""

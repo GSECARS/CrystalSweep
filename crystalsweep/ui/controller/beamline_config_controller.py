@@ -127,6 +127,14 @@ class BeamlineConfigController:
             panel.set_status("No configuration selected. Use 'New' to create one.", error=True)
             return
 
+        if config.rotation_motor is None or not config.rotation_motor.pv.strip():
+            panel.set_status("Rotation stage PV is required.", error=True)
+            return
+
+        if not config.detectors:
+            panel.set_status("At least one detector is required.", error=True)
+            return
+
         shorthands = [m.shorthand for m in config.motors if m.shorthand]
         if len(shorthands) != len(set(shorthands)):
             panel.set_status("Motor shorthands must be unique.", error=True)

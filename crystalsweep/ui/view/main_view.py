@@ -18,9 +18,13 @@ import wx
 from wxutils import Popup
 
 from crystalsweep.ui.view.ad_viewer_view import ADViewerView
+from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import BG_SURFACE
 
 __all__ = ["MainView"]
+
+_LEFT_PANEL_W = 340
+_SASH_W = 4
 
 
 class MainView(wx.Frame):
@@ -33,17 +37,24 @@ class MainView(wx.Frame):
         self._version = version
         self._open_config_cb: Callable[[], None] | None = None
 
-        self.ad_viewer = ADViewerView(self)
+        self._splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
+        self._splitter.SetSashGravity(0.0)
+        self._splitter.SetMinimumPaneSize(180)
+
+        self.collection_table = CollectionTableView(self._splitter)
+        self.ad_viewer = ADViewerView(self._splitter)
+
+        self._splitter.SplitVertically(self.collection_table, self.ad_viewer, _LEFT_PANEL_W)
+        self._splitter.Bind(wx.EVT_SPLITTER_SASH_POS_CHANGING, self._on_sash_changing)
 
         self._build_menu_bar()
-
         self.Bind(wx.EVT_CLOSE, self._close_event_handler)
-
         self._configure_main_window()
 
     def display_window(self) -> None:
         """Displays the main window of the application."""
         self.Show(True)
+        wx.CallAfter(self._set_initial_sash)
 
     def bind_open_configuration(self, callback: Callable[[], None]) -> None:
         """Set the handler invoked when File -> Configuration is selected."""
@@ -72,12 +83,24 @@ class MainView(wx.Frame):
         self.SetTitle(f"CrystalSweep - {self._version}")
         self.SetBackgroundColour(BG_SURFACE)
 
+        self._splitter.SetBackgroundColour(wx.Colour(45, 45, 48))
+
         main_sizer = wx.BoxSizer(wx.VERTICAL)
-        main_sizer.Add(self.ad_viewer, 1, wx.EXPAND | wx.ALL, 5)
+        main_sizer.Add(self._splitter, 1, wx.EXPAND | wx.ALL, 5)
 
         self.SetSizer(main_sizer)
-        self.SetSize(800, 600)
-        self.SetMinSize((500, 520))
+        self.SetSize(1200, 700)
+        self.SetMinSize((800, 520))
+
+    def _on_sash_changing(self, event: wx.SplitterEvent) -> None:
+        min_w = self.collection_table.GetMinSize().width
+        if min_w > 0 and event.GetSashPosition() < min_w:
+            event.SetSashPosition(min_w)
+
+    def _set_initial_sash(self) -> None:
+        w = self._splitter.GetClientSize().width
+        if w > 0:
+            self._splitter.SetSashPosition(w // 2)
 
     def _close_event_handler(self, event: wx.CloseEvent) -> None:
         """Runs when trying to close the main window."""

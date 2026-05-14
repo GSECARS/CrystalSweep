@@ -27,11 +27,12 @@ _ACTIVE_FILE_NAME = ".active"
 
 @dataclass(frozen=True, slots=True)
 class MotorConfig:
-    """Single motor entry: short hand, variable name, and EPICS PV."""
+    """Single motor entry: short hand, variable name, EPICS PV, and decimal precision."""
 
     shorthand: str
     name: str
     pv: str
+    precision: int = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,13 +59,14 @@ class BeamlineConfig:
 
     name: str = ""
     beamline: str = ""
+    rotation_motor: MotorConfig | None = None
     detectors: tuple[DetectorConfig, ...] = field(default_factory=tuple)
     active_detector: int = -1
     motors: tuple[MotorConfig, ...] = field(default_factory=tuple)
 
     @property
     def is_empty(self) -> bool:
-        return not self.name and not self.beamline and not self.detectors and not self.motors
+        return not self.name and not self.beamline and self.rotation_motor is None and not self.detectors and not self.motors
 
     @property
     def active_detector_config(self) -> DetectorConfig | None:
@@ -172,13 +174,25 @@ class BeamlineConfigModel:
                 shorthand=str(m.get("shorthand", "")),
                 name=str(m.get("name", "")),
                 pv=str(m.get("pv", "")),
+                precision=max(0, int(m.get("precision", 4))),
             )
             for m in motors_data
         )
 
+        rotation_motor: MotorConfig | None = None
+        rm_data = data.get("rotation_motor")
+        if isinstance(rm_data, dict):
+            rotation_motor = MotorConfig(
+                shorthand=str(rm_data.get("shorthand", "")),
+                name=str(rm_data.get("name", "")),
+                pv=str(rm_data.get("pv", "")),
+                precision=max(0, int(rm_data.get("precision", 4))),
+            )
+
         cfg = BeamlineConfig(
             name=name,
             beamline=str(data.get("beamline", "")),
+            rotation_motor=rotation_motor,
             detectors=tuple(detectors),
             active_detector=active_detector,
             motors=motors,
@@ -193,6 +207,11 @@ class BeamlineConfigModel:
 
         payload: dict = {
             "beamline": config.beamline,
+            "rotation_motor": (
+                {"shorthand": config.rotation_motor.shorthand, "name": config.rotation_motor.name, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision}
+                if config.rotation_motor is not None
+                else {}
+            ),
             "detectors": [
                 {
                     "name": d.name,
@@ -201,7 +220,7 @@ class BeamlineConfigModel:
                 }
                 for idx, d in enumerate(config.detectors)
             ],
-            "motors": [{"shorthand": m.shorthand, "name": m.name, "pv": m.pv} for m in config.motors],
+            "motors": [{"shorthand": m.shorthand, "name": m.name, "pv": m.pv, "precision": m.precision} for m in config.motors],
         }
 
         path = self.path_for(config.name)

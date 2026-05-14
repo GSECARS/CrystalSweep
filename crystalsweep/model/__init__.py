@@ -14,8 +14,23 @@
 
 from crystalsweep.model.ad_viewer_model import ADViewerModel
 from crystalsweep.model.beamline_config_model import BeamlineConfig, BeamlineConfigModel, DetectorConfig, MotorConfig
+from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, CollectionTableModel
 from crystalsweep.model.image_loader_model import ImageLoaderModel
 from crystalsweep.model.integration_model import IntegrationModel
 from crystalsweep.model.main_model import MainModel
+from crystalsweep.model.validation import MotorPositionValidator
 
-__all__ = ["ADViewerModel", "BeamlineConfig", "BeamlineConfigModel", "DetectorConfig", "ImageLoaderModel", "IntegrationModel", "MainModel", "MotorConfig"]
+__all__ = [
+    "ADViewerModel",
+    "BeamlineConfig",
+    "BeamlineConfigModel",
+    "CollectionPoint",
+    "CollectionTableModel",
+    "DetectorConfig",
+    "ImageLoaderModel",
+    "IntegrationModel",
+    "MainModel",
+    "MotorConfig",
+    "MotorPositionValidator",
+    "SCAN_TYPES",
+]

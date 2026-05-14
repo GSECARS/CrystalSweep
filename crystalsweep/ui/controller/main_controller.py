@@ -20,6 +20,7 @@ import wx
 from crystalsweep.model import MainModel
 from crystalsweep.ui.controller.ad_viewer_controller import ADViewerController
 from crystalsweep.ui.controller.beamline_config_controller import BeamlineConfigController
+from crystalsweep.ui.controller.collection_table_controller import CollectionTableController
 from crystalsweep.ui.view import MainView
 
 __all__ = ["MainController"]
@@ -42,13 +43,17 @@ class MainController:
         self._model = MainModel()
         self._view = MainView(version=version)
 
-        # Initialize controllers
+        self._collection_controller = CollectionTableController(model=self._model, view=self._view.collection_table)
         self._ad_viewer_controller = ADViewerController(model=self._model, view=self._view)
         self._beamline_config_controller = BeamlineConfigController(
             model=self._model,
             view=self._view,
-            on_config_applied=lambda _cfg: self._ad_viewer_controller.resubscribe_detector(),
+            on_config_applied=self._on_config_applied,
         )
+
+    def _on_config_applied(self, cfg) -> None:
+        self._ad_viewer_controller.resubscribe_detector()
+        self._collection_controller.on_config_applied(cfg)
 
     def run(self) -> None:
         """Starts the main application loop."""

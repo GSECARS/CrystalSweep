@@ -28,11 +28,15 @@ __all__ = ["BeamlineConfigDialog", "BeamlineConfigView"]
 _ROW_INPUT_HEIGHT = 28
 
 _PLACEHOLDER_BEAMLINE = "e.g. 13-IDD"
+_PLACEHOLDER_ROTATION_SHORT = "e.g. omega"
+_PLACEHOLDER_ROTATION_NAME = "e.g. rotation"
+_PLACEHOLDER_ROTATION_PV = "e.g. 13IDD:m7.VAL"
 _PLACEHOLDER_DETECTOR_NAME = "e.g. Eiger 9M"
 _PLACEHOLDER_DETECTOR_PREFIX = "e.g. 13EIG2_9M:"
 _PLACEHOLDER_MOTOR_SHORT = "e.g. vert"
 _PLACEHOLDER_MOTOR_NAME = "e.g. vertical"
 _PLACEHOLDER_MOTOR_PV = "e.g. 13IDD:m1.VAL"
+_PLACEHOLDER_MOTOR_PRECISION = "4"
 
 
 class _ActiveConfigChangedCallback(Protocol):
@@ -152,6 +156,8 @@ class _MotorRow(wx.Panel):
         self.name_ctrl.SetMinSize((90, _ROW_INPUT_HEIGHT))
         self.pv_ctrl = DarkTextCtrl(self, value=motor.pv, placeholder=_PLACEHOLDER_MOTOR_PV)
         self.pv_ctrl.SetMinSize((140, _ROW_INPUT_HEIGHT))
+        self.precision_ctrl = DarkTextCtrl(self, value=str(motor.precision), placeholder=_PLACEHOLDER_MOTOR_PRECISION)
+        self.precision_ctrl.SetMinSize((40, _ROW_INPUT_HEIGHT))
 
         self._remove_btn = FlatButton(self, "X", color_scheme=DANGER_SCHEME)
         self._remove_btn.SetMinSize((28, _ROW_INPUT_HEIGHT))
@@ -161,15 +167,21 @@ class _MotorRow(wx.Panel):
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(self.shorthand_ctrl, 1, wx.EXPAND | wx.RIGHT, 4)
         sizer.Add(self.name_ctrl, 2, wx.EXPAND | wx.RIGHT, 4)
-        sizer.Add(self.pv_ctrl, 3, wx.EXPAND | wx.RIGHT, 6)
+        sizer.Add(self.pv_ctrl, 3, wx.EXPAND | wx.RIGHT, 4)
+        sizer.Add(self.precision_ctrl, 0, wx.EXPAND | wx.RIGHT, 6)
         sizer.Add(self._remove_btn, 0, wx.EXPAND)
         self.SetSizer(sizer)
 
     def to_motor(self) -> MotorConfig:
+        try:
+            precision = max(0, int(self.precision_ctrl.GetValue().strip()))
+        except ValueError:
+            precision = 4
         return MotorConfig(
             shorthand=self.shorthand_ctrl.GetValue().strip(),
             name=self.name_ctrl.GetValue().strip(),
             pv=self.pv_ctrl.GetValue().strip(),
+            precision=precision,
         )
 
     def _request_remove(self) -> None:
@@ -221,6 +233,38 @@ class BeamlineConfigView(wx.Panel):
         b_sizer.Add(self._beamline_ctrl, 0, wx.EXPAND)
         b_body.SetSizer(b_sizer)
 
+        self._rotation_section = _Section(self, "Rotation Stage")
+        r_body = self._rotation_section.body
+
+        rot_header = wx.Panel(r_body)
+        rot_header.SetBackgroundColour(BG_CARD)
+        rot_header_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        rot_header_sizer.Add(_label(rot_header, "Short", secondary=True), 1, wx.RIGHT, 4)
+        rot_header_sizer.Add(_label(rot_header, "Variable", secondary=True), 2, wx.RIGHT, 4)
+        rot_header_sizer.Add(_label(rot_header, "PV  \u2731", secondary=True), 3, wx.RIGHT, 4)
+        rot_header_sizer.Add(_label(rot_header, "Prec", secondary=True), 0)
+        rot_header.SetSizer(rot_header_sizer)
+
+        self._rotation_short_ctrl = DarkTextCtrl(r_body, placeholder=_PLACEHOLDER_ROTATION_SHORT)
+        self._rotation_short_ctrl.SetMinSize((70, _ROW_INPUT_HEIGHT))
+        self._rotation_name_ctrl = DarkTextCtrl(r_body, placeholder=_PLACEHOLDER_ROTATION_NAME)
+        self._rotation_name_ctrl.SetMinSize((90, _ROW_INPUT_HEIGHT))
+        self._rotation_pv_ctrl = DarkTextCtrl(r_body, placeholder=_PLACEHOLDER_ROTATION_PV)
+        self._rotation_pv_ctrl.SetMinSize((140, _ROW_INPUT_HEIGHT))
+        self._rotation_precision_ctrl = DarkTextCtrl(r_body, value="4", placeholder=_PLACEHOLDER_MOTOR_PRECISION)
+        self._rotation_precision_ctrl.SetMinSize((40, _ROW_INPUT_HEIGHT))
+
+        rot_row = wx.BoxSizer(wx.HORIZONTAL)
+        rot_row.Add(self._rotation_short_ctrl, 1, wx.EXPAND | wx.RIGHT, 4)
+        rot_row.Add(self._rotation_name_ctrl, 2, wx.EXPAND | wx.RIGHT, 4)
+        rot_row.Add(self._rotation_pv_ctrl, 3, wx.EXPAND | wx.RIGHT, 4)
+        rot_row.Add(self._rotation_precision_ctrl, 0, wx.EXPAND)
+
+        r_sizer = wx.BoxSizer(wx.VERTICAL)
+        r_sizer.Add(rot_header, 0, wx.EXPAND | wx.BOTTOM, 4)
+        r_sizer.Add(rot_row, 0, wx.EXPAND)
+        r_body.SetSizer(r_sizer)
+
         self._detectors_section = _Section(self, "Detectors")
         d_body = self._detectors_section.body
 
@@ -258,7 +302,8 @@ class BeamlineConfigView(wx.Panel):
         mot_header_sizer = wx.BoxSizer(wx.HORIZONTAL)
         mot_header_sizer.Add(_label(mot_header, "Short", secondary=True), 1, wx.RIGHT, 4)
         mot_header_sizer.Add(_label(mot_header, "Variable", secondary=True), 2, wx.RIGHT, 4)
-        mot_header_sizer.Add(_label(mot_header, "PV", secondary=True), 3, wx.RIGHT, 6)
+        mot_header_sizer.Add(_label(mot_header, "PV", secondary=True), 3, wx.RIGHT, 4)
+        mot_header_sizer.Add(_label(mot_header, "Prec", secondary=True), 0, wx.RIGHT, 6)
         mot_header_sizer.AddSpacer(28)
         mot_header.SetSizer(mot_header_sizer)
 
@@ -291,6 +336,7 @@ class BeamlineConfigView(wx.Panel):
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(selector_panel, 0, wx.EXPAND | wx.ALL, 10)
         outer.Add(self._beamline_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        outer.Add(self._rotation_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._detectors_section, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._motors_section, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._save_btn, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
@@ -324,6 +370,11 @@ class BeamlineConfigView(wx.Panel):
         """Populate all fields from the given configuration."""
         self._current_name = config.name
         self._beamline_ctrl.SetValue(config.beamline)
+        rm = config.rotation_motor
+        self._rotation_short_ctrl.SetValue(rm.shorthand if rm else "")
+        self._rotation_name_ctrl.SetValue(rm.name if rm else "")
+        self._rotation_pv_ctrl.SetValue(rm.pv if rm else "")
+        self._rotation_precision_ctrl.SetValue(str(rm.precision) if rm else "4")
 
         self._clear_detector_rows()
         for idx, detector in enumerate(config.detectors):
@@ -355,10 +406,27 @@ class BeamlineConfigView(wx.Panel):
         if detectors and active_index == -1:
             active_index = 0
 
+        rot_pv = self._rotation_pv_ctrl.GetValue().strip()
+        try:
+            rot_precision = max(0, int(self._rotation_precision_ctrl.GetValue().strip()))
+        except ValueError:
+            rot_precision = 4
+        rotation_motor = (
+            MotorConfig(
+                shorthand=self._rotation_short_ctrl.GetValue().strip(),
+                name=self._rotation_name_ctrl.GetValue().strip(),
+                pv=rot_pv,
+                precision=rot_precision,
+            )
+            if rot_pv
+            else None
+        )
+
         motors = tuple(row.to_motor() for row in self._motor_rows if row.to_motor().shorthand)
         return BeamlineConfig(
             name=self._current_name,
             beamline=self._beamline_ctrl.GetValue().strip(),
+            rotation_motor=rotation_motor,
             detectors=tuple(detectors),
             active_detector=active_index,
             motors=motors,

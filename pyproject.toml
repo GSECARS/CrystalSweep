@@ -41,6 +41,7 @@ dependencies = [
     "pyfai>=2026.3.0",
     "pyopengl>=3.1.10",
     "pyopengl-accelerate>=3.1.10",
+    "pydantic>=2.0.0",
     "tomli-w>=1.2.0",
     "vispy>=0.14.3",
     "wxpython>=4.2.5",
