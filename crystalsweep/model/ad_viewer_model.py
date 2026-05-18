@@ -12,17 +12,17 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-import ctypes
 import logging
-import sys
+import struct
 import zlib
 from dataclasses import dataclass, field
-from pathlib import Path
 from threading import Event, Thread
 from time import sleep
 from typing import Protocol
 
-import hdf5plugin
+import bitshuffle
+import blosc
+import lz4.block
 import numpy as np
 from p4p.client.thread import Context, Subscription
 
@@ -42,26 +42,6 @@ _SCALAR_TYPE_MAP: dict[int, tuple[str, int]] = {
     9: ("float32", 4),
     10: ("float64", 8),
 }
-
-_PLUGIN_DIR = Path(hdf5plugin.__file__).parent / "plugins"
-_EXT = "dll" if sys.platform == "win32" else ("dylib" if sys.platform == "darwin" else "so")
-
-_HDFPLUGIN_LIBS = {
-    "bitshuffle": str(_PLUGIN_DIR / f"libh5bshuf.{_EXT}"),
-    "blosc": str(_PLUGIN_DIR / f"libh5blosc.{_EXT}"),
-}
-
-_lib_cache: dict[str, ctypes.CDLL] = {}
-
-
-def _load_lib(name: str) -> ctypes.CDLL:
-    """Load a codec shared library bundled with hdf5plugin."""
-    if name in _lib_cache:
-        return _lib_cache[name]
-    path = _HDFPLUGIN_LIBS[name]
-    lib = ctypes.cdll.LoadLibrary(path)
-    _lib_cache[name] = lib
-    return lib
 
 
 class FrameCallback(Protocol):
@@ -90,10 +70,8 @@ class ADViewerModel:
     def subscribe(self, pv_name: str, frame_callback: FrameCallback) -> None:
         """Start monitoring *pv_name* and deliver frames to *frame_callback*."""
         self.unsubscribe()
-
         self._pv_name = pv_name
         self._frame_callback = frame_callback
-
         if self.use_polling:
             _log.info("AD viewer subscribing to %s (polling @ %.0f Hz)", pv_name, 1.0 / self.poll_interval)
             self._stop_polling.clear()
@@ -122,23 +100,18 @@ class ADViewerModel:
     def _poll_loop(self) -> None:
         """Background loop: fetch latest PV value at ``poll_interval`` Hz."""
         last_unique_id: object = None
-
         while not self._stop_polling.is_set():
             try:
                 value = self._context.get(self._pv_name, request=self.default_request)
                 current_id = value.get("uniqueId", None)
-
                 if current_id is not None and current_id == last_unique_id:
                     sleep(self.poll_interval)
                     continue
-
                 last_unique_id = current_id
                 _log.debug("New frame received via polling (uniqueId=%s)", current_id)
                 self._process_image(value)
-
             except Exception:
                 _log.exception("Error polling PV %s", self._pv_name)
-
             sleep(self.poll_interval)
 
     def _on_ntndarray(self, value: object) -> None:
@@ -146,91 +119,63 @@ class ADViewerModel:
         _log.debug("New frame received via PV monitor")
         self._process_image(value)
 
-    def _decompress_lz4hdf5(self, data: bytes, dtype: str) -> np.ndarray:
-        """Decompress the lz4hdf5 block format (HDF5 filter 32004)."""
-        lib = _load_lib("bitshuffle")
-        pos = 0
-        orig_size = int.from_bytes(data[pos : pos + 8], "big")
-        pos += 8
-        block_size = int.from_bytes(data[pos : pos + 4], "big")
-        pos += 4
-
-        out = bytearray(orig_size)
-        write_pos = 0
-
-        while write_pos < orig_size:
-            comp_block_size = int.from_bytes(data[pos : pos + 4], "big")
-            pos += 4
-            current_block = min(block_size, orig_size - write_pos)
-
-            if comp_block_size == current_block:
-                out[write_pos : write_pos + current_block] = data[pos : pos + current_block]
-            else:
-                in_block = (ctypes.c_ubyte * comp_block_size).from_buffer_copy(data[pos : pos + comp_block_size])
-                out_block = (ctypes.c_ubyte * current_block).from_buffer(out, write_pos)
-                lib.LZ4_decompress_fast(in_block, out_block, ctypes.c_int(current_block))
-
-            pos += comp_block_size
-            write_pos += current_block
-
-        return np.frombuffer(bytes(out), dtype=dtype)
-
     def _decompress(self, compressed_bytes: bytes, codec_name: str, scalar_type: int, compressed_size: int, uncompressed_size: int) -> np.ndarray:
-        """Decompress a compressed NTNDArray payload using hdf5plugin bundled libs."""
+        """Decompress a compressed NTNDArray payload."""
         dtype, elem_size = _SCALAR_TYPE_MAP.get(scalar_type, ("uint8", 1))
-
-        if codec_name == "lz4hdf5":
-            return self._decompress_lz4hdf5(compressed_bytes[:compressed_size], dtype)
+        chunk = compressed_bytes[:compressed_size]
 
         if codec_name == "zlib":
-            return np.frombuffer(zlib.decompress(compressed_bytes[:compressed_size]), dtype=dtype)
+            return np.frombuffer(zlib.decompress(chunk), dtype=dtype)
 
-        in_buf = (ctypes.c_ubyte * compressed_size).from_buffer_copy(compressed_bytes[:compressed_size])
-        out_data = bytearray(uncompressed_size)
-        out_buf = (ctypes.c_ubyte * uncompressed_size).from_buffer(out_data)
+        if codec_name == "lz4hdf5":
+            orig_size = struct.unpack_from(">Q", chunk, 0)[0]
+            block_size = struct.unpack_from(">I", chunk, 8)[0]
+            out_parts: list[bytes] = []
+            pos, write_pos = 12, 0
+            while write_pos < orig_size:
+                comp_block_size = struct.unpack_from(">I", chunk, pos)[0]
+                pos += 4
+                current_block = min(block_size, orig_size - write_pos)
+                if comp_block_size == current_block:
+                    out_parts.append(chunk[pos : pos + current_block])
+                else:
+                    out_parts.append(lz4.block.decompress(chunk[pos : pos + comp_block_size], uncompressed_size=current_block))
+                pos += comp_block_size
+                write_pos += current_block
+            return np.frombuffer(b"".join(out_parts), dtype=dtype)
 
         if codec_name == "blosc":
-            lib = _load_lib("blosc")
-            lib.blosc_decompress(in_buf, out_buf, ctypes.c_size_t(uncompressed_size))
+            return np.frombuffer(blosc.decompress(chunk), dtype=dtype)
 
-        elif codec_name == "lz4":
-            lib = _load_lib("bitshuffle")
-            lib.LZ4_decompress_fast(in_buf, out_buf, ctypes.c_int(uncompressed_size))
+        if codec_name == "lz4":
+            return np.frombuffer(lz4.block.decompress(chunk, uncompressed_size=uncompressed_size), dtype=dtype)
 
-        elif codec_name == "bslz4":
-            lib = _load_lib("bitshuffle")
+        if codec_name == "bslz4":
             n_elem = uncompressed_size // elem_size
-            lib.bshuf_decompress_lz4(in_buf, out_buf, ctypes.c_size_t(n_elem), ctypes.c_size_t(elem_size), ctypes.c_size_t(0))
+            out = bitshuffle.decompress_lz4(np.frombuffer(chunk, dtype=np.uint8), (n_elem,), np.dtype(dtype))
+            return out.reshape(-1)
 
-        else:
-            raise RuntimeError(f"Unsupported codec: {codec_name!r}")
-
-        return np.frombuffer(bytes(out_data), dtype=dtype)
+        raise RuntimeError(f"Unsupported codec: {codec_name!r}")
 
     def _process_image(self, value: object) -> None:
         """Decode an NTNDArray *value* and forward the resulting frame to the callback."""
         if self._frame_callback is None:
             return
-
         try:
             raw = value["value"]
             if raw is None:
                 return
-
             dims: list[int] = [d["size"] for d in value["dimension"] if d["size"] > 0]
             if not dims:
                 return
-
             flat = np.array(raw, copy=False)
             if flat.size == 0:
                 return
-
             codec_name: str = ""
             try:
                 codec_name = value["codec"]["name"] or ""
             except Exception:
                 pass
-
             if codec_name:
                 compressed_size: int = int(value["compressedSize"])
                 uncompressed_size: int = int(value["uncompressedSize"])
@@ -238,7 +183,6 @@ class ADViewerModel:
                 scalar_type: int = int(raw_param) if raw_param is not None else 5
                 _log.debug("Decompressing codec=%s scalar_type=%d compressed=%d uncompressed=%d", codec_name, scalar_type, compressed_size, uncompressed_size)
                 flat = self._decompress(flat.tobytes(), codec_name, scalar_type, compressed_size, uncompressed_size)
-
             image = flat.reshape(dims[::-1])
             _log.debug("Delivering frame shape=%s dtype=%s", image.shape, image.dtype)
             self._frame_callback(image)
