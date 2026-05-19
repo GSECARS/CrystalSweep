@@ -21,6 +21,7 @@ from crystalsweep.model import MainModel
 from crystalsweep.ui.controller.ad_viewer_controller import ADViewerController
 from crystalsweep.ui.controller.beamline_config_controller import BeamlineConfigController
 from crystalsweep.ui.controller.collection_table_controller import CollectionTableController
+from crystalsweep.ui.controller.file_settings_controller import FileSettingsController
 from crystalsweep.ui.view import MainView
 
 __all__ = ["MainController"]
@@ -43,6 +44,7 @@ class MainController:
         self._model = MainModel()
         self._view = MainView(version=version)
 
+        self._file_settings_controller = FileSettingsController(model=self._model, view=self._view)
         self._collection_controller = CollectionTableController(model=self._model, view=self._view.collection_table)
         self._ad_viewer_controller = ADViewerController(model=self._model, view=self._view)
         self._beamline_config_controller = BeamlineConfigController(
