@@ -13,8 +13,13 @@
 # ----------------------------------------------------------------------------------
 
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any
+
+from epicscorelibs.path import get_lib
+
+os.environ.setdefault("PYEPICS_LIBCA", get_lib("ca"))
 
 from epics import caget
 
