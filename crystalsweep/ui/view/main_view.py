@@ -20,12 +20,12 @@ from wxutils import Popup
 from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE
+from crystalsweep.ui.view.custom.widgets import ThemedSplitter
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 
 __all__ = ["MainView"]
 
 _LEFT_PANEL_W = 340
-_SASH_W = 4
 
 
 class MainView(wx.Frame):
@@ -38,7 +38,7 @@ class MainView(wx.Frame):
         self._version = version
         self._open_config_cb: Callable[[], None] | None = None
 
-        self._splitter = wx.SplitterWindow(self, style=wx.SP_LIVE_UPDATE)
+        self._splitter = ThemedSplitter(self)
         self._splitter.SetSashGravity(0.0)
         self._splitter.SetMinimumPaneSize(180)
 
@@ -94,8 +94,6 @@ class MainView(wx.Frame):
         self.SetTitle(f"CrystalSweep - {self._version}")
         self.SetBackgroundColour(BG_SURFACE)
 
-        self._splitter.SetBackgroundColour(wx.Colour(45, 45, 48))
-
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         main_sizer.Add(self._splitter, 1, wx.EXPAND | wx.ALL, 5)
 
@@ -112,6 +110,7 @@ class MainView(wx.Frame):
         w = self._splitter.GetClientSize().width
         if w > 0:
             self._splitter.SetSashPosition(w // 2)
+        self._splitter._reposition_overlay()
 
     def _close_event_handler(self, event: wx.CloseEvent) -> None:
         """Runs when trying to close the main window."""
