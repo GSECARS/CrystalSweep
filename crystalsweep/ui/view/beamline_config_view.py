@@ -20,7 +20,7 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, DANGER, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, DarkCombo, DarkTextCtrl, FlatButton, RadioDot
+from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, FlatButton, RadioDot
 
 __all__ = ["BeamlineConfigDialog", "BeamlineConfigView"]
 
@@ -526,7 +526,7 @@ class BeamlineConfigView(wx.Panel):
 
 
 class BeamlineConfigDialog(wx.Dialog):
-    """Top-level dialog that wraps the BeamlineConfigView panel."""
+    """Top-level dialog that wraps the BeamlineConfigView panel with a dark scrollbar."""
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(
@@ -536,12 +536,61 @@ class BeamlineConfigDialog(wx.Dialog):
         )
         self.SetBackgroundColour(BG_SURFACE)
 
-        self.config_panel = BeamlineConfigView(self)
+        self._viewport = wx.Panel(self, style=wx.BORDER_NONE)
+        self._viewport.SetBackgroundColour(BG_SURFACE)
+        self._scroll_offset: int = 0
 
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.config_panel, 1, wx.EXPAND)
-        self.SetSizer(sizer)
+        self.config_panel = BeamlineConfigView(self._viewport)
 
-        self.SetSize(620, 680)
-        self.SetMinSize((480, 540))
+        self._scrollbar = DarkScrollBar(self, on_scroll=self._on_sb_scroll)
+
+        self._viewport.Bind(wx.EVT_SIZE, self._on_viewport_size)
+        self._viewport.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
+        self.config_panel.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
+
+        outer = wx.BoxSizer(wx.HORIZONTAL)
+        outer.Add(self._viewport, 1, wx.EXPAND)
+        outer.Add(self._scrollbar, 0, wx.EXPAND)
+        self.SetSizer(outer)
+
+        self.SetSize(628, 680)
+        self.SetMinSize((488, 540))
         self.CentreOnParent()
+
+    def _content_height(self) -> int:
+        return self.config_panel.GetBestSize().height
+
+    def _viewport_height(self) -> int:
+        return self._viewport.GetClientSize().height
+
+    def _max_offset(self) -> int:
+        return max(0, self._content_height() - self._viewport_height())
+
+    def _apply_offset(self) -> None:
+        w = self._viewport.GetClientSize().width
+        h = self._content_height()
+        self._scroll_offset = max(0, min(self._scroll_offset, self._max_offset()))
+        self.config_panel.SetSize(0, -self._scroll_offset, w, max(h, self._viewport_height()))
+        self._sync_scrollbar()
+
+    def _sync_scrollbar(self) -> None:
+        total = self._content_height()
+        visible = self._viewport_height()
+        if total <= visible:
+            self._scrollbar.update(0.0, 1.0)
+        else:
+            self._scrollbar.update(self._scroll_offset / (total - visible), visible / total)
+
+    def _on_sb_scroll(self, fraction: float) -> None:
+        self._scroll_offset = int(fraction * self._max_offset())
+        self._apply_offset()
+
+    def _on_viewport_size(self, event: wx.SizeEvent) -> None:
+        event.Skip()
+        self._apply_offset()
+
+    def _on_wheel(self, event: wx.MouseEvent) -> None:
+        delta = event.GetWheelRotation() // event.GetWheelDelta()
+        self._scroll_offset = max(0, min(self._scroll_offset - delta * 20, self._max_offset()))
+        self._apply_offset()
+        event.Skip()
