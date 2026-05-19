@@ -66,8 +66,8 @@ class FileSettingsView(wx.Panel):
         self._build_layout()
 
     def _build_layout(self) -> None:
-        label_font = scaled_font(11)
-        section_font = scaled_font(11, weight=wx.FONTWEIGHT_BOLD)
+        label_font = scaled_font(12)
+        section_font = scaled_font(13, weight=wx.FONTWEIGHT_BOLD)
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.AddSpacer(6)
@@ -148,7 +148,7 @@ class FileSettingsView(wx.Panel):
     def _make_row_path_status(self, label_font: wx.Font) -> wx.Sizer:
         row = wx.BoxSizer(wx.HORIZONTAL)
         self._path_status_label = wx.StaticText(self, label="", style=wx.ST_ELLIPSIZE_START | wx.ST_NO_AUTORESIZE)
-        self._path_status_label.SetFont(scaled_font(10))
+        self._path_status_label.SetFont(scaled_font(12))
         self._path_status_label.SetBackgroundColour(BG_CARD)
         self._path_status_label.SetForegroundColour(FG_SECONDARY)
         row.Add(self._path_status_label, 1, wx.EXPAND)
@@ -197,7 +197,7 @@ class FileSettingsView(wx.Panel):
 
     def _make_row_software(self, label_font: wx.Font) -> wx.Sizer:
         row = wx.BoxSizer(wx.HORIZONTAL)
-        cal_font = scaled_font(11)
+        cal_font = scaled_font(12)
 
         left = wx.BoxSizer(wx.VERTICAL)
         top_left = wx.BoxSizer(wx.HORIZONTAL)
