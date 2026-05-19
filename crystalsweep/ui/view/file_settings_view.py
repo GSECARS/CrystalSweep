@@ -1,0 +1,363 @@
+#!/usr/bin/python
+# ----------------------------------------------------------------------------------
+# Project: Crystalsweep
+# File: crystalsweep/ui/view/file_settings_view.py
+# ----------------------------------------------------------------------------------
+# Purpose:
+# File settings panel displayed at the top of the left side panel.  Exposes
+# filename, directory path (with folder-browser button), frame number (with
+# reset and update buttons), map extension, image-format checkboxes, and
+# external software toggles with load-calibration buttons.
+# ----------------------------------------------------------------------------------
+# Author: Christofanis Skordas
+#
+# Copyright (c) 2026 GSECARS, The University of Chicago, USA
+# Copyright (c) 2026 NSF SEES, USA
+# ----------------------------------------------------------------------------------
+
+import sys
+from pathlib import Path
+from typing import Callable
+
+import wx
+
+from crystalsweep.ui.view.custom.icons import draw_folder_open, draw_refresh, draw_update
+from crystalsweep.ui.view.custom.theme import (
+    ACCENT,
+    BG_CARD,
+    BG_ELEVATED,
+    BG_SURFACE,
+    FG_PRIMARY,
+    FG_SECONDARY,
+    SEP_COLOUR,
+    scaled_font,
+)
+from crystalsweep.ui.view.custom.widgets import DarkTextCtrl, DarkToggle, FlatButton, IconButton
+
+__all__ = ["FileSettingsView"]
+
+_DEFAULT_MAP_EXT = "map"
+
+
+class FileSettingsView(wx.Panel):
+    """File settings panel: filename, path, frame #, map ext, format flags, software flags."""
+
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent)
+
+        self._on_filename_changed_cb: Callable[[str], None] | None = None
+        self._on_directory_changed_cb: Callable[[Path], None] | None = None
+        self._on_frame_reset_cb: Callable[[], None] | None = None
+        self._on_frame_update_cb: Callable[[int], None] | None = None
+        self._on_map_ext_changed_cb: Callable[[str], None] | None = None
+        self._on_hdf5_changed_cb: Callable[[bool], None] | None = None
+        self._on_cbf_changed_cb: Callable[[bool], None] | None = None
+        self._on_tif_changed_cb: Callable[[bool], None] | None = None
+        self._on_crysalis_changed_cb: Callable[[bool], None] | None = None
+        self._on_crysalis_calibration_cb: Callable[[Path], None] | None = None
+        self._on_apex_changed_cb: Callable[[bool], None] | None = None
+        self._on_apex_calibration_cb: Callable[[Path], None] | None = None
+
+        self.SetBackgroundColour(BG_CARD)
+        self._build_layout()
+
+    def _build_layout(self) -> None:
+        label_font = scaled_font(11)
+        section_font = scaled_font(11, weight=wx.FONTWEIGHT_BOLD)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+        outer.AddSpacer(6)
+
+        outer.Add(self._make_section_label("File Settings", section_font), 0, wx.LEFT | wx.RIGHT, 10)
+        outer.AddSpacer(6)
+
+        outer.Add(self._make_sep(), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
+        outer.AddSpacer(6)
+
+        outer.Add(self._make_row_filename(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.AddSpacer(4)
+
+        outer.Add(self._make_row_path(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.AddSpacer(4)
+
+        outer.Add(self._make_row_frame(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.AddSpacer(4)
+
+        outer.Add(self._make_row_map_ext(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.AddSpacer(8)
+
+        outer.Add(self._make_sep(), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
+        outer.AddSpacer(6)
+
+        outer.Add(self._make_row_format_checkboxes(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.AddSpacer(8)
+
+        outer.Add(self._make_sep(), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
+        outer.AddSpacer(6)
+
+        outer.Add(self._make_row_crysalis(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.AddSpacer(4)
+
+        outer.Add(self._make_row_apex(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.AddSpacer(8)
+
+        self.SetSizer(outer)
+
+    def _make_section_label(self, text: str, font: wx.Font) -> wx.StaticText:
+        lbl = wx.StaticText(self, label=text)
+        lbl.SetFont(font)
+        lbl.SetForegroundColour(FG_PRIMARY)
+        lbl.SetBackgroundColour(BG_CARD)
+        return lbl
+
+    def _make_sep(self) -> wx.Panel:
+        sep = wx.Panel(self, size=(-1, 1))
+        sep.SetBackgroundColour(SEP_COLOUR)
+        return sep
+
+    def _field_label(self, text: str, font: wx.Font) -> wx.StaticText:
+        lbl = wx.StaticText(self, label=text)
+        lbl.SetFont(font)
+        lbl.SetForegroundColour(FG_SECONDARY)
+        lbl.SetBackgroundColour(BG_CARD)
+        return lbl
+
+    def _make_row_filename(self, label_font: wx.Font) -> wx.Sizer:
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        lbl = self._field_label("Filename", label_font)
+        lbl.SetMinSize((70, -1))
+        self._filename_ctrl = DarkTextCtrl(self, placeholder="filename")
+        self._filename_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_filename_enter)
+        self._filename_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_filename_enter)
+        row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(6)
+        row.Add(self._filename_ctrl, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        return row
+
+    def _make_row_path(self, label_font: wx.Font) -> wx.Sizer:
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        lbl = self._field_label("Path", label_font)
+        lbl.SetMinSize((70, -1))
+        self._path_ctrl = DarkTextCtrl(self, placeholder="directory path")
+        self._path_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_path_enter)
+        self._path_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_path_enter)
+        self._path_browse_btn = IconButton(self, draw_folder_open, size=16, tooltip="Browse for directory")
+        self._path_browse_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_directory())
+        row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(6)
+        row.Add(self._path_ctrl, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(4)
+        row.Add(self._path_browse_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+        return row
+
+    def _make_row_frame(self, label_font: wx.Font) -> wx.Sizer:
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        lbl = self._field_label("Frame #", label_font)
+        lbl.SetMinSize((70, -1))
+        self._frame_ctrl = DarkTextCtrl(self, value="0", placeholder="0")
+        self._frame_reset_btn = IconButton(self, draw_refresh, size=16, tooltip="Reset frame number")
+        self._frame_reset_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_reset())
+        self._frame_update_btn = IconButton(self, draw_update, size=16, tooltip="Apply frame number")
+        self._frame_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_update())
+        row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(6)
+        row.Add(self._frame_ctrl, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(4)
+        row.Add(self._frame_reset_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(2)
+        row.Add(self._frame_update_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+        return row
+
+    def _make_row_map_ext(self, label_font: wx.Font) -> wx.Sizer:
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        lbl = self._field_label("Map ext.", label_font)
+        lbl.SetMinSize((70, -1))
+        self._map_ext_ctrl = DarkTextCtrl(self, value=_DEFAULT_MAP_EXT, placeholder="map")
+        self._map_ext_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_map_ext_enter)
+        self._map_ext_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_map_ext_enter)
+        row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(6)
+        row.Add(self._map_ext_ctrl, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        return row
+
+    def _make_row_format_checkboxes(self, label_font: wx.Font) -> wx.Sizer:
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        self._hdf5_toggle = DarkToggle(self, "HDF5")
+        self._hdf5_toggle.SetBackgroundColour(BG_CARD)
+        self._hdf5_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_hdf5_changed_cb, v))
+        self._cbf_toggle = DarkToggle(self, "CBF")
+        self._cbf_toggle.SetBackgroundColour(BG_CARD)
+        self._cbf_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_cbf_changed_cb, v))
+        self._tif_toggle = DarkToggle(self, "TIF")
+        self._tif_toggle.SetBackgroundColour(BG_CARD)
+        self._tif_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_tif_changed_cb, v))
+        row.Add(self._hdf5_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(10)
+        row.Add(self._cbf_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(10)
+        row.Add(self._tif_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+        return row
+
+    def _make_row_crysalis(self, label_font: wx.Font) -> wx.Sizer:
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        self._crysalis_toggle = DarkToggle(self, "Use CrysAlis")
+        self._crysalis_toggle.SetBackgroundColour(BG_CARD)
+        self._crysalis_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_crysalis_changed_cb, v))
+        self._crysalis_cal_btn = FlatButton(self, "Load Calibration")
+        self._crysalis_cal_btn.SetMinSize((110, 26))
+        self._crysalis_cal_btn.set_action(self._browse_crysalis_calibration)
+        row.Add(self._crysalis_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(8)
+        row.Add(self._crysalis_cal_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+        return row
+
+    def _make_row_apex(self, label_font: wx.Font) -> wx.Sizer:
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        self._apex_toggle = DarkToggle(self, "Use APEX")
+        self._apex_toggle.SetBackgroundColour(BG_CARD)
+        self._apex_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_apex_changed_cb, v))
+        self._apex_cal_btn = FlatButton(self, "Load Calibration")
+        self._apex_cal_btn.SetMinSize((110, 26))
+        self._apex_cal_btn.set_action(self._browse_apex_calibration)
+        row.Add(self._apex_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(8)
+        row.Add(self._apex_cal_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+        return row
+
+    def bind_filename_changed(self, callback: Callable[[str], None]) -> None:
+        self._on_filename_changed_cb = callback
+
+    def bind_directory_changed(self, callback: Callable[[Path], None]) -> None:
+        self._on_directory_changed_cb = callback
+
+    def bind_frame_reset(self, callback: Callable[[], None]) -> None:
+        self._on_frame_reset_cb = callback
+
+    def bind_frame_update(self, callback: Callable[[int], None]) -> None:
+        self._on_frame_update_cb = callback
+
+    def bind_map_ext_changed(self, callback: Callable[[str], None]) -> None:
+        self._on_map_ext_changed_cb = callback
+
+    def bind_hdf5_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_hdf5_changed_cb = callback
+
+    def bind_cbf_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_cbf_changed_cb = callback
+
+    def bind_tif_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_tif_changed_cb = callback
+
+    def bind_crysalis_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_crysalis_changed_cb = callback
+
+    def bind_crysalis_calibration(self, callback: Callable[[Path], None]) -> None:
+        self._on_crysalis_calibration_cb = callback
+
+    def bind_apex_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_apex_changed_cb = callback
+
+    def bind_apex_calibration(self, callback: Callable[[Path], None]) -> None:
+        self._on_apex_calibration_cb = callback
+
+    def set_filename(self, value: str) -> None:
+        self._filename_ctrl.SetValue(value)
+
+    def set_directory(self, path: Path) -> None:
+        self._path_ctrl.SetValue(str(path) if path != Path() else "")
+
+    def set_frame_number(self, value: int) -> None:
+        self._frame_ctrl.SetValue(str(value))
+
+    def set_map_ext(self, value: str) -> None:
+        self._map_ext_ctrl.SetValue(value)
+
+    def set_hdf5(self, value: bool) -> None:
+        self._hdf5_toggle.SetValue(value)
+
+    def set_cbf(self, value: bool) -> None:
+        self._cbf_toggle.SetValue(value)
+
+    def set_tif(self, value: bool) -> None:
+        self._tif_toggle.SetValue(value)
+
+    def set_crysalis(self, value: bool) -> None:
+        self._crysalis_toggle.SetValue(value)
+
+    def set_apex(self, value: bool) -> None:
+        self._apex_toggle.SetValue(value)
+
+    def _fire(self, cb, value) -> None:
+        if cb is not None:
+            cb(value)
+
+    def _on_filename_enter(self, event: wx.Event) -> None:
+        value = self._filename_ctrl.GetValue()
+        if self._on_filename_changed_cb is not None:
+            self._on_filename_changed_cb(value)
+        event.Skip()
+
+    def _on_path_enter(self, event: wx.Event) -> None:
+        raw = self._path_ctrl.GetValue().strip()
+        if self._on_directory_changed_cb is not None and raw:
+            self._on_directory_changed_cb(Path(raw))
+        event.Skip()
+
+    def _on_frame_reset(self) -> None:
+        self._frame_ctrl.SetValue("0")
+        if self._on_frame_reset_cb is not None:
+            self._on_frame_reset_cb()
+
+    def _on_frame_update(self) -> None:
+        try:
+            value = int(self._frame_ctrl.GetValue())
+        except ValueError:
+            return
+        if self._on_frame_update_cb is not None:
+            self._on_frame_update_cb(value)
+
+    def _on_map_ext_enter(self, event: wx.Event) -> None:
+        value = self._map_ext_ctrl.GetValue().strip()
+        if value and self._on_map_ext_changed_cb is not None:
+            self._on_map_ext_changed_cb(value)
+        event.Skip()
+
+    def _browse_directory(self) -> None:
+        with wx.DirDialog(
+            self,
+            "Select directory",
+            defaultPath=self._path_ctrl.GetValue() or str(Path.home()),
+            style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+        ) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            chosen = Path(dlg.GetPath())
+        self._path_ctrl.SetValue(str(chosen))
+        if self._on_directory_changed_cb is not None:
+            self._on_directory_changed_cb(chosen)
+
+    def _browse_crysalis_calibration(self) -> None:
+        with wx.FileDialog(
+            self,
+            "Load CrysAlis calibration file",
+            wildcard="All files (*.*)|*.*" if sys.platform == "win32" else "*",
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        ) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            chosen = Path(dlg.GetPath())
+        if self._on_crysalis_calibration_cb is not None:
+            self._on_crysalis_calibration_cb(chosen)
+
+    def _browse_apex_calibration(self) -> None:
+        with wx.FileDialog(
+            self,
+            "Load APEX calibration file",
+            wildcard="All files (*.*)|*.*" if sys.platform == "win32" else "*",
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        ) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            chosen = Path(dlg.GetPath())
+        if self._on_apex_calibration_cb is not None:
+            self._on_apex_calibration_cb(chosen)

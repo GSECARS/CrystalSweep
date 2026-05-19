@@ -23,6 +23,7 @@ from crystalsweep.ui.view.custom import (
     IntensityHistogramWidget,
     colormap_color,
 )
+from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.main_view import MainView
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
     "COLORMAP_NAMES",
     "CUSTOM_COLORMAPS",
     "colormap_color",
+    "FileSettingsView",
     "ImageCanvas",
     "IntegrationPlot",
     "IntensityHistogramWidget",

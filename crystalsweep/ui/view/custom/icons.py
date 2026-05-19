@@ -19,7 +19,7 @@ import wx
 
 from crystalsweep.ui.view.custom.theme import ACCENT, BG_SURFACE, ICON_FG
 
-__all__ = ["draw_folder", "draw_chevron_left", "draw_chevron_right", "draw_cog"]
+__all__ = ["draw_folder", "draw_chevron_left", "draw_chevron_right", "draw_cog", "draw_folder_open", "draw_refresh", "draw_update"]
 
 
 def draw_folder(gc: wx.GraphicsContext, s: int) -> None:
@@ -98,3 +98,61 @@ def draw_cog(gc: wx.GraphicsContext, s: int) -> None:
     gc.FillPath(path)
     gc.SetBrush(wx.Brush(BG_SURFACE))
     gc.FillPath(hole)
+
+
+def draw_folder_open(gc: wx.GraphicsContext, s: int) -> None:
+    """Open folder icon for directory selection."""
+    m, r = s * 0.1, s * 0.07
+    body = gc.CreatePath()
+    body.AddRoundedRectangle(m, m + s * 0.18, s - 2 * m, s - 2 * m - s * 0.18, r)
+    gc.SetBrush(wx.Brush(wx.Colour(ACCENT.Red(), ACCENT.Green(), ACCENT.Blue(), 200)))
+    gc.SetPen(wx.TRANSPARENT_PEN)
+    gc.FillPath(body)
+    tab = gc.CreatePath()
+    tab.AddRoundedRectangle(m, m, s * 0.38, s * 0.18 + r, r * 0.8)
+    gc.FillPath(tab)
+    gc.SetPen(wx.Pen(BG_SURFACE, max(1, int(s * 0.09)), wx.PENSTYLE_SOLID))
+    cx, cy = s * 0.62, s * 0.6
+    aw = s * 0.18
+    path = gc.CreatePath()
+    path.MoveToPoint(cx - aw, cy)
+    path.AddLineToPoint(cx + aw, cy)
+    gc.StrokePath(path)
+
+
+def draw_refresh(gc: wx.GraphicsContext, s: int) -> None:
+    """Circular refresh / reset arrow icon."""
+    cx, cy, r = s * 0.5, s * 0.5, s * 0.32
+    gc.SetPen(wx.Pen(ICON_FG, max(1, int(s * 0.1)), wx.PENSTYLE_SOLID))
+    gc.SetBrush(wx.TRANSPARENT_BRUSH)
+    path = gc.CreatePath()
+    path.AddArc(cx, cy, r, math.radians(30), math.radians(330), True)
+    gc.StrokePath(path)
+    ang = math.radians(30)
+    tx, ty = cx + r * math.cos(ang), cy + r * math.sin(ang)
+    head = s * 0.12
+    path2 = gc.CreatePath()
+    path2.MoveToPoint(tx - head, ty)
+    path2.AddLineToPoint(tx, ty - head)
+    path2.AddLineToPoint(tx + head * 0.4, ty + head * 0.7)
+    gc.StrokePath(path2)
+
+
+def draw_update(gc: wx.GraphicsContext, s: int) -> None:
+    """Upward arrow icon representing an update / apply action."""
+    cx = s * 0.5
+    stem_top = s * 0.22
+    stem_bot = s * 0.78
+    stem_w = s * 0.1
+    head_w = s * 0.28
+    gc.SetBrush(wx.Brush(ICON_FG))
+    gc.SetPen(wx.TRANSPARENT_PEN)
+    stem = gc.CreatePath()
+    stem.AddRectangle(cx - stem_w / 2, stem_top + s * 0.14, stem_w, stem_bot - stem_top - s * 0.14)
+    gc.FillPath(stem)
+    arrow = gc.CreatePath()
+    arrow.MoveToPoint(cx, stem_top)
+    arrow.AddLineToPoint(cx - head_w / 2, stem_top + s * 0.22)
+    arrow.AddLineToPoint(cx + head_w / 2, stem_top + s * 0.22)
+    arrow.CloseSubpath()
+    gc.FillPath(arrow)
