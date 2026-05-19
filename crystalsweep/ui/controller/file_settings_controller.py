@@ -100,6 +100,7 @@ class FileSettingsController:
 
     def _on_crysalis_calibration(self, path: Path) -> None:
         self._model.file_settings.crysalis_calibration = path
+        self._view.file_settings.set_crysalis_calibration_label(path)
         _log.debug("file_settings.crysalis_calibration = %s", path)
 
     def _on_apex_changed(self, value: bool) -> None:
@@ -108,4 +109,5 @@ class FileSettingsController:
 
     def _on_apex_calibration(self, path: Path) -> None:
         self._model.file_settings.apex_calibration = path
+        self._view.file_settings.set_apex_calibration_label(path)
         _log.debug("file_settings.apex_calibration = %s", path)

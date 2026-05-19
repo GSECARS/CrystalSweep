@@ -237,12 +237,13 @@ class LiveToggle(wx.Control):
 class IconButton(wx.Panel):
     """Borderless icon button with hover and press background effects."""
 
-    def __init__(self, parent: wx.Window, draw_fn: Callable, size: int = ICON_SIZE, tooltip: str = "") -> None:
+    def __init__(self, parent: wx.Window, draw_fn: Callable, size: int = ICON_SIZE, tooltip: str = "", bg: wx.Colour | None = None) -> None:
         super().__init__(parent, size=wx.Size(size + 8, size + 8), style=wx.BORDER_NONE)
         self._draw_fn = draw_fn
         self._icon_size = size
         self._hovered = False
         self._pressed = False
+        self._idle_bg: wx.Colour = bg if bg is not None else wx.Colour(0, 0, 0)
         self._callback: Callable[[wx.CommandEvent], None] | None = None
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         if tooltip:
@@ -270,12 +271,15 @@ class IconButton(wx.Panel):
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(self._idle_bg))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
         if self._pressed:
             bg = BTN_PRESS_BG
         elif self._hovered:
             bg = BTN_HOVER_BG
         else:
-            bg = wx.Colour(0, 0, 0)
+            bg = self._idle_bg
         gc.SetBrush(wx.Brush(bg))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRoundedRectangle(0, 0, w, h, 4)
@@ -311,9 +315,10 @@ class IconButton(wx.Panel):
 class DarkTextCtrl(wx.Panel):
     """Custom-painted editable text field, dark-styled with centered text."""
 
-    def __init__(self, parent: wx.Window, value: str = "", placeholder: str = "") -> None:
-        super().__init__(parent, style=wx.BORDER_NONE, size=wx.Size(80, 32))
+    def __init__(self, parent: wx.Window, value: str = "", placeholder: str = "", parent_bg: wx.Colour | None = None) -> None:
+        super().__init__(parent, style=wx.BORDER_NONE, size=wx.Size(80, 28))
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self._parent_bg: wx.Colour = parent_bg if parent_bg is not None else BG_SURFACE
         self._value = value
         self._placeholder = placeholder
         self._editing = False
@@ -486,6 +491,9 @@ class DarkTextCtrl(wx.Panel):
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(self._parent_bg))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
         if self._disabled:
             bg = BG_SURFACE
         elif self._error:
