@@ -14,6 +14,7 @@
 # ----------------------------------------------------------------------------------
 
 import logging
+import threading
 from typing import Callable
 
 import wx
@@ -139,6 +140,16 @@ class BeamlineConfigController:
         if len(shorthands) != len(set(shorthands)):
             panel.set_status("Motor shorthands must be unique.", error=True)
             return
+
+        all_motors = [config.rotation_motor] + list(config.motors) if config.rotation_motor else list(config.motors)
+        pvs = [m.pv.strip() for m in all_motors if m.pv.strip()]
+
+        def _check_pvs() -> None:
+            offline = [pv for pv in pvs if not self._model.epics.is_online(pv)]
+            if offline:
+                wx.CallAfter(panel.set_status, f"Warning: PV(s) unreachable: {', '.join(offline)}", True)
+
+        threading.Thread(target=_check_pvs, daemon=True).start()
 
         try:
             path = self._model.beamline.save(config)

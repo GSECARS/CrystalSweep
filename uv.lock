@@ -135,6 +135,7 @@ dependencies = [
     { name = "p4p" },
     { name = "pillow" },
     { name = "pydantic" },
+    { name = "pyepics" },
     { name = "pyfai" },
     { name = "pyopengl" },
     { name = "pyopengl-accelerate" },
@@ -161,6 +162,7 @@ requires-dist = [
     { name = "p4p", specifier = ">=4.2.2" },
     { name = "pillow", specifier = ">=11.2.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pyepics", specifier = ">=3.5.9" },
     { name = "pyfai", specifier = ">=2026.3.0" },
     { name = "pyopengl", specifier = ">=3.1.10" },
     { name = "pyopengl-accelerate", specifier = ">=3.1.10" },
@@ -698,6 +700,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/30/a6/9f9f380dbb301f67023bf8f707aaa75daadf84f7152d95c410fd7e81d994/pydantic_core-2.46.4-cp314-cp314t-win32.whl", hash = "sha256:e846ae7835bf0703ae43f534ab79a867146dadd59dc9ca5c8b53d5c8f7c9ef02", size = 1955575, upload-time = "2026-05-06T13:38:51.116Z" },
     { url = "https://files.pythonhosted.org/packages/40/1f/f1eb9eb350e795d1af8586289746f5c5677d16043040d63710e22abc43c9/pydantic_core-2.46.4-cp314-cp314t-win_amd64.whl", hash = "sha256:2108ba5c1c1eca18030634489dc544844144ee36357f2f9f780b93e7ddbb44b5", size = 2051624, upload-time = "2026-05-06T13:38:21.672Z" },
     { url = "https://files.pythonhosted.org/packages/f6/d2/42dd53d0a85c27606f316d3aa5d2869c4e8470a5ed6dec30e4a1abe19192/pydantic_core-2.46.4-cp314-cp314t-win_arm64.whl", hash = "sha256:4fcbe087dbc2068af7eda3aa87634eba216dbda64d1ae73c8684b621d33f6596", size = 2017325, upload-time = "2026-05-06T13:40:52.723Z" },
+]
+
+[[package]]
+name = "pyepics"
+version = "3.5.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pyparsing" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8a/56/b7edf871ec2d81ecc600a7687cf9c536759f31ea482e8aec453c6dd12d21/pyepics-3.5.9.tar.gz", hash = "sha256:78222c1a8aff55bc7a93bdcb6eea9cb544fa8b9122daed1e7ea5b5e87269d45c", size = 6149589, upload-time = "2025-12-17T17:16:33.913Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/83/7dafb09fbc3efe9d00c4667d22b32b53d08e8a676fa164c6dd8f5debe85e/pyepics-3.5.9-py3-none-any.whl", hash = "sha256:b9863cc55a58542f0a28ad04621d4471f649e9cacfa4ccf346a58d6ba158640c", size = 5332286, upload-time = "2025-12-17T17:16:31.93Z" },
 ]
 
 [[package]]
