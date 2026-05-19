@@ -19,7 +19,6 @@ import numpy as np
 
 try:
     import h5py
-    import hdf5plugin as _hdf5plugin  # noqa: F401 - imported for compression filter side effects
 
     HAS_H5PY = True
 except ImportError:
