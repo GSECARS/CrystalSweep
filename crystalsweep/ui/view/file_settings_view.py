@@ -131,7 +131,7 @@ class FileSettingsView(wx.Panel):
         self._filename_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_filename_enter)
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(6)
-        row.Add(self._filename_ctrl, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        row.Add(self._filename_ctrl, 1, wx.EXPAND)
         return row
 
     def _make_row_path(self, label_font: wx.Font) -> wx.Sizer:
@@ -145,7 +145,7 @@ class FileSettingsView(wx.Panel):
         self._path_browse_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_directory())
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(6)
-        row.Add(self._path_ctrl, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        row.Add(self._path_ctrl, 1, wx.EXPAND)
         row.AddSpacer(4)
         row.Add(self._path_browse_btn, 0, wx.ALIGN_CENTER_VERTICAL)
         return row
@@ -161,7 +161,7 @@ class FileSettingsView(wx.Panel):
         self._frame_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_update())
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(6)
-        row.Add(self._frame_ctrl, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        row.Add(self._frame_ctrl, 1, wx.EXPAND)
         row.AddSpacer(4)
         row.Add(self._frame_reset_btn, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(2)
@@ -177,7 +177,7 @@ class FileSettingsView(wx.Panel):
         self._map_ext_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_map_ext_enter)
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(6)
-        row.Add(self._map_ext_ctrl, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        row.Add(self._map_ext_ctrl, 1, wx.EXPAND)
         return row
 
     def _make_row_format_checkboxes(self, label_font: wx.Font) -> wx.Sizer:
