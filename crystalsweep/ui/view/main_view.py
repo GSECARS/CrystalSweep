@@ -12,6 +12,7 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+import sys
 from typing import Callable
 
 import wx
@@ -20,7 +21,7 @@ from wxutils import Popup
 from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE
-from crystalsweep.ui.view.custom.widgets import ThemedSplitter
+from crystalsweep.ui.view.custom.widgets import DarkMenuBar, ThemedSplitter
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 
 __all__ = ["MainView"]
@@ -58,7 +59,7 @@ class MainView(wx.Frame):
         self._splitter.SplitVertically(self._left_panel, self.ad_viewer, _LEFT_PANEL_W)
         self._splitter.Bind(wx.EVT_SPLITTER_SASH_POS_CHANGING, self._on_sash_changing)
 
-        self._build_menu_bar()
+        self._menu_bar = self._build_menu_bar()
         self.Bind(wx.EVT_CLOSE, self._close_event_handler)
         self._configure_main_window()
 
@@ -71,23 +72,41 @@ class MainView(wx.Frame):
         """Set the handler invoked when File -> Configuration is selected."""
         self._open_config_cb = callback
 
-    def _build_menu_bar(self) -> None:
-        menu_bar = wx.MenuBar()
+    def _build_menu_bar(self) -> DarkMenuBar | None:
+        if sys.platform == "darwin":
+            menu_bar = wx.MenuBar()
+            file_menu = wx.Menu()
+            config_item = file_menu.Append(wx.ID_ANY, "Configuration\tCtrl+,", "Edit beamline configuration")
+            file_menu.AppendSeparator()
+            exit_item = file_menu.Append(wx.ID_EXIT, "Exit\tCtrl+Q", "Close the application")
+            menu_bar.Append(file_menu, "&File")
+            self.SetMenuBar(menu_bar)
+            self.Bind(wx.EVT_MENU, self._on_open_configuration, config_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self.Close(), exit_item)
+            return None
 
-        file_menu = wx.Menu()
-        config_item = file_menu.Append(wx.ID_ANY, "Configuration\tCtrl+,", "Edit beamline configuration")
-        file_menu.AppendSeparator()
-        exit_item = file_menu.Append(wx.ID_EXIT, "Exit\tCtrl+Q", "Close the application")
+        bar = DarkMenuBar(self)
+        bar.append_menu(
+            title="File",
+            items=["Configuration", None, "Exit"],
+            shortcuts=["Ctrl+,", None, "Ctrl+Q"],
+            callbacks=[self._on_open_configuration, None, self._on_exit],
+        )
+        accel = wx.AcceleratorTable([
+            wx.AcceleratorEntry(wx.ACCEL_CTRL, ord(","), wx.ID_ANY),
+            wx.AcceleratorEntry(wx.ACCEL_CTRL, ord("Q"), wx.ID_EXIT),
+        ])
+        self.SetAcceleratorTable(accel)
+        self.Bind(wx.EVT_MENU, lambda _e: self._on_open_configuration(), id=wx.ID_ANY)
+        self.Bind(wx.EVT_MENU, lambda _e: self.Close(), id=wx.ID_EXIT)
+        return bar
 
-        menu_bar.Append(file_menu, "&File")
-        self.SetMenuBar(menu_bar)
-
-        self.Bind(wx.EVT_MENU, self._on_open_configuration, config_item)
-        self.Bind(wx.EVT_MENU, lambda _e: self.Close(), exit_item)
-
-    def _on_open_configuration(self, _event: wx.CommandEvent) -> None:
+    def _on_open_configuration(self, _event: wx.CommandEvent | None = None) -> None:
         if self._open_config_cb is not None:
             self._open_config_cb()
+
+    def _on_exit(self) -> None:
+        self.Close()
 
     def _configure_main_window(self) -> None:
         """Configures the main wx Frame of the application."""
@@ -95,6 +114,8 @@ class MainView(wx.Frame):
         self.SetBackgroundColour(BG_SURFACE)
 
         main_sizer = wx.BoxSizer(wx.VERTICAL)
+        if self._menu_bar is not None:
+            main_sizer.Add(self._menu_bar, 0, wx.EXPAND)
         main_sizer.Add(self._splitter, 1, wx.EXPAND | wx.ALL, 5)
 
         self.SetSizer(main_sizer)
