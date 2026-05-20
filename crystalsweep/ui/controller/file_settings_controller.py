@@ -34,7 +34,9 @@ class FileSettingsController:
 
         fs = self._view.file_settings
         fs.bind_filename_changed(self._on_filename_changed)
+        fs.bind_filename_update(self._on_filename_update)
         fs.bind_directory_changed(self._on_directory_changed)
+        fs.bind_path_update(self._on_path_update)
         fs.bind_frame_reset(self._on_frame_reset)
         fs.bind_frame_update(self._on_frame_update)
         fs.bind_map_ext_changed(self._on_map_ext_changed)
@@ -65,9 +67,15 @@ class FileSettingsController:
         self._model.file_settings.filename = value
         _log.debug("file_settings.filename = %r", value)
 
+    def _on_filename_update(self) -> None:
+        _log.debug("file_settings: filename update from PV not yet implemented")
+
     def _on_directory_changed(self, path: Path) -> None:
         self._model.file_settings.directory = path
         _log.debug("file_settings.directory = %s", path)
+
+    def _on_path_update(self) -> None:
+        _log.debug("file_settings: path update from PV not yet implemented")
 
     def _on_frame_reset(self) -> None:
         self._model.file_settings.reset_frame_number()

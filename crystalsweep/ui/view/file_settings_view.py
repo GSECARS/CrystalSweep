@@ -50,7 +50,9 @@ class FileSettingsView(wx.Panel):
         super().__init__(parent)
 
         self._on_filename_changed_cb: Callable[[str], None] | None = None
+        self._on_filename_update_cb: Callable[[], None] | None = None
         self._on_directory_changed_cb: Callable[[Path], None] | None = None
+        self._on_path_update_cb: Callable[[], None] | None = None
         self._on_frame_reset_cb: Callable[[], None] | None = None
         self._on_frame_update_cb: Callable[[int], None] | None = None
         self._on_map_ext_changed_cb: Callable[[str], None] | None = None
@@ -124,9 +126,13 @@ class FileSettingsView(wx.Panel):
         self._filename_ctrl = DarkTextCtrl(self, placeholder="filename", parent_bg=BG_CARD)
         self._filename_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_filename_enter)
         self._filename_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_filename_enter)
+        self._filename_update_btn = IconButton(self, draw_update, size=16, tooltip="Update filename", bg=BG_CARD)
+        self._filename_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_filename_update_cb))
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(6)
         row.Add(self._filename_ctrl, 1, wx.EXPAND)
+        row.AddSpacer(2)
+        row.Add(self._filename_update_btn, 0, wx.ALIGN_CENTER_VERTICAL)
         return row
 
     def _make_row_path(self, label_font: wx.Font) -> wx.Sizer:
@@ -138,11 +144,15 @@ class FileSettingsView(wx.Panel):
         self._path_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_path_enter)
         self._path_browse_btn = IconButton(self, draw_folder_open, size=16, tooltip="Browse for directory", bg=BG_CARD)
         self._path_browse_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_directory())
+        self._path_update_btn = IconButton(self, draw_update, size=16, tooltip="Update path", bg=BG_CARD)
+        self._path_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_path_update_cb))
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(6)
         row.Add(self._path_ctrl, 1, wx.EXPAND)
         row.AddSpacer(4)
         row.Add(self._path_browse_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(2)
+        row.Add(self._path_update_btn, 0, wx.ALIGN_CENTER_VERTICAL)
         return row
 
     def _make_row_path_status(self, label_font: wx.Font) -> wx.Sizer:
@@ -161,7 +171,7 @@ class FileSettingsView(wx.Panel):
         self._frame_ctrl.SetSize(wx.Size(62, 28))
         self._frame_reset_btn = IconButton(self, draw_refresh, size=16, tooltip="Reset frame number", bg=BG_CARD)
         self._frame_reset_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_reset())
-        self._frame_update_btn = IconButton(self, draw_update, size=16, tooltip="Apply frame number", bg=BG_CARD)
+        self._frame_update_btn = IconButton(self, draw_update, size=16, tooltip="Update frame number", bg=BG_CARD)
         self._frame_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_update())
         self._hdf5_toggle = DarkToggle(self, "HDF5")
         self._hdf5_toggle.SetBackgroundColour(BG_CARD)
@@ -250,8 +260,14 @@ class FileSettingsView(wx.Panel):
     def bind_filename_changed(self, callback: Callable[[str], None]) -> None:
         self._on_filename_changed_cb = callback
 
+    def bind_filename_update(self, callback: Callable[[], None]) -> None:
+        self._on_filename_update_cb = callback
+
     def bind_directory_changed(self, callback: Callable[[Path], None]) -> None:
         self._on_directory_changed_cb = callback
+
+    def bind_path_update(self, callback: Callable[[], None]) -> None:
+        self._on_path_update_cb = callback
 
     def bind_frame_reset(self, callback: Callable[[], None]) -> None:
         self._on_frame_reset_cb = callback
@@ -328,8 +344,12 @@ class FileSettingsView(wx.Panel):
             self._apex_cal_label.SetForegroundColour(FG_SECONDARY)
         self._apex_cal_label.Refresh()
 
-    def _fire(self, cb, value) -> None:
-        if cb is not None:
+    def _fire(self, cb, value=None) -> None:
+        if cb is None:
+            return
+        if value is None:
+            cb()
+        else:
             cb(value)
 
     def _validate_path(self) -> None:
