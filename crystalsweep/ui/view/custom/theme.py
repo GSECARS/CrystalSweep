@@ -17,7 +17,7 @@ import sys
 import wx
 
 _PT_TO_PX = {9: 10, 10: 11, 11: 12, 12: 13, 13: 14}
-_WIN_PX_ADJUST = -3
+_WIN_PX_ADJUST = -1
 
 
 def scaled_font(
