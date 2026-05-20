@@ -243,6 +243,15 @@ class _CollectionRow(wx.Panel):
         self._selected = selected
         self.Refresh()
 
+    def refresh_from_point(self, point: "CollectionPoint") -> None:
+        if point.scan_type in SCAN_TYPES:
+            self._type_combo.SetSelection(list(SCAN_TYPES).index(point.scan_type))
+        self._time_ctrl.SetValue(point.time)
+        self._rot_start_ctrl.SetValue(point.rotation_start)
+        self._rot_end_ctrl.SetValue(point.rotation_end)
+        self._step_ctrl.SetValue(point.step)
+        self._apply_scan_type_state(point.scan_type)
+
     def update_col_widths(self, col_widths: list[int]) -> None:
         self._col_widths = col_widths
         self._reposition()
@@ -517,21 +526,12 @@ class CollectionTableView(wx.Panel):
         scroll_row.Add(self._viewport, 1, wx.EXPAND)
         scroll_row.Add(self._scrollbar, 0, wx.EXPAND)
 
-        footer_sep = wx.Panel(self, size=(-1, 1))
-        footer_sep.SetBackgroundColour(SEP_COLOUR)
-
-        self._add_btn = FlatButton(self, "+ Add point")
-        self._add_btn.SetMinSize((-1, 28))
-        self._add_btn.set_action(self._on_add_clicked)
-
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(title_row, 0, wx.EXPAND)
         outer.Add(title_sep, 0, wx.EXPAND)
         outer.Add(self._header, 0, wx.EXPAND)
         outer.Add(header_border, 0, wx.EXPAND)
         outer.Add(scroll_row, 1, wx.EXPAND)
-        outer.Add(footer_sep, 0, wx.EXPAND)
-        outer.Add(self._add_btn, 0, wx.EXPAND | wx.ALL, 4)
         self.SetSizer(outer)
 
     def set_columns(self, motor_shorthands: list[str], rotation_shorthand: str = "", motor_precisions: dict[str, int] | None = None, rotation_precision: int = 4) -> None:
@@ -585,6 +585,10 @@ class CollectionTableView(wx.Panel):
         self._restripe()
         self._viewport.refresh_layout()
         self._rebind_rows()
+
+    def refresh_row(self, index: int, point: CollectionPoint) -> None:
+        if 0 <= index < len(self._rows):
+            self._rows[index].refresh_from_point(point)
 
     def set_row_selected(self, index: int, selected: bool) -> None:
         if 0 <= index < len(self._rows):

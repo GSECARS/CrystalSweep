@@ -19,6 +19,7 @@ import wx
 from wxutils import Popup
 
 from crystalsweep.ui.view.ad_viewer_view import ADViewerView
+from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE
 from crystalsweep.ui.view.custom.widgets import DarkMenuBar, ThemedSplitter
@@ -47,10 +48,12 @@ class MainView(wx.Frame):
         self._left_panel.SetBackgroundColour(BG_CARD)
 
         self.file_settings = FileSettingsView(self._left_panel)
+        self.collection_settings = CollectionSettingsView(self._left_panel)
         self.collection_table = CollectionTableView(self._left_panel)
 
         left_sizer = wx.BoxSizer(wx.VERTICAL)
         left_sizer.Add(self.file_settings, 0, wx.EXPAND)
+        left_sizer.Add(self.collection_settings, 0, wx.EXPAND)
         left_sizer.Add(self.collection_table, 1, wx.EXPAND)
         self._left_panel.SetSizer(left_sizer)
 

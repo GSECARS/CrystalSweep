@@ -30,7 +30,6 @@ class CollectionTableController:
         self._model = model
         self._view = view
 
-        self._view.bind_add(self._on_add)
         self._view.bind_clear(self._on_clear)
         self._view.bind_delete_selected(self._on_delete_selected)
         self._view.bind_label_changed(self._on_label_changed)
