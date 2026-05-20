@@ -187,21 +187,34 @@ class CollectionSettingsController:
 
     def _on_add_map_points(self) -> None:
         cs = self._model.collection_settings
-        shorthands = [m.shorthand for m in self._model.beamline.active.motors if m.shorthand]
+        motors = [m for m in self._model.beamline.active.motors if m.shorthand]
+        shorthands = [m.shorthand for m in motors]
 
         def axis_positions(start: float, end: float, n: int) -> list[float]:
             if n <= 1:
                 return [start]
             return [start + (end - start) * i / (n - 1) for i in range(n)]
 
-        axis1 = axis_positions(cs.map_start, cs.map_end, cs.map_points)
-        axis2 = axis_positions(cs.map2_start, cs.map2_end, cs.map2_points) if cs.map2_enabled else [None]
+        def current_pos(motor_cfg) -> float:
+            if motor_cfg is None:
+                return 0.0
+            raw = self._model.epics.caget(motor_cfg.pv)
+            try:
+                return float(raw) if raw is not None else 0.0
+            except (ValueError, TypeError):
+                return 0.0
 
-        motor1_cfg = next((m for m in self._model.beamline.active.motors if m.shorthand == cs.map_motor), None)
-        motor2_cfg = next((m for m in self._model.beamline.active.motors if m.shorthand == cs.map2_motor), None) if cs.map2_enabled else None
+        motor1_cfg = next((m for m in motors if m.shorthand == cs.map_motor), None)
+        motor2_cfg = next((m for m in motors if m.shorthand == cs.map2_motor), None) if cs.map2_enabled else None
+
+        origin1 = current_pos(motor1_cfg)
+        origin2 = current_pos(motor2_cfg) if cs.map2_enabled else 0.0
 
         prec1 = motor1_cfg.precision if motor1_cfg else 4
         prec2 = motor2_cfg.precision if motor2_cfg else 4
+
+        axis1 = [origin1 + p for p in axis_positions(cs.map_start, cs.map_end, cs.map_points)]
+        axis2 = [origin2 + p for p in axis_positions(cs.map2_start, cs.map2_end, cs.map2_points)] if cs.map2_enabled else [None]
 
         for pos2 in axis2:
             for pos1 in axis1:
@@ -213,6 +226,13 @@ class CollectionSettingsController:
                     point.rotation_end = str(cs.rotation_end)
                 if cs.scan_type == "step":
                     point.step = str(cs.step_size)
+                for motor in motors:
+                    raw = self._model.epics.caget(motor.pv)
+                    if raw is not None:
+                        try:
+                            point.motor_positions[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
+                        except (ValueError, TypeError):
+                            pass
                 if cs.map_motor in point.motor_positions:
                     point.motor_positions[cs.map_motor] = f"{pos1:.{prec1}f}"
                 if pos2 is not None and motor2_cfg and cs.map2_motor in point.motor_positions:
@@ -220,7 +240,7 @@ class CollectionSettingsController:
                 self._view.collection_table.add_row(point)
 
         n_total = cs.map_points * (cs.map2_points if cs.map2_enabled else 1)
-        _log.debug("Added %d map collection points", n_total)
+        _log.debug("Added %d map collection points (origin1=%.4f, origin2=%.4f)", n_total, origin1, origin2)
 
     def _on_update_selected(self) -> None:
         cs = self._model.collection_settings
