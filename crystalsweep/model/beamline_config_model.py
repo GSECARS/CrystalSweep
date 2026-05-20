@@ -27,12 +27,13 @@ _ACTIVE_FILE_NAME = ".active"
 
 @dataclass(frozen=True, slots=True)
 class MotorConfig:
-    """Single motor entry: short hand, variable name, EPICS PV, and decimal precision."""
+    """Single motor entry: shorthand, description, EPICS PV, decimal precision, and mapping flag."""
 
     shorthand: str
-    name: str
+    description: str
     pv: str
     precision: int = 4
+    mapping_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,9 +173,10 @@ class BeamlineConfigModel:
         motors = tuple(
             MotorConfig(
                 shorthand=str(m.get("shorthand", "")),
-                name=str(m.get("name", "")),
+                description=str(m.get("description", m.get("name", ""))),
                 pv=str(m.get("pv", "")),
                 precision=max(0, int(m.get("precision", 4))),
+                mapping_enabled=bool(m.get("mapping_enabled", False)),
             )
             for m in motors_data
         )
@@ -184,7 +186,7 @@ class BeamlineConfigModel:
         if isinstance(rm_data, dict):
             rotation_motor = MotorConfig(
                 shorthand=str(rm_data.get("shorthand", "")),
-                name=str(rm_data.get("name", "")),
+                description=str(rm_data.get("description", rm_data.get("name", ""))),
                 pv=str(rm_data.get("pv", "")),
                 precision=max(0, int(rm_data.get("precision", 4))),
             )
@@ -208,7 +210,7 @@ class BeamlineConfigModel:
         payload: dict = {
             "beamline": config.beamline,
             "rotation_motor": (
-                {"shorthand": config.rotation_motor.shorthand, "name": config.rotation_motor.name, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision}
+                {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision}
                 if config.rotation_motor is not None
                 else {}
             ),
@@ -220,7 +222,7 @@ class BeamlineConfigModel:
                 }
                 for idx, d in enumerate(config.detectors)
             ],
-            "motors": [{"shorthand": m.shorthand, "name": m.name, "pv": m.pv, "precision": m.precision} for m in config.motors],
+            "motors": [{"shorthand": m.shorthand, "description": m.description, "pv": m.pv, "precision": m.precision, "mapping_enabled": m.mapping_enabled} for m in config.motors],
         }
 
         path = self.path_for(config.name)

@@ -20,7 +20,7 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, DANGER, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, FlatButton, RadioDot
+from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton, RadioDot
 
 __all__ = ["BeamlineConfigDialog", "BeamlineConfigView"]
 
@@ -29,12 +29,12 @@ _ROW_INPUT_HEIGHT = 28
 
 _PLACEHOLDER_BEAMLINE = "e.g. 13-IDD"
 _PLACEHOLDER_ROTATION_SHORT = "e.g. omega"
-_PLACEHOLDER_ROTATION_NAME = "e.g. rotation"
+_PLACEHOLDER_ROTATION_DESCRIPTION = "e.g. rotation"
 _PLACEHOLDER_ROTATION_PV = "e.g. 13IDD:m7.VAL"
 _PLACEHOLDER_DETECTOR_NAME = "e.g. Eiger 9M"
 _PLACEHOLDER_DETECTOR_PREFIX = "e.g. 13EIG2_9M:"
 _PLACEHOLDER_MOTOR_SHORT = "e.g. vert"
-_PLACEHOLDER_MOTOR_NAME = "e.g. vertical"
+_PLACEHOLDER_MOTOR_DESCRIPTION = "e.g. vertical"
 _PLACEHOLDER_MOTOR_PV = "e.g. 13IDD:m1.VAL"
 _PLACEHOLDER_MOTOR_PRECISION = "4"
 
@@ -138,7 +138,7 @@ class _DetectorRow(wx.Panel):
 
 
 class _MotorRow(wx.Panel):
-    """Editable row for a single motor: shorthand, variable name, PV, remove."""
+    """Editable row for a single motor: shorthand, variable name, PV, mapping toggle, remove."""
 
     def __init__(
         self,
@@ -152,12 +152,15 @@ class _MotorRow(wx.Panel):
 
         self.shorthand_ctrl = DarkTextCtrl(self, value=motor.shorthand, placeholder=_PLACEHOLDER_MOTOR_SHORT)
         self.shorthand_ctrl.SetMinSize((70, _ROW_INPUT_HEIGHT))
-        self.name_ctrl = DarkTextCtrl(self, value=motor.name, placeholder=_PLACEHOLDER_MOTOR_NAME)
-        self.name_ctrl.SetMinSize((90, _ROW_INPUT_HEIGHT))
+        self.description_ctrl = DarkTextCtrl(self, value=motor.description, placeholder=_PLACEHOLDER_MOTOR_DESCRIPTION)
+        self.description_ctrl.SetMinSize((90, _ROW_INPUT_HEIGHT))
         self.pv_ctrl = DarkTextCtrl(self, value=motor.pv, placeholder=_PLACEHOLDER_MOTOR_PV)
         self.pv_ctrl.SetMinSize((140, _ROW_INPUT_HEIGHT))
         self.precision_ctrl = DarkTextCtrl(self, value=str(motor.precision), placeholder=_PLACEHOLDER_MOTOR_PRECISION)
         self.precision_ctrl.SetMinSize((40, _ROW_INPUT_HEIGHT))
+        self.mapping_toggle = DarkToggle(self, "Map")
+        self.mapping_toggle.SetBackgroundColour(BG_CARD)
+        self.mapping_toggle.SetValue(motor.mapping_enabled)
 
         self._remove_btn = FlatButton(self, "X", color_scheme=DANGER_SCHEME)
         self._remove_btn.SetMinSize((28, _ROW_INPUT_HEIGHT))
@@ -166,9 +169,10 @@ class _MotorRow(wx.Panel):
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(self.shorthand_ctrl, 1, wx.EXPAND | wx.RIGHT, 4)
-        sizer.Add(self.name_ctrl, 2, wx.EXPAND | wx.RIGHT, 4)
+        sizer.Add(self.description_ctrl, 2, wx.EXPAND | wx.RIGHT, 4)
         sizer.Add(self.pv_ctrl, 3, wx.EXPAND | wx.RIGHT, 4)
         sizer.Add(self.precision_ctrl, 0, wx.EXPAND | wx.RIGHT, 6)
+        sizer.Add(self.mapping_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         sizer.Add(self._remove_btn, 0, wx.EXPAND)
         self.SetSizer(sizer)
 
@@ -179,9 +183,10 @@ class _MotorRow(wx.Panel):
             precision = 4
         return MotorConfig(
             shorthand=self.shorthand_ctrl.GetValue().strip(),
-            name=self.name_ctrl.GetValue().strip(),
+            description=self.description_ctrl.GetValue().strip(),
             pv=self.pv_ctrl.GetValue().strip(),
             precision=precision,
+            mapping_enabled=self.mapping_toggle.GetValue(),
         )
 
     def _request_remove(self) -> None:
@@ -240,15 +245,15 @@ class BeamlineConfigView(wx.Panel):
         rot_header.SetBackgroundColour(BG_CARD)
         rot_header_sizer = wx.BoxSizer(wx.HORIZONTAL)
         rot_header_sizer.Add(_label(rot_header, "Short", secondary=True), 1, wx.RIGHT, 4)
-        rot_header_sizer.Add(_label(rot_header, "Variable", secondary=True), 2, wx.RIGHT, 4)
+        rot_header_sizer.Add(_label(rot_header, "Description", secondary=True), 2, wx.RIGHT, 4)
         rot_header_sizer.Add(_label(rot_header, "PV  \u2731", secondary=True), 3, wx.RIGHT, 4)
         rot_header_sizer.Add(_label(rot_header, "Prec", secondary=True), 0)
         rot_header.SetSizer(rot_header_sizer)
 
         self._rotation_short_ctrl = DarkTextCtrl(r_body, placeholder=_PLACEHOLDER_ROTATION_SHORT)
         self._rotation_short_ctrl.SetMinSize((70, _ROW_INPUT_HEIGHT))
-        self._rotation_name_ctrl = DarkTextCtrl(r_body, placeholder=_PLACEHOLDER_ROTATION_NAME)
-        self._rotation_name_ctrl.SetMinSize((90, _ROW_INPUT_HEIGHT))
+        self._rotation_description_ctrl = DarkTextCtrl(r_body, placeholder=_PLACEHOLDER_ROTATION_DESCRIPTION)
+        self._rotation_description_ctrl.SetMinSize((90, _ROW_INPUT_HEIGHT))
         self._rotation_pv_ctrl = DarkTextCtrl(r_body, placeholder=_PLACEHOLDER_ROTATION_PV)
         self._rotation_pv_ctrl.SetMinSize((140, _ROW_INPUT_HEIGHT))
         self._rotation_precision_ctrl = DarkTextCtrl(r_body, value="4", placeholder=_PLACEHOLDER_MOTOR_PRECISION)
@@ -256,7 +261,7 @@ class BeamlineConfigView(wx.Panel):
 
         rot_row = wx.BoxSizer(wx.HORIZONTAL)
         rot_row.Add(self._rotation_short_ctrl, 1, wx.EXPAND | wx.RIGHT, 4)
-        rot_row.Add(self._rotation_name_ctrl, 2, wx.EXPAND | wx.RIGHT, 4)
+        rot_row.Add(self._rotation_description_ctrl, 2, wx.EXPAND | wx.RIGHT, 4)
         rot_row.Add(self._rotation_pv_ctrl, 3, wx.EXPAND | wx.RIGHT, 4)
         rot_row.Add(self._rotation_precision_ctrl, 0, wx.EXPAND)
 
@@ -301,9 +306,10 @@ class BeamlineConfigView(wx.Panel):
         mot_header.SetBackgroundColour(BG_CARD)
         mot_header_sizer = wx.BoxSizer(wx.HORIZONTAL)
         mot_header_sizer.Add(_label(mot_header, "Short", secondary=True), 1, wx.RIGHT, 4)
-        mot_header_sizer.Add(_label(mot_header, "Variable", secondary=True), 2, wx.RIGHT, 4)
+        mot_header_sizer.Add(_label(mot_header, "Description", secondary=True), 2, wx.RIGHT, 4)
         mot_header_sizer.Add(_label(mot_header, "PV", secondary=True), 3, wx.RIGHT, 4)
         mot_header_sizer.Add(_label(mot_header, "Prec", secondary=True), 0, wx.RIGHT, 6)
+        mot_header_sizer.Add(_label(mot_header, "Map", secondary=True), 0, wx.RIGHT, 6)
         mot_header_sizer.AddSpacer(28)
         mot_header.SetSizer(mot_header_sizer)
 
@@ -372,7 +378,7 @@ class BeamlineConfigView(wx.Panel):
         self._beamline_ctrl.SetValue(config.beamline)
         rm = config.rotation_motor
         self._rotation_short_ctrl.SetValue(rm.shorthand if rm else "")
-        self._rotation_name_ctrl.SetValue(rm.name if rm else "")
+        self._rotation_description_ctrl.SetValue(rm.description if rm else "")
         self._rotation_pv_ctrl.SetValue(rm.pv if rm else "")
         self._rotation_precision_ctrl.SetValue(str(rm.precision) if rm else "4")
 
@@ -414,7 +420,7 @@ class BeamlineConfigView(wx.Panel):
         rotation_motor = (
             MotorConfig(
                 shorthand=self._rotation_short_ctrl.GetValue().strip(),
-                name=self._rotation_name_ctrl.GetValue().strip(),
+                description=self._rotation_description_ctrl.GetValue().strip(),
                 pv=rot_pv,
                 precision=rot_precision,
             )
