@@ -517,6 +517,7 @@ class CollectionSettingsView(wx.Panel):
         show = self._map_toggle.GetValue()
         self._map_table.Show(show)
         self._map_presets_panel.Show(show)
+        self._add_btn.SetLabel("+ Add map points" if show else "+ Add point")
         self.Layout()
         self.GetParent().Layout()
 

@@ -162,6 +162,9 @@ class CollectionSettingsController:
 
     def _on_add_point(self) -> None:
         cs = self._model.collection_settings
+        if cs.map:
+            self._on_add_map_points()
+            return
         shorthands = [m.shorthand for m in self._model.beamline.active.motors if m.shorthand]
         point = self._model.collection.add_point(shorthands)
         point.scan_type = cs.scan_type
@@ -173,6 +176,43 @@ class CollectionSettingsController:
             point.step = str(cs.step_size)
         self._view.collection_table.add_row(point)
         _log.debug("Added collection point: %s (%s)", point.label, point.scan_type)
+
+    def _on_add_map_points(self) -> None:
+        cs = self._model.collection_settings
+        shorthands = [m.shorthand for m in self._model.beamline.active.motors if m.shorthand]
+
+        def axis_positions(start: float, end: float, n: int) -> list[float]:
+            if n <= 1:
+                return [start]
+            return [start + (end - start) * i / (n - 1) for i in range(n)]
+
+        axis1 = axis_positions(cs.map_start, cs.map_end, cs.map_points)
+        axis2 = axis_positions(cs.map2_start, cs.map2_end, cs.map2_points) if cs.map2_enabled else [None]
+
+        motor1_cfg = next((m for m in self._model.beamline.active.motors if m.shorthand == cs.map_motor), None)
+        motor2_cfg = next((m for m in self._model.beamline.active.motors if m.shorthand == cs.map2_motor), None) if cs.map2_enabled else None
+
+        prec1 = motor1_cfg.precision if motor1_cfg else 4
+        prec2 = motor2_cfg.precision if motor2_cfg else 4
+
+        for pos2 in axis2:
+            for pos1 in axis1:
+                point = self._model.collection.add_point(shorthands)
+                point.scan_type = cs.scan_type
+                point.time = str(cs.exposure)
+                if cs.scan_type in ("wide", "step"):
+                    point.rotation_start = str(cs.rotation_start)
+                    point.rotation_end = str(cs.rotation_end)
+                if cs.scan_type == "step":
+                    point.step = str(cs.step_size)
+                if cs.map_motor in point.motor_positions:
+                    point.motor_positions[cs.map_motor] = f"{pos1:.{prec1}f}"
+                if pos2 is not None and motor2_cfg and cs.map2_motor in point.motor_positions:
+                    point.motor_positions[cs.map2_motor] = f"{pos2:.{prec2}f}"
+                self._view.collection_table.add_row(point)
+
+        n_total = cs.map_points * (cs.map2_points if cs.map2_enabled else 1)
+        _log.debug("Added %d map collection points", n_total)
 
     def _on_update_selected(self) -> None:
         cs = self._model.collection_settings

@@ -94,6 +94,10 @@ class FlatButton(wx.Control):
     def set_action(self, callback: Callable[[], None]) -> None:
         self._action = callback
 
+    def SetLabel(self, label: str) -> None:
+        self._label = label
+        self.Refresh()
+
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
