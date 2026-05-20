@@ -24,7 +24,7 @@ import bitshuffle
 import blosc
 import lz4.block
 import numpy as np
-from p4p.client.thread import Context, Subscription
+from p4p.client.thread import Cancelled, Context, Disconnected, Subscription
 
 __all__ = ["ADViewerModel"]
 
@@ -54,7 +54,7 @@ class FrameCallback(Protocol):
 class ADViewerModel:
     """Streams images from an EPICS PVA NTNDArray PV using p4p. Compressed streams are decompressed client-side."""
 
-    use_polling: bool = field(default=True)
+    use_polling: bool = field(default=False)
     poll_interval: float = field(default=0.1)
     poll_join_timeout: float = field(default=1.0)
     default_request: str = field(default="field(value,codec,compressedSize,uncompressedSize,dimension,uniqueId)")
@@ -110,12 +110,23 @@ class ADViewerModel:
                 last_unique_id = current_id
                 _log.debug("New frame received via polling (uniqueId=%s)", current_id)
                 self._process_image(value)
+            except TimeoutError:
+                _log.debug("Timeout polling PV %s", self._pv_name)
             except Exception:
                 _log.exception("Error polling PV %s", self._pv_name)
             sleep(self.poll_interval)
 
     def _on_ntndarray(self, value: object) -> None:
         """Callback invoked by the p4p monitor on each PV update."""
+        if isinstance(value, Disconnected):
+            _log.warning("PV %s disconnected", self._pv_name)
+            return
+        if isinstance(value, Cancelled):
+            _log.debug("PV %s subscription cancelled", self._pv_name)
+            return
+        if isinstance(value, Exception):
+            _log.error("PV %s monitor error: %s", self._pv_name, value)
+            return
         _log.debug("New frame received via PV monitor")
         self._process_image(value)
 
