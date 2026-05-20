@@ -20,20 +20,30 @@ from pathlib import Path
 
 import tomli_w
 
-__all__ = ["BeamlineConfig", "BeamlineConfigModel", "DetectorConfig", "MotorConfig"]
+__all__ = ["BeamlineConfig", "BeamlineConfigModel", "ControllerConfig", "DetectorConfig", "MotorConfig"]
 
 _ACTIVE_FILE_NAME = ".active"
 
 
 @dataclass(frozen=True, slots=True)
+class ControllerConfig:
+    """A motion controller (Newport XPS, Aerotech Automation1, etc.) used by one or more motors."""
+
+    name: str
+    type: str
+    params: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class MotorConfig:
-    """Single motor entry: shorthand, description, EPICS PV, decimal precision, and mapping flag."""
+    """Single motor entry: shorthand, description, EPICS PV, decimal precision, mapping flag, and controller."""
 
     shorthand: str
     description: str
     pv: str
     precision: int = 4
     mapping_enabled: bool = False
+    controller: str = "epics"
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +74,7 @@ class BeamlineConfig:
     detectors: tuple[DetectorConfig, ...] = field(default_factory=tuple)
     active_detector: int = -1
     motors: tuple[MotorConfig, ...] = field(default_factory=tuple)
+    controllers: tuple[ControllerConfig, ...] = field(default_factory=tuple)
 
     @property
     def is_empty(self) -> bool:
@@ -169,6 +180,16 @@ class BeamlineConfigModel:
         if detectors and active_detector == -1:
             active_detector = 0
 
+        controllers_data = data.get("controllers", []) or []
+        controllers = tuple(
+            ControllerConfig(
+                name=str(c.get("name", "")),
+                type=str(c.get("type", "")),
+                params=dict(c.get("params", {})),
+            )
+            for c in controllers_data
+        )
+
         motors_data = data.get("motors", []) or []
         motors = tuple(
             MotorConfig(
@@ -177,6 +198,7 @@ class BeamlineConfigModel:
                 pv=str(m.get("pv", "")),
                 precision=max(0, int(m.get("precision", 4))),
                 mapping_enabled=bool(m.get("mapping_enabled", False)),
+                controller=str(m.get("controller", "epics")),
             )
             for m in motors_data
         )
@@ -189,6 +211,7 @@ class BeamlineConfigModel:
                 description=str(rm_data.get("description", rm_data.get("name", ""))),
                 pv=str(rm_data.get("pv", "")),
                 precision=max(0, int(rm_data.get("precision", 4))),
+                controller=str(rm_data.get("controller", "epics")),
             )
 
         cfg = BeamlineConfig(
@@ -198,6 +221,7 @@ class BeamlineConfigModel:
             detectors=tuple(detectors),
             active_detector=active_detector,
             motors=motors,
+            controllers=controllers,
         )
         self._active = cfg
         return cfg
@@ -210,19 +234,22 @@ class BeamlineConfigModel:
         payload: dict = {
             "beamline": config.beamline,
             "rotation_motor": (
-                {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision}
+                {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision, "controller": config.rotation_motor.controller}
                 if config.rotation_motor is not None
                 else {}
             ),
             "detectors": [
-                {
-                    "name": d.name,
-                    "pv_prefix": d.pv_prefix,
-                    "active": idx == config.active_detector,
-                }
+                {"name": d.name, "pv_prefix": d.pv_prefix, "active": idx == config.active_detector}
                 for idx, d in enumerate(config.detectors)
             ],
-            "motors": [{"shorthand": m.shorthand, "description": m.description, "pv": m.pv, "precision": m.precision, "mapping_enabled": m.mapping_enabled} for m in config.motors],
+            "controllers": [
+                {"name": c.name, "type": c.type, "params": c.params}
+                for c in config.controllers
+            ],
+            "motors": [
+                {"shorthand": m.shorthand, "description": m.description, "pv": m.pv, "precision": m.precision, "mapping_enabled": m.mapping_enabled, "controller": m.controller}
+                for m in config.motors
+            ],
         }
 
         path = self.path_for(config.name)
