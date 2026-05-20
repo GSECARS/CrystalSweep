@@ -165,7 +165,8 @@ class CollectionSettingsController:
         if cs.map:
             self._on_add_map_points()
             return
-        shorthands = [m.shorthand for m in self._model.beamline.active.motors if m.shorthand]
+        motors = [m for m in self._model.beamline.active.motors if m.shorthand]
+        shorthands = [m.shorthand for m in motors]
         point = self._model.collection.add_point(shorthands)
         point.scan_type = cs.scan_type
         point.time = str(cs.exposure)
@@ -174,6 +175,13 @@ class CollectionSettingsController:
             point.rotation_end = str(cs.rotation_end)
         if cs.scan_type == "step":
             point.step = str(cs.step_size)
+        for motor in motors:
+            raw = self._model.epics.caget(motor.pv)
+            if raw is not None:
+                try:
+                    point.motor_positions[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
+                except (ValueError, TypeError):
+                    pass
         self._view.collection_table.add_row(point)
         _log.debug("Added collection point: %s (%s)", point.label, point.scan_type)
 
