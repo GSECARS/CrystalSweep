@@ -22,7 +22,7 @@ from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE
-from crystalsweep.ui.view.custom.widgets import DarkMenuBar, ThemedSplitter
+from crystalsweep.ui.view.custom.widgets import DarkMenuBar, SectionDivider, ThemedSplitter
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 
 __all__ = ["MainView"]
@@ -52,8 +52,13 @@ class MainView(wx.Frame):
         self.collection_table = CollectionTableView(self._left_panel)
 
         left_sizer = wx.BoxSizer(wx.VERTICAL)
+        left_sizer.Add(SectionDivider(self._left_panel, "File Settings"), 0, wx.EXPAND)
         left_sizer.Add(self.file_settings, 0, wx.EXPAND)
+        left_sizer.AddSpacer(25)
+        left_sizer.Add(SectionDivider(self._left_panel, "Collection Settings"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_settings, 0, wx.EXPAND)
+        left_sizer.AddSpacer(25)
+        left_sizer.Add(SectionDivider(self._left_panel, "Collection Points"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_table, 1, wx.EXPAND)
         self._left_panel.SetSizer(left_sizer)
 

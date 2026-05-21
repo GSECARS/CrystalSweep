@@ -58,6 +58,7 @@ __all__ = [
     "IconButton",
     "LiveToggle",
     "RadioDot",
+    "SectionDivider",
     "ThemedSplitter",
 ]
 
@@ -1190,6 +1191,38 @@ class DarkScrollBar(wx.Panel):
             self._hovered = False
             self.Refresh()
         event.Skip()
+
+
+class SectionDivider(wx.Control):
+    """Horizontal rule with a centred label sitting on top of the line."""
+
+    def __init__(self, parent: wx.Window, label: str) -> None:
+        super().__init__(parent, style=wx.BORDER_NONE)
+        self._label = label
+        self._bg = parent.GetBackgroundColour()
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self.SetMinSize((-1, 28))
+        super().Bind(wx.EVT_PAINT, self._on_paint)
+        super().Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
+        w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(self._bg))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
+        gc.SetFont(font, FG_SECONDARY)
+        tw, th = gc.GetTextExtent(self._label)
+        pad = 10
+        ty = (h - th) / 2
+        tx = (w - tw) / 2
+        cy = h / 2
+        gc.SetPen(wx.Pen(wx.Colour(70, 70, 76), 2))
+        gc.StrokeLine(pad, cy, tx - pad, cy)
+        gc.StrokeLine(tx + tw + pad, cy, w - pad, cy)
+        gc.DrawText(self._label, tx, ty)
 
 
 _SASH_COLOUR = wx.Colour(60, 60, 65)

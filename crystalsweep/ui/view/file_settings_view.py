@@ -69,15 +69,8 @@ class FileSettingsView(wx.Panel):
 
     def _build_layout(self) -> None:
         label_font = scaled_font(12)
-        section_font = scaled_font(13, weight=wx.FONTWEIGHT_BOLD)
 
         outer = wx.BoxSizer(wx.VERTICAL)
-        outer.AddSpacer(6)
-
-        outer.Add(self._make_section_label("File Settings", section_font), 0, wx.LEFT | wx.RIGHT, 10)
-        outer.AddSpacer(6)
-
-        outer.Add(self._make_sep(), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
         outer.AddSpacer(6)
 
         outer.Add(self._make_row_filename_and_frame(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
@@ -99,13 +92,6 @@ class FileSettingsView(wx.Panel):
         outer.AddSpacer(8)
 
         self.SetSizer(outer)
-
-    def _make_section_label(self, text: str, font: wx.Font) -> wx.StaticText:
-        lbl = wx.StaticText(self, label=text)
-        lbl.SetFont(font)
-        lbl.SetForegroundColour(FG_PRIMARY)
-        lbl.SetBackgroundColour(BG_CARD)
-        return lbl
 
     def _make_sep(self) -> wx.Panel:
         sep = wx.Panel(self, size=(-1, 1))

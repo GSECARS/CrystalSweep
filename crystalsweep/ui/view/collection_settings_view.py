@@ -294,22 +294,9 @@ class CollectionSettingsView(wx.Panel):
 
     def _build_layout(self) -> None:
         label_font = scaled_font(12)
-        section_font = scaled_font(13, weight=wx.FONTWEIGHT_BOLD)
 
         outer = wx.BoxSizer(wx.VERTICAL)
-        outer.AddSpacer(6)
-
-        section_lbl = wx.StaticText(self, label="Collection Settings")
-        section_lbl.SetFont(section_font)
-        section_lbl.SetForegroundColour(FG_PRIMARY)
-        section_lbl.SetBackgroundColour(BG_CARD)
-        outer.Add(section_lbl, 0, wx.LEFT | wx.RIGHT, 10)
-        outer.AddSpacer(6)
-
-        sep_top = wx.Panel(self, size=(-1, 1))
-        sep_top.SetBackgroundColour(SEP_COLOUR)
-        outer.Add(sep_top, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
-        outer.AddSpacer(6)
+        outer.AddSpacer(8)
 
         outer.Add(self._make_row_type(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
         outer.AddSpacer(4)
