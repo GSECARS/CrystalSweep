@@ -138,7 +138,7 @@ class MainView(wx.Frame):
         main_sizer.Add(self._splitter, 1, wx.EXPAND | wx.ALL, 5)
 
         self.SetSizer(main_sizer)
-        self.SetSize(1200, 700)
+        self.SetSize(1600, 900)
         self.SetMinSize((800, 520))
 
     def _update_left_min_size(self) -> None:
