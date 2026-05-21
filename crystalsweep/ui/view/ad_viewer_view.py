@@ -78,10 +78,10 @@ class ADViewerView(wx.Panel):
         self._intensity_histogram = IntensityHistogramWidget(self, on_levels_changed=self._on_histogram_levels_changed)
         self._integration_plot = IntegrationPlot(self)
 
-        self.SetBackgroundColour(BG_SURFACE)
+        self.SetBackgroundColour(wx.BLACK)
 
         self._canvas_panel = wx.Panel(self)
-        self._canvas_panel.SetBackgroundColour(BG_SURFACE)
+        self._canvas_panel.SetBackgroundColour(wx.BLACK)
         self._image_canvas = ImageCanvas(self._canvas_panel)
 
         # Parent overlay buttons to the VisPy native widget so they render above it on Windows
