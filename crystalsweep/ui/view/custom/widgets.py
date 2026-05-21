@@ -707,12 +707,10 @@ class DarkCombo(wx.Panel):
 
     def _on_click(self, event: wx.MouseEvent) -> None:
         if not self._choices:
-            event.Skip()
             return
         popup = _DarkMenuPopup(self, self._choices, self._selection, on_select=self._select, choice_colours=self._choice_colours)
         w, h = self.GetSize()
         popup.popup_below(self.ClientToScreen(wx.Point(0, h)), w)
-        event.Skip()
 
     def _select(self, idx: int) -> None:
         self._selection = idx
@@ -721,10 +719,11 @@ class DarkCombo(wx.Panel):
             self._callback(self.GetStringSelection())
 
 
-class _DarkMenuPopup(wx.PopupTransientWindow):
-    """Dark-themed dropdown popup used by DarkCombo."""
+class _DarkMenuPopup(wx.PopupWindow):
+    """Dark-themed dropdown popup used by DarkCombo — scrollable for long lists."""
 
     _ROW_H = 26
+    _MAX_VISIBLE = 16
 
     def __init__(
         self,
@@ -734,10 +733,12 @@ class _DarkMenuPopup(wx.PopupTransientWindow):
         on_select: Callable[[int], None],
         choice_colours: dict[str, wx.Colour] | None = None,
     ) -> None:
-        super().__init__(parent, flags=wx.BORDER_SIMPLE | wx.PU_CONTAINS_CONTROLS)
+        super().__init__(parent, flags=wx.BORDER_SIMPLE)
         self._choices = list(choices)
         self._selection = selection
         self._hover_index = -1
+        self._scroll_offset = 0
+        self._visible_rows = min(self._MAX_VISIBLE, len(self._choices))
         self._on_select = on_select
         self._choice_colours: dict[str, wx.Colour] = choice_colours or {}
         self.SetBackgroundColour(POPUP_BG)
@@ -745,20 +746,37 @@ class _DarkMenuPopup(wx.PopupTransientWindow):
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_MOTION, self._on_motion)
         self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
-        self.Bind(wx.EVT_LEFT_UP, self._on_left_up)
+        self.Bind(wx.EVT_LEFT_DOWN, self._on_left_down)
+        self.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
+        self.Bind(wx.EVT_KILL_FOCUS, self._on_kill_focus)
 
     def popup_below(self, screen_pt: wx.Point, min_width: int) -> None:
         dc = wx.ClientDC(self)
         dc.SetFont(scaled_font(12))
         text_w = max((dc.GetTextExtent(c)[0] for c in self._choices), default=0)
         width = max(min_width, text_w + 24)
-        height = self._ROW_H * len(self._choices) + 4
+        height = self._ROW_H * self._visible_rows + 4
         self.SetSize(width, height)
-        self.Position(screen_pt, (0, 0))
-        self.Popup()
+        self._scroll_to(self._selection)
+        self.SetPosition(screen_pt)
+        self.Show()
+        self.SetFocus()
+
+    def _scroll_to(self, idx: int) -> None:
+        if idx < 0:
+            return
+        if idx < self._scroll_offset:
+            self._scroll_offset = idx
+        elif idx >= self._scroll_offset + self._visible_rows:
+            self._scroll_offset = idx - self._visible_rows + 1
+        self._scroll_offset = max(0, min(self._scroll_offset, max(0, len(self._choices) - self._visible_rows)))
+
+    def _dismiss(self) -> None:
+        self.Hide()
+        self.Destroy()
 
     def _row_at(self, y: int) -> int:
-        idx = (y - 2) // self._ROW_H
+        idx = self._scroll_offset + (y - 2) // self._ROW_H
         return int(idx) if 0 <= idx < len(self._choices) else -1
 
     def _on_paint(self, _: wx.PaintEvent) -> None:
@@ -769,8 +787,12 @@ class _DarkMenuPopup(wx.PopupTransientWindow):
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
         font = scaled_font(12)
-        for i, label in enumerate(self._choices):
-            y = 2 + i * self._ROW_H
+        for slot in range(self._visible_rows):
+            i = self._scroll_offset + slot
+            if i >= len(self._choices):
+                break
+            label = self._choices[i]
+            y = 2 + slot * self._ROW_H
             if i == self._hover_index:
                 gc.SetBrush(wx.Brush(POPUP_BTN_HOVER))
                 gc.SetPen(wx.TRANSPARENT_PEN)
@@ -794,13 +816,24 @@ class _DarkMenuPopup(wx.PopupTransientWindow):
             self.Refresh()
         event.Skip()
 
-    def _on_left_up(self, event: wx.MouseEvent) -> None:
+    def _on_left_down(self, event: wx.MouseEvent) -> None:
         idx = self._row_at(event.GetY())
         if idx >= 0:
-            self.Dismiss()
+            self._dismiss()
             wx.CallAfter(self._on_select, idx)
         else:
-            event.Skip()
+            self._dismiss()
+
+    def _on_kill_focus(self, _: wx.FocusEvent) -> None:
+        wx.CallAfter(self._dismiss)
+
+    def _on_wheel(self, event: wx.MouseEvent) -> None:
+        delta = -1 if event.GetWheelRotation() > 0 else 1
+        new_offset = max(0, min(self._scroll_offset + delta, max(0, len(self._choices) - self._visible_rows)))
+        if new_offset != self._scroll_offset:
+            self._scroll_offset = new_offset
+            self._hover_index = -1
+            self.Refresh()
 
 
 _MENU_BAR_H = 28
