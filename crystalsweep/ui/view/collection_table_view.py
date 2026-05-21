@@ -481,10 +481,15 @@ class CollectionTableView(wx.Panel):
         self._on_time_cb: Callable[[int, str], None] | None = None
         self._on_selection_cb: Callable[[int, bool], None] | None = None
         self._on_remove_cb: Callable[[int], None] | None = None
+        self._on_min_width_changed_cb: Callable[[int], None] | None = None
 
         self._build_layout()
         self.SetMinSize((self._min_content_width(), -1))
         self.Bind(wx.EVT_SIZE, self._on_size)
+
+    @property
+    def min_content_width(self) -> int:
+        return self._min_content_width()
 
     def _min_content_width(self) -> int:
         n_motor = len(self._motor_shorthands)
@@ -555,7 +560,10 @@ class CollectionTableView(wx.Panel):
         self._motor_precisions = motor_precisions or {}
         self._rotation_precision = rotation_precision
         self._rotation_shorthand = rotation_shorthand
-        self.SetMinSize((self._min_content_width(), -1))
+        min_w = self._min_content_width()
+        self.SetMinSize((min_w, -1))
+        if self._on_min_width_changed_cb is not None:
+            self._on_min_width_changed_cb(min_w)
         widths = self._col_widths()
         self._header.update_col_widths(self._motor_shorthands, self._rotation_shorthand, widths)
 
@@ -645,6 +653,9 @@ class CollectionTableView(wx.Panel):
 
     def bind_remove(self, callback: Callable[[int], None]) -> None:
         self._on_remove_cb = callback
+
+    def bind_min_width_changed(self, callback: Callable[[int], None]) -> None:
+        self._on_min_width_changed_cb = callback
 
     def _on_add_clicked(self) -> None:
         if self._on_add_cb is not None:

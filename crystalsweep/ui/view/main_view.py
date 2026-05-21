@@ -61,6 +61,8 @@ class MainView(wx.Frame):
 
         self._splitter.SplitVertically(self._left_panel, self.ad_viewer, _LEFT_PANEL_W)
         self._splitter.Bind(wx.EVT_SPLITTER_SASH_POS_CHANGING, self._on_sash_changing)
+        self.collection_table.bind_min_width_changed(self._on_table_min_width_changed)
+        self._update_left_min_size()
 
         self._menu_bar = self._build_menu_bar()
         self.Bind(wx.EVT_CLOSE, self._close_event_handler)
@@ -125,15 +127,28 @@ class MainView(wx.Frame):
         self.SetSize(1200, 700)
         self.SetMinSize((800, 520))
 
+    def _update_left_min_size(self) -> None:
+        min_w = self.collection_table.min_content_width
+        self._left_panel.SetMinSize((min_w, -1))
+        self._splitter.SetMinimumPaneSize(min_w)
+
+    def _on_table_min_width_changed(self, min_w: int) -> None:
+        self._left_panel.SetMinSize((min_w, -1))
+        self._splitter.SetMinimumPaneSize(min_w)
+        cur = self._splitter.GetSashPosition()
+        if cur < min_w:
+            self._splitter.SetSashPosition(min_w)
+
     def _on_sash_changing(self, event: wx.SplitterEvent) -> None:
         min_w = self._left_panel.GetMinSize().width
         if min_w > 0 and event.GetSashPosition() < min_w:
             event.SetSashPosition(min_w)
 
     def _set_initial_sash(self) -> None:
+        min_w = self._left_panel.GetMinSize().width
         w = self._splitter.GetClientSize().width
-        if w > 0:
-            self._splitter.SetSashPosition(w // 2)
+        pos = max(min_w, w // 2) if w > 0 else min_w
+        self._splitter.SetSashPosition(pos)
         self._splitter._reposition_overlay()
 
     def _close_event_handler(self, event: wx.CloseEvent) -> None:
