@@ -50,6 +50,8 @@ class MainController:
         self._collection_settings_controller = CollectionSettingsController(model=self._model, view=self._view)
         self._collection_controller = CollectionTableController(model=self._model, view=self._view.collection_table)
         self._collect_controller = CollectController(model=self._model, view=self._view)
+        self._collection_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
+        self._collection_settings_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
         self._ad_viewer_controller = ADViewerController(model=self._model, view=self._view)
         self._beamline_config_controller = BeamlineConfigController(
             model=self._model,

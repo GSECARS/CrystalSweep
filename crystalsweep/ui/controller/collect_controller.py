@@ -15,6 +15,7 @@
 
 import logging
 import threading
+import time as _time
 
 import wx
 
@@ -34,9 +35,13 @@ class CollectController:
         self._view = view
         self._abort_event = threading.Event()
         self._thread: threading.Thread | None = None
+        self._start_time: float = 0.0
+        self._elapsed_timer = wx.Timer()
+        self._elapsed_timer.Bind(wx.EVT_TIMER, self._on_elapsed_tick)
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
+        self.refresh_eta()
 
     def _on_collect(self) -> None:
         points = self._model.collection.points
@@ -45,16 +50,57 @@ class CollectController:
             return
 
         self._abort_event.clear()
+        self._start_time = _time.monotonic()
         self._view.collect.set_status_collecting()
+        self._elapsed_timer.Start(1000)
         self._thread = threading.Thread(target=self._run, args=(points,), daemon=True)
         self._thread.start()
+
+    def refresh_eta(self) -> None:
+        """Recompute and display the estimated collection time for selected points only."""
+        selected = [p for p in self._model.collection.points if p.selected]
+        if not selected:
+            self._view.collect.clear_eta()
+            return
+        self._view.collect.set_eta(self._estimate_total_seconds(selected))
+
+    @staticmethod
+    def _estimate_total_seconds(points) -> float:
+        total = 0.0
+        for point in points:
+            try:
+                exposure = float(point.time) if point.time else 1.0
+            except ValueError:
+                exposure = 1.0
+            if point.scan_type == "step":
+                try:
+                    step = float(point.step) if point.step else 1.0
+                    start = float(point.rotation_start) if point.rotation_start else 0.0
+                    end = float(point.rotation_end) if point.rotation_end else 180.0
+                    n_frames = max(1, round(abs(end - start) / step))
+                except (ValueError, ZeroDivisionError):
+                    n_frames = 1
+                total += exposure * n_frames
+            else:
+                total += exposure
+        return total
 
     def _on_abort(self) -> None:
         self._abort_event.set()
         _log.info("Collection aborted by user")
 
+    def _on_elapsed_tick(self, _event: wx.TimerEvent) -> None:
+        elapsed = _time.monotonic() - self._start_time
+        self._view.collect.set_elapsed(elapsed)
+
+    def _stop_elapsed_timer(self) -> None:
+        self._elapsed_timer.Stop()
+        elapsed = _time.monotonic() - self._start_time
+        self._view.collect.set_elapsed(elapsed)
+
     def _run(self, points) -> None:
         total = len(points)
+
         for idx, point in enumerate(points, start=1):
             if self._abort_event.is_set():
                 break
@@ -86,6 +132,7 @@ class CollectController:
 
             _log.debug("Point %d/%d (%s) done", idx, total, point.label)
 
+        wx.CallAfter(self._stop_elapsed_timer)
         if self._abort_event.is_set():
             wx.CallAfter(self._view.collect.set_status, "Aborted", wx.Colour(220, 160, 40))
             wx.CallAfter(self._view.collect.set_collecting, False)

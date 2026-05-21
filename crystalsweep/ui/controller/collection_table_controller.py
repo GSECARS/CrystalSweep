@@ -29,6 +29,7 @@ class CollectionTableController:
     def __init__(self, model: MainModel, view: CollectionTableView) -> None:
         self._model = model
         self._view = view
+        self._on_points_changed: list = []
 
         self._view.bind_clear(self._on_clear)
         self._view.bind_delete_selected(self._on_delete_selected)
@@ -43,6 +44,14 @@ class CollectionTableController:
         self._view.bind_remove(self._on_remove)
 
         self.refresh_columns()
+
+    def add_points_changed_listener(self, callback) -> None:
+        """Register a callback to be called whenever the point list or scan params change."""
+        self._on_points_changed.append(callback)
+
+    def _notify_points_changed(self) -> None:
+        for cb in self._on_points_changed:
+            cb()
 
     def refresh_columns(self) -> None:
         """Rebuild the table columns from the currently active beamline config."""
@@ -93,25 +102,32 @@ class CollectionTableController:
 
     def _on_type_changed(self, index: int, scan_type: ScanType) -> None:
         self._model.collection.update_scan_type(index, scan_type)
+        self._notify_points_changed()
 
     def _on_rotation_start_changed(self, index: int, value: str) -> None:
         self._model.collection.update_rotation_start(index, value)
+        self._notify_points_changed()
 
     def _on_rotation_end_changed(self, index: int, value: str) -> None:
         self._model.collection.update_rotation_end(index, value)
+        self._notify_points_changed()
 
     def _on_step_changed(self, index: int, value: str) -> None:
         self._model.collection.update_step(index, value)
+        self._notify_points_changed()
 
     def _on_time_changed(self, index: int, value: str) -> None:
         self._model.collection.update_time(index, value)
+        self._notify_points_changed()
 
     def _on_selection_changed(self, index: int, selected: bool) -> None:
         self._model.collection.set_selected(index, selected)
+        self._notify_points_changed()
 
     def _on_remove(self, index: int) -> None:
         self._model.collection.remove_point(index)
         self._view.remove_row(index)
+        self._notify_points_changed()
         _log.debug("Removed collection point at index %d", index)
 
     def _on_clear(self) -> None:
@@ -119,6 +135,7 @@ class CollectionTableController:
         for _ in range(count):
             self._model.collection.remove_point(0)
             self._view.remove_row(0)
+        self._notify_points_changed()
         _log.debug("Cleared all %d collection points", count)
 
     def _on_delete_selected(self) -> None:
@@ -126,4 +143,5 @@ class CollectionTableController:
         for index in reversed(indices):
             self._model.collection.remove_point(index)
             self._view.remove_row(index)
+        self._notify_points_changed()
         _log.debug("Deleted %d selected collection points", len(indices))

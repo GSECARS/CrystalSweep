@@ -15,6 +15,8 @@
 
 import logging
 
+import wx
+
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import ScanType
 from crystalsweep.ui.view import MainView
@@ -32,6 +34,7 @@ class CollectionSettingsController:
         self._view = view
         self._desc_to_shorthand: dict[str, str] = {}
         self._shorthand_to_desc: dict[str, str] = {}
+        self._on_points_changed: list = []
 
         cs = self._view.collection_settings
         cs.bind_scan_type_changed(self._on_scan_type_changed)
@@ -57,6 +60,13 @@ class CollectionSettingsController:
 
         self._sync_rotation_shorthand()
         self._sync_map_motors()
+
+    def add_points_changed_listener(self, callback) -> None:
+        self._on_points_changed.append(callback)
+
+    def _notify_points_changed(self) -> None:
+        for cb in self._on_points_changed:
+            cb()
 
     def on_config_applied(self) -> None:
         """Called when a new beamline config is applied — refresh rotation shorthand and map motors."""
@@ -168,6 +178,7 @@ class CollectionSettingsController:
         motors = [m for m in self._model.beamline.active.motors if m.shorthand]
         shorthands = [m.shorthand for m in motors]
         point = self._model.collection.add_point(shorthands)
+        point.selected = True
         point.scan_type = cs.scan_type
         point.time = str(cs.exposure)
         if cs.scan_type in ("wide", "step"):
@@ -183,6 +194,7 @@ class CollectionSettingsController:
                 except (ValueError, TypeError):
                     pass
         self._view.collection_table.add_row(point)
+        self._notify_points_changed()
         _log.debug("Added collection point: %s (%s)", point.label, point.scan_type)
 
     def _on_add_map_points(self) -> None:
@@ -219,6 +231,7 @@ class CollectionSettingsController:
         for pos2 in axis2:
             for pos1 in axis1:
                 point = self._model.collection.add_point(shorthands)
+                point.selected = True
                 point.scan_type = cs.scan_type
                 point.time = str(cs.exposure)
                 if cs.scan_type in ("wide", "step"):
@@ -240,6 +253,7 @@ class CollectionSettingsController:
                 self._view.collection_table.add_row(point)
 
         n_total = cs.map_points * (cs.map2_points if cs.map2_enabled else 1)
+        wx.CallAfter(self._notify_points_changed)
         _log.debug("Added %d map collection points (origin1=%.4f, origin2=%.4f)", n_total, origin1, origin2)
 
     def _on_update_selected(self) -> None:
@@ -259,4 +273,5 @@ class CollectionSettingsController:
             else:
                 self._model.collection.update_step(index, "")
             self._view.collection_table.refresh_row(index, self._model.collection.points[index])
+        self._notify_points_changed()
         _log.debug("Updated %d selected collection points", len(indices))
