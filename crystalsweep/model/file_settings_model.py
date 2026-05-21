@@ -18,9 +18,6 @@ from pathlib import Path
 
 __all__ = ["FileSettingsModel"]
 
-_DEFAULT_MAP_EXT: str = "map"
-
-
 @dataclass()
 class FileSettingsModel:
     """Holds state for the file settings section of the GUI."""
@@ -28,7 +25,7 @@ class FileSettingsModel:
     filename: str = field(default="")
     directory: Path = field(default_factory=Path)
     frame_number: int = field(default=0)
-    map_ext: str = field(default=_DEFAULT_MAP_EXT)
+    map_ext: str = field(default="")
 
     use_hdf5: bool = field(default=False)
     use_cbf: bool = field(default=False)

@@ -353,7 +353,7 @@ class DarkTextCtrl(wx.Panel):
         self._callback_kill: Callable | None = None
         self._font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
         self._placeholder_font = scaled_font(12, style=wx.FONTSTYLE_ITALIC)
-        self._ctrl = wx.TextCtrl(self, value=value, style=wx.TE_PROCESS_ENTER | wx.TE_CENTER | wx.BORDER_NONE)
+        self._ctrl = wx.TextCtrl(self, value=value, style=wx.TE_PROCESS_ENTER | wx.BORDER_NONE)
         self._ctrl.SetBackgroundColour(BG_ELEVATED)
         self._ctrl.SetForegroundColour(FG_PRIMARY)
         self._ctrl.SetFont(self._font)
@@ -529,20 +529,21 @@ class DarkTextCtrl(wx.Panel):
         if self._editing:
             return
         fg = FG_SECONDARY if self._disabled else FG_PRIMARY
+        x_pad = 6
         if self._value:
             gc.SetFont(self._font, fg)
-            tw, th = gc.GetTextExtent(self._value)
-            gc.DrawText(self._value, (w - tw) / 2, (h - th) / 2)
+            _, th = gc.GetTextExtent(self._value)
+            gc.DrawText(self._value, x_pad, (h - th) / 2)
         elif self._placeholder and not self._disabled:
             gc.SetFont(self._placeholder_font, FG_SECONDARY)
-            tw, th = gc.GetTextExtent(self._placeholder)
-            gc.DrawText(self._placeholder, (w - tw) / 2, (h - th) / 2)
+            _, th = gc.GetTextExtent(self._placeholder)
+            gc.DrawText(self._placeholder, x_pad, (h - th) / 2)
 
 
 class DarkToggle(wx.Panel):
     """Custom-painted checkbox, dark-styled."""
 
-    _BOX_W, _BOX_H, _R = 16, 16, 3
+    _BOX_W, _BOX_H, _R = 13, 13, 2
 
     def __init__(self, parent: wx.Window, label: str, value: bool = False) -> None:
         super().__init__(parent, style=wx.BORDER_NONE)
@@ -616,7 +617,7 @@ class DarkToggle(wx.Panel):
             path.AddLineToPoint(bx + self._BOX_W - 3, by + 3)
             gc.StrokePath(path)
         font = scaled_font(12)
-        gc.SetFont(font, FG_PRIMARY if not self._hovered else ACCENT_HOVER)
+        gc.SetFont(font, FG_SECONDARY)
         _, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, bx + self._BOX_W + 8, cy - th / 2)
 

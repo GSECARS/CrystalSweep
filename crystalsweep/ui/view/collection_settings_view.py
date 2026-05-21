@@ -296,7 +296,7 @@ class CollectionSettingsView(wx.Panel):
         label_font = scaled_font(12)
 
         outer = wx.BoxSizer(wx.VERTICAL)
-        outer.AddSpacer(8)
+        outer.AddSpacer(2)
 
         outer.Add(self._make_row_type(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
         outer.AddSpacer(4)

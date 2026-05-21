@@ -49,7 +49,7 @@ POPUP_BTN_BG = wx.Colour(45, 45, 50)
 POPUP_BTN_HOVER = wx.Colour(62, 62, 70)
 POPUP_BTN_PRESS = wx.Colour(85, 85, 95)
 
-PONI_LOADED = wx.Colour(72, 199, 116)
+PONI_LOADED = wx.Colour(46, 139, 78)
 PONI_MISSING = wx.Colour(110, 110, 120)
 
 DANGER = wx.Colour(180, 40, 40)
