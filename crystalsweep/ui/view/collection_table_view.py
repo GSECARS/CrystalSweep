@@ -19,7 +19,7 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BG_SURFACE, FG_PRIMARY, SEP_COLOUR, scaled_font
+from crystalsweep.ui.view.custom.theme import BG_CARD, BG_ELEVATED, BG_SURFACE, FG_PRIMARY, FG_SECONDARY, SEP_COLOUR, scaled_font
 from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, MUTED_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, FlatButton
 
 __all__ = ["CollectionTableView"]
@@ -235,7 +235,7 @@ class _CollectionRow(wx.Panel):
         self._remove_btn_panel = wx.Panel(self, style=wx.BORDER_NONE)
         self._remove_btn_panel.SetBackgroundColour(BG_CARD)
         self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.SetMinSize((inner_h + 8, inner_h))
+        self._remove_btn.SetMinSize((inner_h, inner_h))
         self._remove_btn.SetToolTip("Remove row")
         self._remove_btn.set_action(on_remove)
         _btn_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -432,8 +432,8 @@ class _HeaderRow(wx.Panel):
 
         _draw_checkbox(gc, self._checkbox_rect(), self._all_selected)
 
-        font = scaled_font(13, weight=wx.FONTWEIGHT_BOLD)
-        gc.SetFont(font, ACCENT)
+        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
+        gc.SetFont(font, FG_SECONDARY)
 
         x = 0
         gc.SetPen(wx.Pen(_BORDER, 1))
@@ -461,7 +461,7 @@ class CollectionTableView(wx.Panel):
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent, style=wx.BORDER_NONE)
-        self.SetBackgroundColour(BG_SURFACE)
+        self.SetBackgroundColour(BG_CARD)
 
         self._motor_shorthands: list[str] = []
         self._motor_precisions: dict[str, int] = {}
@@ -494,10 +494,12 @@ class CollectionTableView(wx.Panel):
     def _min_content_width(self) -> int:
         n_motor = len(self._motor_shorthands)
         motor_cols = _MOTOR_W * n_motor + (_GET_W + _MOVE_W if n_motor else 0)
-        return _CHECK_W + _EXT_W + motor_cols + _TYPE_W + _ROT_W + _ROT_W + _STEP_W + _TIME_W + _REMOVE_W + _SB_W
+        return _CHECK_W + _EXT_W + motor_cols + _TYPE_W + _ROT_W + _ROT_W + _STEP_W + _TIME_W + _REMOVE_W + _SB_W + self._SIDE_PAD
+
+    _SIDE_PAD = 20
 
     def _col_widths(self) -> list[int]:
-        total = self.GetClientSize().width - _SB_W
+        total = self.GetClientSize().width - _SB_W - self._SIDE_PAD
         n_motor = len(self._motor_shorthands)
         motor_cols = _MOTOR_W * n_motor + (_GET_W + _MOVE_W if n_motor else 0)
         fixed = _CHECK_W + motor_cols + _TYPE_W + _ROT_W + _ROT_W + _STEP_W + _TIME_W + _REMOVE_W
@@ -506,11 +508,6 @@ class CollectionTableView(wx.Panel):
         return [_CHECK_W, ext_w] + [_MOTOR_W] * n_motor + motor_action_cols + [_TYPE_W, _ROT_W, _ROT_W, _STEP_W, _TIME_W, _REMOVE_W]
 
     def _build_layout(self) -> None:
-        title_lbl = wx.StaticText(self, label="Collection Points")
-        title_lbl.SetForegroundColour(FG_PRIMARY)
-        title_lbl.SetFont(scaled_font(13, weight=wx.FONTWEIGHT_BOLD))
-        title_lbl.SetBackgroundColour(BG_SURFACE)
-
         self._delete_selected_btn = FlatButton(self, "Delete selected", color_scheme=DANGER_SCHEME)
         self._delete_selected_btn.SetMinSize((100, 22))
         self._delete_selected_btn.set_action(self._on_delete_selected_clicked)
@@ -520,7 +517,6 @@ class CollectionTableView(wx.Panel):
         self._clear_btn.set_action(self._on_clear_clicked)
 
         title_row = wx.BoxSizer(wx.HORIZONTAL)
-        title_row.Add(title_lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.TOP | wx.BOTTOM, 8)
         title_row.AddStretchSpacer()
         title_row.Add(self._delete_selected_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._clear_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
@@ -548,11 +544,11 @@ class CollectionTableView(wx.Panel):
         scroll_row.Add(self._scrollbar, 0, wx.EXPAND)
 
         outer = wx.BoxSizer(wx.VERTICAL)
-        outer.Add(title_row, 0, wx.EXPAND)
-        outer.Add(title_sep, 0, wx.EXPAND)
-        outer.Add(self._header, 0, wx.EXPAND)
-        outer.Add(header_border, 0, wx.EXPAND)
-        outer.Add(scroll_row, 1, wx.EXPAND)
+        outer.Add(title_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.Add(title_sep, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.Add(self._header, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.Add(header_border, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.Add(scroll_row, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
         self.SetSizer(outer)
 
     def set_columns(self, motor_shorthands: list[str], rotation_shorthand: str = "", motor_precisions: dict[str, int] | None = None, rotation_precision: int = 4) -> None:

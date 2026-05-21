@@ -23,7 +23,6 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, ScanType
 from crystalsweep.ui.view.custom.theme import (
-    ACCENT,
     BG_CARD,
     BG_ELEVATED,
     BG_SURFACE,
@@ -105,7 +104,7 @@ class _MapHeaderRow(wx.Panel):
         gc.DrawRectangle(0, 0, w, h)
         widths = _col_widths(w)
         font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
-        gc.SetFont(font, ACCENT)
+        gc.SetFont(font, FG_SECONDARY)
         gc.SetPen(wx.Pen(_TABLE_BORDER, 1))
         x = 0
         for i, (label, cw) in enumerate(zip(self._LABELS, widths)):
