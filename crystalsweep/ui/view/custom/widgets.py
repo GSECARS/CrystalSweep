@@ -62,10 +62,10 @@ __all__ = [
 ]
 
 
-# Colour palettes for FlatButton: (idle, hover, press, foreground).
-DEFAULT_SCHEME = (POPUP_BTN_BG, POPUP_BTN_HOVER, POPUP_BTN_PRESS, FG_PRIMARY)
-DANGER_SCHEME = (POPUP_BTN_BG, DANGER_HOVER, DANGER_PRESS, wx.Colour(230, 90, 90))
-MUTED_SCHEME = (wx.Colour(38, 38, 44), wx.Colour(55, 60, 75), wx.Colour(30, 35, 55), wx.Colour(120, 150, 190))
+# Colour palettes for FlatButton: (idle, hover, press, idle_fg, hover_fg).
+DEFAULT_SCHEME = (POPUP_BTN_BG, POPUP_BTN_HOVER, POPUP_BTN_PRESS, FG_PRIMARY, FG_PRIMARY)
+DANGER_SCHEME = (POPUP_BTN_BG, DANGER_HOVER, DANGER_PRESS, wx.Colour(230, 90, 90), FG_PRIMARY)
+MUTED_SCHEME = (wx.Colour(38, 38, 44), wx.Colour(55, 60, 75), wx.Colour(30, 35, 55), wx.Colour(120, 150, 190), wx.Colour(120, 150, 190))
 
 
 class FlatButton(wx.Control):
@@ -75,17 +75,18 @@ class FlatButton(wx.Control):
         self,
         parent: wx.Window,
         label: str,
-        color_scheme: tuple[wx.Colour, wx.Colour, wx.Colour, wx.Colour] = DEFAULT_SCHEME,
+        color_scheme: tuple[wx.Colour, wx.Colour, wx.Colour, wx.Colour, wx.Colour] = DEFAULT_SCHEME,
     ) -> None:
         super().__init__(parent, style=wx.BORDER_NONE | wx.WANTS_CHARS)
         self._label = label
         self._hovered = False
         self._pressed = False
         self._action: Callable[[], None] | None = None
-        self._idle_bg, self._hover_bg, self._press_bg, self._fg = color_scheme
+        self._idle_bg, self._hover_bg, self._press_bg, self._idle_fg, self._hover_fg = color_scheme
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self.SetMinSize((-1, 26))
         super().Bind(wx.EVT_PAINT, self._on_paint)
+        super().Bind(wx.EVT_SIZE, self._on_size)
         super().Bind(wx.EVT_ENTER_WINDOW, self._on_enter)
         super().Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
         super().Bind(wx.EVT_LEFT_DOWN, self._on_press)
@@ -98,6 +99,10 @@ class FlatButton(wx.Control):
         self._label = label
         self.Refresh()
 
+    def _on_size(self, event: wx.SizeEvent) -> None:
+        self.Refresh()
+        event.Skip()
+
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
@@ -108,11 +113,14 @@ class FlatButton(wx.Control):
             bg = self._hover_bg
         else:
             bg = self._idle_bg
-        gc.SetBrush(wx.Brush(bg))
+        gc.SetBrush(wx.Brush(self.GetParent().GetBackgroundColour()))
         gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+        gc.SetBrush(wx.Brush(bg))
         gc.DrawRoundedRectangle(0, 0, w, h, 4)
         font = scaled_font(12)
-        gc.SetFont(font, self._fg)
+        fg = self._hover_fg if (self._hovered or self._pressed) else self._idle_fg
+        gc.SetFont(font, fg)
         tw, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, (w - tw) / 2, (h - th) / 2)
 
@@ -149,6 +157,7 @@ class FrameLabel(wx.Control):
         self._value: str = "0"
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         super().Bind(wx.EVT_PAINT, self._on_paint)
+        super().Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
 
     def ChangeValue(self, value: str) -> None:
         self._value = value
@@ -181,6 +190,7 @@ class LiveToggle(wx.Control):
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self.SetToolTip(tooltip)
         super().Bind(wx.EVT_PAINT, self._on_paint)
+        super().Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
         super().Bind(wx.EVT_MOTION, self._on_motion)
         super().Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
         super().Bind(wx.EVT_LEFT_UP, self._on_click)
@@ -205,7 +215,7 @@ class LiveToggle(wx.Control):
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(wx.Colour(0, 0, 0)))
+        gc.SetBrush(wx.Brush(BG_SURFACE))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
         colour = (LIVE_ON_HOVER if self._hovered else LIVE_ON) if self._live else (LIVE_OFF_HOVER if self._hovered else LIVE_OFF)
@@ -256,6 +266,7 @@ class IconButton(wx.Panel):
         if tooltip:
             self.SetToolTip(tooltip)
         self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_SIZE, self._on_size)
         self.Bind(wx.EVT_MOTION, self._on_motion)
         self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
         self.Bind(wx.EVT_LEFT_DOWN, self._on_press)
@@ -273,6 +284,10 @@ class IconButton(wx.Panel):
             if not hovered:
                 self._pressed = False
             self.Refresh()
+
+    def _on_size(self, event: wx.SizeEvent) -> None:
+        self.Refresh()
+        event.Skip()
 
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
@@ -627,6 +642,7 @@ class DarkCombo(wx.Panel):
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self.SetBackgroundColour(BG_ELEVATED)
         self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
         self.Bind(wx.EVT_LEFT_UP, self._on_click)
         self.Bind(wx.EVT_ENTER_WINDOW, self._on_enter_combo)
         self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave_combo)
@@ -910,6 +926,7 @@ class _DarkMenuButton(wx.Control):
         self._active = False
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
         self.Bind(wx.EVT_ENTER_WINDOW, self._on_enter)
         self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
         self.Bind(wx.EVT_LEFT_DOWN, self._on_press)
@@ -1015,6 +1032,7 @@ class RadioDot(wx.Panel):
         if tooltip:
             self.SetToolTip(tooltip)
         self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
         self.Bind(wx.EVT_LEFT_UP, self._on_click)
         self.Bind(wx.EVT_ENTER_WINDOW, self._on_enter_dot)
         self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave_dot)
@@ -1044,7 +1062,7 @@ class RadioDot(wx.Panel):
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(self.GetBackgroundColour()))
+        gc.SetBrush(wx.Brush(BG_CARD))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
         cx, cy = w / 2, h / 2

@@ -166,6 +166,7 @@ class _CollectionRow(wx.Panel):
     ) -> None:
         super().__init__(parent, size=(-1, _ROW_H), style=wx.BORDER_NONE)
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self.SetBackgroundColour(BG_CARD)
 
         self._on_label_changed = on_label_changed
         self._on_motor_changed = on_motor_changed
@@ -231,13 +232,26 @@ class _CollectionRow(wx.Panel):
         self._time_ctrl.set_restrict_to_float(True)
         self._time_ctrl.set_validator(self._make_motor_validator(4))
 
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.SetMinSize((-1, inner_h))
+        self._remove_btn_panel = wx.Panel(self, style=wx.BORDER_NONE)
+        self._remove_btn_panel.SetBackgroundColour(BG_CARD)
+        self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=DANGER_SCHEME)
+        self._remove_btn.SetMinSize((inner_h + 8, inner_h))
         self._remove_btn.SetToolTip("Remove row")
         self._remove_btn.set_action(on_remove)
+        _btn_sizer = wx.BoxSizer(wx.VERTICAL)
+        _btn_sizer.AddStretchSpacer()
+        _btn_sizer.Add(self._remove_btn, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        _btn_sizer.AddStretchSpacer()
+        self._remove_btn_panel.SetSizer(_btn_sizer)
 
         self._apply_scan_type_state(point.scan_type)
         self._reposition()
+
+    def SetBackgroundColour(self, colour: wx.Colour) -> bool:
+        result = super().SetBackgroundColour(colour)
+        if hasattr(self, "_remove_btn_panel"):
+            self._remove_btn_panel.SetBackgroundColour(colour)
+        return result
 
     def set_selected(self, selected: bool) -> None:
         self._selected = selected
@@ -296,7 +310,9 @@ class _CollectionRow(wx.Panel):
         _place(self._rot_end_ctrl, self._col_widths[n + 4 + extra])
         _place(self._step_ctrl, self._col_widths[n + 5 + extra])
         _place(self._time_ctrl, self._col_widths[n + 6 + extra])
-        _place(self._remove_btn, self._col_widths[n + 7 + extra])
+        cw = self._col_widths[n + 7 + extra]
+        self._remove_btn_panel.SetSize(x, 0, cw, _ROW_H)
+        self._remove_btn_panel.Layout()
 
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
