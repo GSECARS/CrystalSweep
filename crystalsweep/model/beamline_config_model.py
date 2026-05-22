@@ -44,6 +44,8 @@ class MotorConfig:
     precision: int = 4
     mapping_enabled: bool = False
     controller: str = "epics"
+    xps_group: str = ""
+    xps_positioner: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +201,8 @@ class BeamlineConfigModel:
                 precision=max(0, int(m.get("precision", 4))),
                 mapping_enabled=bool(m.get("mapping_enabled", False)),
                 controller=str(m.get("controller", "epics")),
+                xps_group=str(m.get("xps_group", "")),
+                xps_positioner=str(m.get("xps_positioner", "")),
             )
             for m in motors_data
         )
@@ -212,6 +216,8 @@ class BeamlineConfigModel:
                 pv=str(rm_data.get("pv", "")),
                 precision=max(0, int(rm_data.get("precision", 4))),
                 controller=str(rm_data.get("controller", "epics")),
+                xps_group=str(rm_data.get("xps_group", "")),
+                xps_positioner=str(rm_data.get("xps_positioner", "")),
             )
 
         cfg = BeamlineConfig(
@@ -234,7 +240,7 @@ class BeamlineConfigModel:
         payload: dict = {
             "beamline": config.beamline,
             "rotation_motor": (
-                {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision, "controller": config.rotation_motor.controller}
+                {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision, "controller": config.rotation_motor.controller, "xps_group": config.rotation_motor.xps_group, "xps_positioner": config.rotation_motor.xps_positioner}
                 if config.rotation_motor is not None
                 else {}
             ),
@@ -247,7 +253,7 @@ class BeamlineConfigModel:
                 for c in config.controllers
             ],
             "motors": [
-                {"shorthand": m.shorthand, "description": m.description, "pv": m.pv, "precision": m.precision, "mapping_enabled": m.mapping_enabled, "controller": m.controller}
+                {"shorthand": m.shorthand, "description": m.description, "pv": m.pv, "precision": m.precision, "mapping_enabled": m.mapping_enabled, "controller": m.controller, "xps_group": m.xps_group, "xps_positioner": m.xps_positioner}
                 for m in config.motors
             ],
         }

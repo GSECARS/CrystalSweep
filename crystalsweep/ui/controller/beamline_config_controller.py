@@ -125,7 +125,10 @@ class BeamlineConfigController:
 
         cfg = self._model.beamline.active
         panel = self._positioners_dlg.config_panel
-        panel.set_controller_names([c.name for c in cfg.controllers if c.name])
+        panel.set_controller_names(
+            [c.name for c in cfg.controllers if c.name],
+            {c.name: c.type for c in cfg.controllers if c.name},
+        )
         panel.load_config(cfg)
         self._show(self._positioners_dlg)
 
@@ -154,7 +157,10 @@ class BeamlineConfigController:
             self._controllers_dlg.config_panel.load_config(cfg)
         if self._positioners_dlg is not None:
             p = self._positioners_dlg.config_panel
-            p.set_controller_names([c.name for c in cfg.controllers if c.name])
+            p.set_controller_names(
+                [c.name for c in cfg.controllers if c.name],
+                {c.name: c.type for c in cfg.controllers if c.name},
+            )
             p.load_config(cfg)
 
     def _switch_to(self, name: str) -> None:

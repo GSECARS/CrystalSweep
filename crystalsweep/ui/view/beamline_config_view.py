@@ -50,6 +50,8 @@ _PLACEHOLDER_MOTOR_SHORT = "e.g. vert"
 _PLACEHOLDER_MOTOR_DESCRIPTION = "e.g. vertical"
 _PLACEHOLDER_MOTOR_PV = "e.g. 13IDD:m1.VAL"
 _PLACEHOLDER_MOTOR_PRECISION = "4"
+_PLACEHOLDER_XPS_GROUP = "e.g. G6"
+_PLACEHOLDER_XPS_POSITIONER = "e.g. ST-Hor"
 
 _CONTROLLER_TYPE_LABELS: list[tuple[str, str]] = [
     ("newport_xps", "NewportXPS C/D"),
@@ -334,13 +336,26 @@ class _RotationRow(_TableRow):
     def __init__(self, parent: wx.Window, motor: MotorConfig | None) -> None:
         super().__init__(parent, BG_CARD, self._PROPS)
         rm = motor
+        self._controller_types: dict[str, str] = {}
 
         self.short_ctrl = DarkTextCtrl(self, value=rm.shorthand if rm else "", placeholder=_PLACEHOLDER_ROTATION_SHORT)
         self.description_ctrl = DarkTextCtrl(self, value=rm.description if rm else "", placeholder=_PLACEHOLDER_ROTATION_DESCRIPTION)
         self.pv_ctrl = DarkTextCtrl(self, value=rm.pv if rm else "", placeholder=_PLACEHOLDER_ROTATION_PV)
         self.precision_ctrl = DarkTextCtrl(self, value=str(rm.precision) if rm else "4", placeholder=_PLACEHOLDER_MOTOR_PRECISION)
         self.controller_combo = DarkCombo(self, choices=["epics"], selection=0)
+        self.controller_combo.Bind(wx.EVT_CHOICE, lambda _e: self._on_controller_changed())
+
+        self.xps_group_ctrl = DarkTextCtrl(self, value=rm.xps_group if rm else "", placeholder=_PLACEHOLDER_XPS_GROUP)
+        self.xps_positioner_ctrl = DarkTextCtrl(self, value=rm.xps_positioner if rm else "", placeholder=_PLACEHOLDER_XPS_POSITIONER)
         self._reposition()
+
+    def _is_xps(self) -> bool:
+        name = self.controller_combo.GetStringSelection()
+        return self._controller_types.get(name) == "newport_xps"
+
+    def _on_controller_changed(self) -> None:
+        self._reposition()
+        self.Refresh()
 
     def _reposition(self) -> None:
         w, _ = self.GetClientSize()
@@ -349,16 +364,33 @@ class _RotationRow(_TableRow):
         widths = self._col_widths(w)
         x = 0
         for ctrl, cw in zip(
-            (self.short_ctrl, self.description_ctrl, self.pv_ctrl, self.precision_ctrl, self.controller_combo),
-            widths,
+            (self.short_ctrl, self.description_ctrl, self.pv_ctrl, self.precision_ctrl),
+            widths[:4],
         ):
             self._place(ctrl, x, cw)
             x += cw
+        xps = self._is_xps()
+        ctrl_w = widths[4]
+        if xps:
+            third = ctrl_w // 3
+            self._place(self.controller_combo, x, third)
+            self._place(self.xps_group_ctrl, x + third, third)
+            self._place(self.xps_positioner_ctrl, x + third * 2, ctrl_w - third * 2)
+            self.xps_group_ctrl.Show()
+            self.xps_positioner_ctrl.Show()
+        else:
+            self._place(self.controller_combo, x, ctrl_w)
+            self.xps_group_ctrl.Hide()
+            self.xps_positioner_ctrl.Hide()
 
-    def update_controller_choices(self, choices: list[str], selected: str = "epics") -> None:
+    def update_controller_choices(self, choices: list[str], selected: str = "epics", controller_types: dict[str, str] | None = None) -> None:
+        if controller_types is not None:
+            self._controller_types = controller_types
         self.controller_combo.SetChoices(choices)
         if selected in choices:
             self.controller_combo.SetSelection(choices.index(selected))
+        self._reposition()
+        self.Refresh()
 
 
 class _MotorRow(_TableRow):
@@ -369,11 +401,13 @@ class _MotorRow(_TableRow):
         parent: wx.Window,
         motor: MotorConfig,
         controller_names: list[str],
+        controller_types: dict[str, str],
         index: int,
         on_remove: Callable[["_MotorRow"], None],
     ) -> None:
         bg = BG_CARD if index % 2 == 0 else _ROW_ALT
         super().__init__(parent, bg, self._PROPS)
+        self._controller_types = controller_types
 
         self.shorthand_ctrl = DarkTextCtrl(self, value=motor.shorthand, placeholder=_PLACEHOLDER_MOTOR_SHORT)
         self.description_ctrl = DarkTextCtrl(self, value=motor.description, placeholder=_PLACEHOLDER_MOTOR_DESCRIPTION)
@@ -387,10 +421,22 @@ class _MotorRow(_TableRow):
         controller_choices = ["epics"] + controller_names
         sel = controller_choices.index(motor.controller) if motor.controller in controller_choices else 0
         self.controller_combo = DarkCombo(self, choices=controller_choices, selection=sel)
+        self.controller_combo.Bind(wx.EVT_CHOICE, lambda _e: self._on_controller_changed())
+
+        self.xps_group_ctrl = DarkTextCtrl(self, value=motor.xps_group, placeholder=_PLACEHOLDER_XPS_GROUP)
+        self.xps_positioner_ctrl = DarkTextCtrl(self, value=motor.xps_positioner, placeholder=_PLACEHOLDER_XPS_POSITIONER)
 
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
         self._remove_btn.set_action(lambda: on_remove(self))
         self._reposition()
+
+    def _is_xps(self) -> bool:
+        name = self.controller_combo.GetStringSelection()
+        return self._controller_types.get(name) == "newport_xps"
+
+    def _on_controller_changed(self) -> None:
+        self._reposition()
+        self.Refresh()
 
     def _reposition(self) -> None:
         w, _ = self.GetClientSize()
@@ -407,16 +453,32 @@ class _MotorRow(_TableRow):
         tw, th = self.mapping_toggle.GetBestSize()
         self.mapping_toggle.SetSize(x + (widths[4] - tw) // 2, (_ROW_H - th) // 2, tw, th)
         x += widths[4]
-        self._place(self.controller_combo, x, widths[5])
-        x += widths[5]
+        xps = self._is_xps()
+        ctrl_w = widths[5]
+        if xps:
+            third = ctrl_w // 3
+            self._place(self.controller_combo, x, third)
+            self._place(self.xps_group_ctrl, x + third, third)
+            self._place(self.xps_positioner_ctrl, x + third * 2, ctrl_w - third * 2)
+            self.xps_group_ctrl.Show()
+            self.xps_positioner_ctrl.Show()
+        else:
+            self._place(self.controller_combo, x, ctrl_w)
+            self.xps_group_ctrl.Hide()
+            self.xps_positioner_ctrl.Hide()
+        x += ctrl_w
         self._place(self._remove_btn, x, widths[6])
 
-    def update_controller_choices(self, controller_names: list[str]) -> None:
+    def update_controller_choices(self, controller_names: list[str], controller_types: dict[str, str] | None = None) -> None:
+        if controller_types is not None:
+            self._controller_types = controller_types
         current = self.controller_combo.GetStringSelection()
         choices = ["epics"] + controller_names
         self.controller_combo.SetChoices(choices)
         if current in choices:
             self.controller_combo.SetSelection(choices.index(current))
+        self._reposition()
+        self.Refresh()
 
     def to_motor(self) -> MotorConfig:
         try:
@@ -430,6 +492,8 @@ class _MotorRow(_TableRow):
             precision=precision,
             mapping_enabled=self.mapping_toggle.GetValue(),
             controller=self.controller_combo.GetStringSelection() or "epics",
+            xps_group=self.xps_group_ctrl.GetValue().strip() if self._is_xps() else "",
+            xps_positioner=self.xps_positioner_ctrl.GetValue().strip() if self._is_xps() else "",
         )
 
 
@@ -789,6 +853,7 @@ class PositionersConfigView(wx.Panel):
         self.SetForegroundColour(POPUP_FG)
         self._motor_rows: list[_MotorRow] = []
         self._controller_names: list[str] = []
+        self._controller_types: dict[str, str] = {}
         self._on_save_cb: Callable[[], None] | None = None
         self._build_layout()
 
@@ -828,10 +893,12 @@ class PositionersConfigView(wx.Panel):
     def bind_save(self, callback: Callable[[], None]) -> None:
         self._on_save_cb = callback
 
-    def set_controller_names(self, names: list[str]) -> None:
+    def set_controller_names(self, names: list[str], controller_types: dict[str, str] | None = None) -> None:
         self._controller_names = names
+        if controller_types is not None:
+            self._controller_types = controller_types
         for row in self._motor_rows:
-            row.update_controller_choices(names)
+            row.update_controller_choices(names, self._controller_types)
         self._refresh_rotation_controller_choices()
 
     def load_config(self, config: BeamlineConfig) -> None:
@@ -857,12 +924,15 @@ class PositionersConfigView(wx.Panel):
             rot_precision = 4
         if not rot_pv:
             return None
+        is_xps = self._rotation_row._is_xps()
         return MotorConfig(
             shorthand=self._rotation_row.short_ctrl.GetValue().strip(),
             description=self._rotation_row.description_ctrl.GetValue().strip(),
             pv=rot_pv,
             precision=rot_precision,
             controller=self._rotation_row.controller_combo.GetStringSelection() or "epics",
+            xps_group=self._rotation_row.xps_group_ctrl.GetValue().strip() if is_xps else "",
+            xps_positioner=self._rotation_row.xps_positioner_ctrl.GetValue().strip() if is_xps else "",
         )
 
     def collect_motors(self) -> tuple[MotorConfig, ...]:
@@ -885,7 +955,7 @@ class PositionersConfigView(wx.Panel):
 
     def _append_motor_row(self, motor: MotorConfig) -> None:
         index = len(self._motor_rows)
-        row = _MotorRow(self._motor_rows_panel._content, motor, self._controller_names, index, on_remove=self._on_remove_motor)
+        row = _MotorRow(self._motor_rows_panel._content, motor, self._controller_names, self._controller_types, index, on_remove=self._on_remove_motor)
         self._motor_rows_panel.bind_mousewheel(row)
         self._motor_rows.append(row)
         self._motor_rows_panel.add_row(row)
@@ -904,7 +974,7 @@ class PositionersConfigView(wx.Panel):
     def _refresh_rotation_controller_choices(self, selected: str | None = None) -> None:
         choices = ["epics"] + self._controller_names
         current = selected or self._rotation_row.controller_combo.GetStringSelection() or "epics"
-        self._rotation_row.update_controller_choices(choices, selected=current)
+        self._rotation_row.update_controller_choices(choices, selected=current, controller_types=self._controller_types)
 
 
 class _ConfigDialog(wx.Dialog):
