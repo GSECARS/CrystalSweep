@@ -54,6 +54,14 @@ class DetectorModel(Protocol):
         """Arm the CBF file writer plugin to capture one frame."""
         ...
 
+    def collect_wide(self, exposure: float) -> None:
+        """Arm the detector in internal-trigger mode for a slew scan and fire Acquire non-blocking.
+
+        The caller is responsible for moving the motor to omega_start before calling this,
+        and for executing the motor slew to omega_end immediately after.
+        """
+        ...
+
     def collect_still(self, exposure: float) -> None:
         """Arm the detector, trigger one frame, and block until complete."""
         ...
@@ -86,6 +94,25 @@ class ADEigerModel:
         p = self._prefix
         caput(f"{p}CBF1:NumCapture", 1)
         caput(f"{p}CBF1:Capture", 1)
+
+    def collect_wide(self, exposure: float) -> None:
+        p = self._prefix
+        plugin = self._plugin
+        acq_time = max(0.001, exposure * 0.999 - 0.001)
+
+        caput(f"{p}cam1:TriggerMode", 0, wait=True)
+        caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
+        caput(f"{p}cam1:NumImages", 1, wait=True)
+
+        if plugin == "HDF1":
+            self.save_hdf5()
+        elif plugin == "TIFF1":
+            self.save_tiff()
+        else:
+            self.save_cbf()
+
+        caput(f"{p}cam1:Acquire", 1)
+        _log.debug("ADEigerModel wide: %s plugin=%s exposure=%.4f armed", p, plugin, exposure)
 
     def collect_still(self, exposure: float) -> None:
         p = self._prefix
@@ -138,6 +165,25 @@ class ADPilatusModel:
         p = self._prefix
         caput(f"{p}CBF1:NumCapture", 1)
         caput(f"{p}CBF1:Capture", 1)
+
+    def collect_wide(self, exposure: float) -> None:
+        p = self._prefix
+        plugin = self._plugin
+        acq_time = max(0.001, exposure - 0.001)
+
+        caput(f"{p}cam1:TriggerMode", 0, wait=True)
+        caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
+        caput(f"{p}cam1:NumImages", 1, wait=True)
+
+        if plugin == "HDF1":
+            self.save_hdf5()
+        elif plugin == "TIFF1":
+            self.save_tiff()
+        else:
+            self.save_cbf()
+
+        caput(f"{p}cam1:Acquire", 1)
+        _log.debug("ADPilatusModel wide: %s plugin=%s exposure=%.4f armed", p, plugin, exposure)
 
     def collect_still(self, exposure: float) -> None:
         p = self._prefix
@@ -192,6 +238,25 @@ class ADSpinnakerModel:
         p = self._prefix
         caput(f"{p}CBF1:NumCapture", 1)
         caput(f"{p}CBF1:Capture", 1)
+
+    def collect_wide(self, exposure: float) -> None:
+        p = self._prefix
+        plugin = self._plugin
+        acq_time = max(0.001, exposure)
+
+        caput(f"{p}cam1:TriggerMode", "Off", wait=True)
+        caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
+        caput(f"{p}cam1:NumImages", 1, wait=True)
+
+        if plugin == "HDF1":
+            self.save_hdf5()
+        elif plugin == "TIFF1":
+            self.save_tiff()
+        else:
+            self.save_cbf()
+
+        caput(f"{p}cam1:Acquire", 1)
+        _log.debug("ADSpinnakerModel wide: %s plugin=%s exposure=%.4f armed", p, plugin, exposure)
 
     def collect_still(self, exposure: float) -> None:
         p = self._prefix

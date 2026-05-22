@@ -30,6 +30,8 @@
 import logging
 from typing import Callable
 
+from epics import caget, caput
+
 from crystalsweep.model.scan_model import ScanSpec
 
 __all__ = ["AerotechA1Model"]
@@ -59,6 +61,9 @@ class AerotechA1Model:
         self._aborted = False
 
     def prepare(self, spec: ScanSpec) -> None:
+        if spec.points == 1:
+            return
+
         if PyAutomation is None:
             raise RuntimeError(_MISSING)
         if spec.points < 1:
@@ -91,6 +96,12 @@ class AerotechA1Model:
             _log.info("AerotechA1Model aborted before run()")
             return
 
+        if spec.points == 1 and spec.pv:
+            self._run_wide_slew(spec)
+            if not self._aborted:
+                on_point(0, spec.end)
+            return
+
         travel_direction = int(spec.controller_params.get("travel_direction", 1))
 
         trajectory = Trajectory(
@@ -116,6 +127,21 @@ class AerotechA1Model:
 
         if not self._aborted:
             on_point(0, spec.end)
+
+    def _run_wide_slew(self, spec: ScanSpec) -> None:
+        pv_base = spec.pv.removesuffix(".VAL")
+        delta = abs(spec.end - spec.start)
+        velocity = delta / spec.exposure
+
+        old_velocity = caget(f"{pv_base}.VELO")
+        caput(f"{pv_base}.VELO", velocity, wait=True)
+        caput(f"{pv_base}.VAL", spec.end, wait=True)
+        caput(f"{pv_base}.VELO", old_velocity, wait=True)
+
+        _log.debug(
+            "AerotechA1Model wide slew: pv=%s end=%.4f velocity=%.4f",
+            pv_base, spec.end, velocity,
+        )
 
     def abort(self) -> None:
         self._aborted = True

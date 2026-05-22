@@ -28,6 +28,8 @@ __all__ = ["CollectController"]
 
 _log = logging.getLogger(__name__)
 
+_PROGRESS_INTERVAL_MS = 100
+
 
 class CollectController:
     """Drives the collect panel: sequential collection loop with per-point hardware scans."""
@@ -41,6 +43,13 @@ class CollectController:
         self._start_time: float = 0.0
         self._elapsed_timer = wx.Timer()
         self._elapsed_timer.Bind(wx.EVT_TIMER, self._on_elapsed_tick)
+
+        self._point_timer = wx.Timer()
+        self._point_timer.Bind(wx.EVT_TIMER, self._on_point_tick)
+        self._point_timer_start: float = 0.0
+        self._point_timer_duration: float = 1.0
+        self._point_timer_idx: int = 1
+        self._point_timer_total: int = 1
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
@@ -105,6 +114,26 @@ class CollectController:
         elapsed = _time.monotonic() - self._start_time
         self._view.collect.set_elapsed(elapsed)
 
+    def _on_point_tick(self, _event: wx.TimerEvent) -> None:
+        elapsed = _time.monotonic() - self._point_timer_start
+        fraction = min(1.0, elapsed / self._point_timer_duration) if self._point_timer_duration > 0 else 1.0
+        self._view.collect.set_progress(
+            self._point_timer_idx,
+            self._point_timer_total,
+            point_fraction=fraction,
+        )
+
+    def _start_point_timer(self, idx: int, total: int, duration: float) -> None:
+        self._point_timer_start = _time.monotonic()
+        self._point_timer_duration = max(duration, 0.1)
+        self._point_timer_idx = idx
+        self._point_timer_total = total
+        self._point_timer.Start(_PROGRESS_INTERVAL_MS)
+
+    def _stop_point_timer(self, idx: int, total: int) -> None:
+        self._point_timer.Stop()
+        self._view.collect.set_progress(idx, total, point_fraction=1.0)
+
     def _stop_elapsed_timer(self) -> None:
         self._elapsed_timer.Stop()
         elapsed = _time.monotonic() - self._start_time
@@ -138,10 +167,6 @@ class CollectController:
                 break
 
             wx.CallAfter(
-                self._view.collect.set_progress,
-                idx, total, 0, 0,
-            )
-            wx.CallAfter(
                 self._view.collect.set_status,
                 f"[{idx}/{total}] {point.label} — {point.scan_type}…",
                 wx.Colour(99, 179, 237),
@@ -149,6 +174,8 @@ class CollectController:
 
             if point.scan_type == "still":
                 self._run_still(point, idx, total, config)
+            elif point.scan_type == "wide":
+                self._run_wide(point, idx, total, config)
             else:
                 _log.info("Scan type %r not yet implemented, skipping point %s", point.scan_type, point.label)
                 wx.CallAfter(
@@ -163,13 +190,18 @@ class CollectController:
             wx.CallAfter(self._view.collect.set_status, "Aborted", wx.Colour(220, 160, 40))
             wx.CallAfter(self._view.collect.set_collecting, False)
         else:
-            wx.CallAfter(self._view.collect.set_progress, total, total, 0, 0)
+            wx.CallAfter(self._view.collect.set_progress, total, total, point_fraction=1.0)
             wx.CallAfter(self._view.collect.set_status, "Done", wx.Colour(99, 179, 237))
             wx.CallAfter(self._view.collect.set_collecting, False)
 
     def _run_still(self, point: CollectionPoint, idx: int, total: int, config) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
+
+        try:
+            exposure = float(point.time) if point.time else 1.0
+        except ValueError:
+            exposure = 1.0
 
         def on_done() -> None:
             print(f"[collect] [{idx}/{total}] {point.label}: still scan complete")
@@ -186,7 +218,45 @@ class CollectController:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
 
+        wx.CallAfter(self._start_point_timer, idx, total, exposure)
         done_event.wait()
+        wx.CallAfter(self._stop_point_timer, idx, total)
+
+        if error_holder:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: {error_holder[0]}",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+
+    def _run_wide(self, point: CollectionPoint, idx: int, total: int, config) -> None:
+        done_event = threading.Event()
+        error_holder: list[Exception] = []
+
+        try:
+            exposure = float(point.time) if point.time else 1.0
+        except ValueError:
+            exposure = 1.0
+
+        def on_done() -> None:
+            print(f"[collect] [{idx}/{total}] {point.label}: wide scan complete")
+            done_event.set()
+
+        def on_error(exc: Exception) -> None:
+            error_holder.append(exc)
+            print(f"[collect] [{idx}/{total}] {point.label}: ERROR — {exc}")
+            done_event.set()
+
+        try:
+            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error)
+        except RuntimeError as exc:
+            wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
+            return
+
+        wx.CallAfter(self._start_point_timer, idx, total, exposure)
+        done_event.wait()
+        wx.CallAfter(self._stop_point_timer, idx, total)
 
         if error_holder:
             wx.CallAfter(

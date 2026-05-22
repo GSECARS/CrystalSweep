@@ -72,10 +72,16 @@ class _ProgressBar(wx.Panel):
         total_points: int,
         frame: int = 0,
         total_frames: int = 0,
+        point_fraction: float | None = None,
     ) -> None:
         completed_points = point - 1
-        frame_progress = (frame / total_frames) if total_frames > 1 else 1.0
-        self._fraction = max(0.0, min(1.0, (completed_points + frame_progress) / total_points if total_points > 0 else 0.0))
+        if point_fraction is not None:
+            inner = max(0.0, min(1.0, point_fraction))
+        elif total_frames > 1:
+            inner = frame / total_frames
+        else:
+            inner = 0.0
+        self._fraction = max(0.0, min(1.0, (completed_points + inner) / total_points if total_points > 0 else 0.0))
         self._point_text = f"Point {point}/{total_points}"
         self._frame_text = f"  Frame {frame}/{total_frames}" if total_frames > 1 else ""
         self.Refresh()
@@ -227,8 +233,9 @@ class CollectView(wx.Panel):
         total_points: int,
         frame: int = 0,
         total_frames: int = 0,
+        point_fraction: float | None = None,
     ) -> None:
-        self._progress_bar.update(point, total_points, frame, total_frames)
+        self._progress_bar.update(point, total_points, frame, total_frames, point_fraction)
 
     def set_eta(self, total_seconds: float) -> None:
         self._eta_label.SetLabel(f"Estimated Time: {_format_hms(total_seconds)}")

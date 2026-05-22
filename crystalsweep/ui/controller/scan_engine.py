@@ -17,6 +17,8 @@ import logging
 import threading
 from typing import Callable
 
+from epics import caget, caput
+
 from crystalsweep.model.beamline_config_model import BeamlineConfig, MotorConfig
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
@@ -93,6 +95,88 @@ class ScanEngine:
         self._thread = threading.Thread(target=_worker, daemon=True, name="scan-still")
         self._thread.start()
 
+    def run_wide(
+        self,
+        point: CollectionPoint,
+        config: BeamlineConfig,
+        on_done: Callable[[], None],
+        on_error: Callable[[Exception], None],
+    ) -> None:
+        """Arm detector for external trigger, run the slew trajectory, wait for readout."""
+        if self.is_running:
+            raise RuntimeError("A scan is already in progress.")
+
+        rotation_cfg = config.rotation_motor
+        if rotation_cfg is None:
+            on_error(ValueError("No rotation motor configured."))
+            return
+
+        det = config.active_detector_config
+        if det is None or not det.pv_prefix.strip():
+            on_error(ValueError("No active detector configured."))
+            return
+
+        try:
+            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
+            omega_end = float(point.rotation_end) if point.rotation_end else 0.0
+            exposure = float(point.time) if point.time else 1.0
+        except ValueError as exc:
+            on_error(exc)
+            return
+
+        if omega_start == omega_end:
+            on_error(ValueError("rotation_start and rotation_end must differ for a wide scan."))
+            return
+
+        controller_cfg = next((c for c in config.controllers if c.name == rotation_cfg.controller), None)
+        params = dict(controller_cfg.params) if controller_cfg else {}
+        if rotation_cfg.xps_group:
+            params["xps_group"] = rotation_cfg.xps_group
+        if rotation_cfg.xps_positioner:
+            params["xps_positioner"] = rotation_cfg.xps_positioner
+
+        omega_range = abs(omega_end - omega_start)
+        spec = ScanSpec(
+            pv=rotation_cfg.pv,
+            start=omega_start,
+            end=omega_end,
+            points=1,
+            exposure=exposure,
+            controller_params=params,
+        )
+
+        controller_type = controller_cfg.type if controller_cfg else rotation_cfg.controller
+
+        detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
+        driver = get_driver(controller_type)
+        self._driver = driver
+
+        prefix = det.pv_prefix.strip()
+        if not prefix.endswith(":"):
+            prefix += ":"
+        acquire_pv = f"{prefix}cam1:Acquire"
+
+        pv_base = rotation_cfg.pv.removesuffix(".VAL")
+
+        def _worker() -> None:
+            try:
+                driver.prepare(spec)
+                caput(f"{pv_base}.VAL", omega_start, wait=True)
+                detector.collect_wide(exposure)
+                driver.run(spec, lambda i, pos: None)
+                while caget(acquire_pv):
+                    pass
+                _log.debug("ScanEngine wide: detector readout complete")
+                on_done()
+            except Exception as exc:
+                _log.exception("ScanEngine wide-scan error")
+                on_error(exc)
+            finally:
+                self._driver = None
+
+        self._thread = threading.Thread(target=_worker, daemon=True, name="scan-wide")
+        self._thread.start()
+
     def run_point(
         self,
         point: CollectionPoint,
@@ -130,7 +214,9 @@ class ScanEngine:
             controller_params=params,
         )
 
-        driver = get_driver(motor_cfg.controller)
+        controller_type = controller_cfg.type if controller_cfg else motor_cfg.controller
+
+        driver = get_driver(controller_type)
         self._driver = driver
 
         def _worker() -> None:
