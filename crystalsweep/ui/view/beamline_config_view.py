@@ -63,6 +63,16 @@ _DETECTOR_DISPLAY_NAMES = [label for _, label in _DETECTOR_TYPE_LABELS]
 _DET_LABEL_TO_TYPE = {label: t for t, label in _DETECTOR_TYPE_LABELS}
 _DET_TYPE_TO_LABEL = {t: label for t, label in _DETECTOR_TYPE_LABELS}
 
+_FILE_FORMAT_LABELS: list[tuple[str, str]] = [
+    ("hdf5", "HDF5"),
+    ("cbf", "CBF"),
+    ("tif", "TIF"),
+]
+_FILE_FORMATS = [f for f, _ in _FILE_FORMAT_LABELS]
+_FILE_FORMAT_DISPLAY_NAMES = [label for _, label in _FILE_FORMAT_LABELS]
+_FMT_LABEL_TO_KEY = {label: f for f, label in _FILE_FORMAT_LABELS}
+_FMT_KEY_TO_LABEL = {f: label for f, label in _FILE_FORMAT_LABELS}
+
 _CONTROLLER_TYPE_LABELS: list[tuple[str, str]] = [
     ("newport_xps", "NewportXPS C/D"),
     ("aerotech_a1", "Automation1"),
@@ -201,7 +211,7 @@ class _TableRow(wx.Panel):
 
 
 class _DetectorRow(_TableRow):
-    _PROPS = [2, 8, 4, 12, 2]
+    _PROPS = [2, 7, 3, 3, 11, 2]
 
     def __init__(
         self,
@@ -220,9 +230,12 @@ class _DetectorRow(_TableRow):
         self.active_dot = RadioDot(self, value=active, tooltip="Set as active detector")
         self.active_dot.set_action(lambda: on_make_active(self))
         self.name_ctrl = DarkTextCtrl(self, value=detector.name, placeholder=_PLACEHOLDER_DETECTOR_NAME)
-        display = _DET_TYPE_TO_LABEL.get(detector.type, _DETECTOR_DISPLAY_NAMES[0])
-        sel = _DETECTOR_DISPLAY_NAMES.index(display) if display in _DETECTOR_DISPLAY_NAMES else 0
-        self.type_combo = DarkCombo(self, choices=_DETECTOR_DISPLAY_NAMES, selection=sel)
+        det_display = _DET_TYPE_TO_LABEL.get(detector.type, _DETECTOR_DISPLAY_NAMES[0])
+        det_sel = _DETECTOR_DISPLAY_NAMES.index(det_display) if det_display in _DETECTOR_DISPLAY_NAMES else 0
+        self.type_combo = DarkCombo(self, choices=_DETECTOR_DISPLAY_NAMES, selection=det_sel)
+        fmt_display = _FMT_KEY_TO_LABEL.get(detector.file_format, _FILE_FORMAT_DISPLAY_NAMES[0])
+        fmt_sel = _FILE_FORMAT_DISPLAY_NAMES.index(fmt_display) if fmt_display in _FILE_FORMAT_DISPLAY_NAMES else 0
+        self.format_combo = DarkCombo(self, choices=_FILE_FORMAT_DISPLAY_NAMES, selection=fmt_sel)
         self.prefix_ctrl = DarkTextCtrl(self, value=detector.pv_prefix, placeholder=_PLACEHOLDER_DETECTOR_PREFIX)
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
         self._remove_btn.set_action(lambda: on_remove(self))
@@ -241,16 +254,20 @@ class _DetectorRow(_TableRow):
         x += widths[1]
         self._place(self.type_combo, x, widths[2])
         x += widths[2]
-        self._place(self.prefix_ctrl, x, widths[3])
+        self._place(self.format_combo, x, widths[3])
         x += widths[3]
-        self._place(self._remove_btn, x, widths[4])
+        self._place(self.prefix_ctrl, x, widths[4])
+        x += widths[4]
+        self._place(self._remove_btn, x, widths[5])
 
     def to_detector(self) -> DetectorConfig:
         det_type = _DET_LABEL_TO_TYPE.get(self.type_combo.GetStringSelection(), _DETECTOR_TYPES[0])
+        file_format = _FMT_LABEL_TO_KEY.get(self.format_combo.GetStringSelection(), _FILE_FORMATS[0])
         return DetectorConfig(
             name=self.name_ctrl.GetValue().strip(),
             pv_prefix=self.prefix_ctrl.GetValue().strip(),
             type=det_type,
+            file_format=file_format,
         )
 
     def set_active_visual(self, active: bool) -> None:
@@ -680,7 +697,7 @@ class DetectorsConfigView(wx.Panel):
     def _build_layout(self) -> None:
         self._detectors_section = _Section(self, "Detectors")
         d_body = self._detectors_section.body
-        self._det_header = _TableHeader(d_body, ["", "Name", "Type", "PV prefix", ""], [2, 8, 4, 12, 2])
+        self._det_header = _TableHeader(d_body, ["", "Name", "Type", "Format", "PV prefix", ""], [2, 7, 3, 3, 11, 2])
         self._detector_rows_panel = _DarkScrolledPanel(d_body)
         self._detector_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_detector_btn = FlatButton(d_body, "+ Add detector")

@@ -78,7 +78,7 @@ class ScanEngine:
             on_error(exc)
             return
 
-        detector = get_detector_model(det.type, det.pv_prefix)
+        detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
 
         def _worker() -> None:
             try:

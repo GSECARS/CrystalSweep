@@ -55,6 +55,7 @@ class DetectorConfig:
     name: str = ""
     pv_prefix: str = ""
     type: str = "eiger"
+    file_format: str = "hdf5"
 
     @property
     def image_pv(self) -> str:
@@ -166,6 +167,7 @@ class BeamlineConfigModel:
                 name=str(entry.get("name", "")),
                 pv_prefix=str(entry.get("pv_prefix", "")),
                 type=str(entry.get("type", "eiger")),
+                file_format=str(entry.get("file_format", "hdf5")),
             )
             if entry.get("active") and active_detector == -1:
                 active_detector = len(detectors)
@@ -178,6 +180,7 @@ class BeamlineConfigModel:
                     name=str(legacy.get("name", "")),
                     pv_prefix=str(legacy.get("pv_prefix", "")),
                     type=str(legacy.get("type", "eiger")),
+                    file_format=str(legacy.get("file_format", "hdf5")),
                 )
             )
             active_detector = 0
@@ -248,7 +251,7 @@ class BeamlineConfigModel:
                 else {}
             ),
             "detectors": [
-                {"name": d.name, "pv_prefix": d.pv_prefix, "type": d.type, "active": idx == config.active_detector}
+                {"name": d.name, "pv_prefix": d.pv_prefix, "type": d.type, "file_format": d.file_format, "active": idx == config.active_detector}
                 for idx, d in enumerate(config.detectors)
             ],
             "controllers": [
