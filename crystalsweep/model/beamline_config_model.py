@@ -54,6 +54,7 @@ class DetectorConfig:
 
     name: str = ""
     pv_prefix: str = ""
+    type: str = "eiger"
 
     @property
     def image_pv(self) -> str:
@@ -164,6 +165,7 @@ class BeamlineConfigModel:
             detector = DetectorConfig(
                 name=str(entry.get("name", "")),
                 pv_prefix=str(entry.get("pv_prefix", "")),
+                type=str(entry.get("type", "eiger")),
             )
             if entry.get("active") and active_detector == -1:
                 active_detector = len(detectors)
@@ -175,6 +177,7 @@ class BeamlineConfigModel:
                 DetectorConfig(
                     name=str(legacy.get("name", "")),
                     pv_prefix=str(legacy.get("pv_prefix", "")),
+                    type=str(legacy.get("type", "eiger")),
                 )
             )
             active_detector = 0
@@ -245,7 +248,7 @@ class BeamlineConfigModel:
                 else {}
             ),
             "detectors": [
-                {"name": d.name, "pv_prefix": d.pv_prefix, "active": idx == config.active_detector}
+                {"name": d.name, "pv_prefix": d.pv_prefix, "type": d.type, "active": idx == config.active_detector}
                 for idx, d in enumerate(config.detectors)
             ],
             "controllers": [

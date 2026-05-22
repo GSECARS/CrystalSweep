@@ -5,7 +5,7 @@
 # ----------------------------------------------------------------------------------
 # Purpose:
 # Controller for the collect section: wires the Collect / Abort buttons and
-# drives the collection loop in a background thread.
+# drives the collection loop using ScanEngine for still scans on the rotation motor.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -20,6 +20,8 @@ import time as _time
 import wx
 
 from crystalsweep.model import MainModel
+from crystalsweep.model.collection_model import CollectionPoint
+from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
 
 __all__ = ["CollectController"]
@@ -28,11 +30,12 @@ _log = logging.getLogger(__name__)
 
 
 class CollectController:
-    """Drives the collect panel: collection loop with per-point and per-frame progress."""
+    """Drives the collect panel: sequential collection loop with per-point hardware scans."""
 
     def __init__(self, model: MainModel, view: MainView) -> None:
         self._model = model
         self._view = view
+        self._engine = ScanEngine()
         self._abort_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._start_time: float = 0.0
@@ -44,16 +47,24 @@ class CollectController:
         self.refresh_eta()
 
     def _on_collect(self) -> None:
-        points = self._model.collection.points
+        if self._view.collect.test_mode:
+            points = self._model.collection.points
+        else:
+            points = [p for p in self._model.collection.points if p.selected]
+
         if not points:
-            self._view.collect.set_status("No collection points.", wx.Colour(220, 160, 40))
+            self._view.collect.set_status("No points selected.", wx.Colour(220, 160, 40))
+            return
+
+        if not self._model.beamline.has_active:
+            self._view.collect.set_status("No active beamline config.", wx.Colour(220, 80, 40))
             return
 
         self._abort_event.clear()
         self._start_time = _time.monotonic()
         self._view.collect.set_status_collecting()
         self._elapsed_timer.Start(1000)
-        self._thread = threading.Thread(target=self._run, args=(points,), daemon=True)
+        self._thread = threading.Thread(target=self._run, args=(points,), daemon=True, name="collect-loop")
         self._thread.start()
 
     def refresh_eta(self) -> None:
@@ -65,7 +76,7 @@ class CollectController:
         self._view.collect.set_eta(self._estimate_total_seconds(selected))
 
     @staticmethod
-    def _estimate_total_seconds(points) -> float:
+    def _estimate_total_seconds(points: list[CollectionPoint]) -> float:
         total = 0.0
         for point in points:
             try:
@@ -87,6 +98,7 @@ class CollectController:
 
     def _on_abort(self) -> None:
         self._abort_event.set()
+        self._engine.abort()
         _log.info("Collection aborted by user")
 
     def _on_elapsed_tick(self, _event: wx.TimerEvent) -> None:
@@ -98,39 +110,53 @@ class CollectController:
         elapsed = _time.monotonic() - self._start_time
         self._view.collect.set_elapsed(elapsed)
 
-    def _run(self, points) -> None:
+    def _run(self, points: list[CollectionPoint]) -> None:
         total = len(points)
+        config = self._model.beamline.active
 
         for idx, point in enumerate(points, start=1):
             if self._abort_event.is_set():
                 break
 
-            scan_type = point.scan_type
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label} — pre-scan…",
+                wx.Colour(99, 179, 237),
+            )
 
-            if scan_type == "step":
-                try:
-                    step_size = float(point.step) if point.step else 1.0
-                    rot_start = float(point.rotation_start) if point.rotation_start else 0.0
-                    rot_end   = float(point.rotation_end)   if point.rotation_end   else 180.0
-                    n_frames  = max(1, round(abs(rot_end - rot_start) / step_size))
-                except (ValueError, ZeroDivisionError):
-                    n_frames = 1
-            else:
-                n_frames = 1
-
-            for frame in range(1, n_frames + 1):
-                if self._abort_event.is_set():
-                    break
-
+            error = self._engine.pre_scan(point, config)
+            if error is not None:
+                _log.warning("Pre-scan check failed for %s: %s", point.label, error)
                 wx.CallAfter(
-                    self._view.collect.set_progress,
-                    idx,
-                    total,
-                    frame if n_frames > 1 else 0,
-                    n_frames if n_frames > 1 else 0,
+                    self._view.collect.set_status,
+                    f"[{idx}/{total}] {point.label} skipped: {error}",
+                    wx.Colour(220, 160, 40),
                 )
+                continue
 
-            _log.debug("Point %d/%d (%s) done", idx, total, point.label)
+            if self._abort_event.is_set():
+                break
+
+            wx.CallAfter(
+                self._view.collect.set_progress,
+                idx, total, 0, 0,
+            )
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label} — {point.scan_type}…",
+                wx.Colour(99, 179, 237),
+            )
+
+            if point.scan_type == "still":
+                self._run_still(point, idx, total, config)
+            else:
+                _log.info("Scan type %r not yet implemented, skipping point %s", point.scan_type, point.label)
+                wx.CallAfter(
+                    self._view.collect.set_status,
+                    f"[{idx}/{total}] {point.label}: scan type '{point.scan_type}' not yet supported",
+                    wx.Colour(220, 160, 40),
+                )
+                continue
 
         wx.CallAfter(self._stop_elapsed_timer)
         if self._abort_event.is_set():
@@ -140,3 +166,32 @@ class CollectController:
             wx.CallAfter(self._view.collect.set_progress, total, total, 0, 0)
             wx.CallAfter(self._view.collect.set_status, "Done", wx.Colour(99, 179, 237))
             wx.CallAfter(self._view.collect.set_collecting, False)
+
+    def _run_still(self, point: CollectionPoint, idx: int, total: int, config) -> None:
+        done_event = threading.Event()
+        error_holder: list[Exception] = []
+
+        def on_done() -> None:
+            print(f"[collect] [{idx}/{total}] {point.label}: still scan complete")
+            done_event.set()
+
+        def on_error(exc: Exception) -> None:
+            error_holder.append(exc)
+            print(f"[collect] [{idx}/{total}] {point.label}: ERROR — {exc}")
+            done_event.set()
+
+        try:
+            self._engine.run_still(point, config, on_done=on_done, on_error=on_error)
+        except RuntimeError as exc:
+            wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
+            return
+
+        done_event.wait()
+
+        if error_holder:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: {error_holder[0]}",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()

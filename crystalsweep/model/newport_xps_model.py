@@ -1,16 +1,18 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/scan/newport_xps.py
+# File: crystalsweep/model/newport_xps_model.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Newport XPS slew-scan driver using the newportxps library.
+# Slew-scan model for Newport XPS motion controllers using the newportxps library.
 #
-# Required controller_params (set on ControllerConfig, passed through ScanSpec):
+# Required controller_params (from ControllerConfig.params):
 #   host        - XPS controller IP or hostname
 #   username    - XPS username (default "Administrator")
 #   password    - XPS password
 # ----------------------------------------------------------------------------------
+# Author: Christofanis Skordas
+#
 # Copyright (c) 2026 GSECARS, The University of Chicago, USA
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
@@ -18,9 +20,9 @@
 import logging
 from typing import Callable
 
-from crystalsweep.scan.driver import ScanSpec
+from crystalsweep.model.scan_model import ScanSpec
 
-__all__ = ["NewportXPSDriver"]
+__all__ = ["NewportXPSModel"]
 
 _log = logging.getLogger(__name__)
 
@@ -32,8 +34,8 @@ except ImportError:
     NewportXPS = None  # type: ignore[assignment,misc]
 
 
-class NewportXPSDriver:
-    """Slew-scan driver for Newport XPS motion controllers."""
+class NewportXPSModel:
+    """Slew-scan model for Newport XPS motion controllers."""
 
     def __init__(self) -> None:
         self._xps = None
@@ -49,26 +51,26 @@ class NewportXPSDriver:
 
         p = spec.controller_params
         if not p.get("host"):
-            raise ValueError("NewportXPSDriver requires controller_params['host'].")
+            raise ValueError("NewportXPSModel requires controller_params['host'].")
 
         self._xps = NewportXPS(
             p["host"],
             username=p.get("username", "Administrator"),
             password=p.get("password", ""),
         )
-        _log.debug("NewportXPSDriver connected to %s", p["host"])
+        _log.debug("NewportXPSModel connected to %s", p["host"])
 
     def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
         if self._aborted:
-            _log.info("NewportXPSDriver aborted before run()")
+            _log.info("NewportXPSModel aborted before run()")
             return
 
         for i, pos in enumerate(spec.positions()):
             if self._aborted:
-                _log.info("NewportXPSDriver aborted at point %d", i)
+                _log.info("NewportXPSModel aborted at point %d", i)
                 break
             on_point(i, pos)
-            _log.debug("NewportXPSDriver point %d/%d pos=%.4f", i + 1, spec.points, pos)
+            _log.debug("NewportXPSModel point %d/%d pos=%.4f", i + 1, spec.points, pos)
 
     def abort(self) -> None:
         self._aborted = True

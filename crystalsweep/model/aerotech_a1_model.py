@@ -1,14 +1,14 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/scan/aerotech_a1.py
+# File: crystalsweep/model/aerotech_a1_model.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Aerotech Automation1 slew-scan driver using the automation1 library.
+# Slew-scan model for Aerotech Automation1 controllers using the pyautomation library.
 # Executes a single continuous trajectory (start → end) with hardware-timed
 # detector pulses — one pulse per point, all triggered by the controller.
 #
-# Required controller_params (set on ControllerConfig, passed through ScanSpec):
+# Required controller_params (from ControllerConfig.params):
 #   ip              - controller IP address
 #   axis_name       - axis name in Automation1 (e.g. "Theta")
 #   counts_per_unit - encoder counts per physical unit (e.g. 1491308.09)
@@ -21,6 +21,8 @@
 #   pso_window_input    - PSO window input enum name, default "iXC4ePrimaryFeedback"
 #   pso_output_pin      - PSO output pin enum name, default "iXC4eAuxiliaryMarkerDifferential"
 # ----------------------------------------------------------------------------------
+# Author: Christofanis Skordas
+#
 # Copyright (c) 2026 GSECARS, The University of Chicago, USA
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
@@ -28,9 +30,9 @@
 import logging
 from typing import Callable
 
-from crystalsweep.scan.driver import ScanSpec
+from crystalsweep.model.scan_model import ScanSpec
 
-__all__ = ["AerotechA1Driver"]
+__all__ = ["AerotechA1Model"]
 
 _log = logging.getLogger(__name__)
 
@@ -49,13 +51,8 @@ except ImportError:
     PsoOutputPin = None  # type: ignore[assignment,misc]
 
 
-class AerotechA1Driver:
-    """Slew-scan driver for Aerotech Automation1 controllers.
-
-    Executes a single continuous trajectory (start → end) with hardware-timed
-    PSO pulses. on_point is called once after the trajectory completes
-    (index=0, position=spec.end).
-    """
+class AerotechA1Model:
+    """Slew-scan model for Aerotech Automation1 controllers."""
 
     def __init__(self) -> None:
         self._automation = None
@@ -72,7 +69,7 @@ class AerotechA1Driver:
         p = spec.controller_params
         for key in ("ip", "axis_name", "counts_per_unit"):
             if not p.get(key):
-                raise ValueError(f"AerotechA1Driver requires controller_params['{key}'].")
+                raise ValueError(f"AerotechA1Model requires controller_params['{key}'].")
 
         axis = AutomationAxis(
             name=p["axis_name"],
@@ -87,11 +84,11 @@ class AerotechA1Driver:
             pso_output_pin=getattr(PsoOutputPin, p.get("pso_output_pin", "iXC4eAuxiliaryMarkerDifferential")),
         )
         self._automation.enable_controller()
-        _log.debug("AerotechA1Driver connected and enabled (%s, axis=%s)", p["ip"], p["axis_name"])
+        _log.debug("AerotechA1Model connected and enabled (%s, axis=%s)", p["ip"], p["axis_name"])
 
     def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
         if self._aborted:
-            _log.info("AerotechA1Driver aborted before run()")
+            _log.info("AerotechA1Model aborted before run()")
             return
 
         travel_direction = int(spec.controller_params.get("travel_direction", 1))
@@ -106,20 +103,16 @@ class AerotechA1Driver:
 
         self._automation.load_trajectory(trajectory)
         _log.debug(
-            "AerotechA1Driver: trajectory loaded (start=%.4f end=%.4f exposure=%.4f points=%d dir=%d)",
-            spec.start,
-            spec.end,
-            spec.exposure,
-            spec.points,
-            travel_direction,
+            "AerotechA1Model: trajectory loaded (start=%.4f end=%.4f exposure=%.4f points=%d dir=%d)",
+            spec.start, spec.end, spec.exposure, spec.points, travel_direction,
         )
 
         if self._aborted:
-            _log.info("AerotechA1Driver aborted before run_trajectory()")
+            _log.info("AerotechA1Model aborted before run_trajectory()")
             return
 
         self._automation.run_trajectory()
-        _log.debug("AerotechA1Driver: trajectory complete")
+        _log.debug("AerotechA1Model: trajectory complete")
 
         if not self._aborted:
             on_point(0, spec.end)

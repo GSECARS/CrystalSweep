@@ -1,8 +1,14 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/scan/step_driver.py
+# File: crystalsweep/model/epics_scan_model.py
 # ----------------------------------------------------------------------------------
+# Purpose:
+# EPICS Channel Access step-scan model: moves a motor PV position by position
+# via caput and waits for each move to complete before calling on_point.
+# ----------------------------------------------------------------------------------
+# Author: Christofanis Skordas
+#
 # Copyright (c) 2026 GSECARS, The University of Chicago, USA
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
@@ -13,22 +19,22 @@ from typing import Callable
 
 from epics import caput
 
-from crystalsweep.scan.driver import ScanSpec
+from crystalsweep.model.scan_model import ScanSpec
 
-__all__ = ["StepDriver"]
+__all__ = ["EpicsScanModel"]
 
 _log = logging.getLogger(__name__)
 
 
-class StepDriver:
-    """EPICS caput step-scan: move → settle → expose → repeat."""
+class EpicsScanModel:
+    """EPICS caput step-scan: move → settle → on_point → repeat."""
 
     def __init__(self) -> None:
         self._abort = False
 
     def prepare(self, spec: ScanSpec) -> None:
         if not spec.pv:
-            raise ValueError("StepDriver requires a non-empty PV.")
+            raise ValueError("EpicsScanModel requires a non-empty PV.")
         if spec.points < 1:
             raise ValueError(f"points must be >= 1, got {spec.points}.")
         if spec.exposure <= 0:
@@ -40,13 +46,12 @@ class StepDriver:
 
         for i, pos in enumerate(spec.positions()):
             if self._abort:
-                _log.info("StepDriver aborted at point %d", i)
+                _log.info("EpicsScanModel aborted at point %d", i)
                 break
             caput(spec.pv, pos, wait=True)
             time.sleep(settle)
-            time.sleep(spec.exposure)
             on_point(i, pos)
-            _log.debug("StepDriver point %d/%d pos=%.4f", i + 1, spec.points, pos)
+            _log.debug("EpicsScanModel point %d/%d pos=%.4f", i + 1, spec.points, pos)
 
     def abort(self) -> None:
         self._abort = True

@@ -53,6 +53,16 @@ _PLACEHOLDER_MOTOR_PRECISION = "4"
 _PLACEHOLDER_XPS_GROUP = "e.g. G6"
 _PLACEHOLDER_XPS_POSITIONER = "e.g. ST-Hor"
 
+_DETECTOR_TYPE_LABELS: list[tuple[str, str]] = [
+    ("eiger", "Eiger"),
+    ("pilatus", "Pilatus"),
+    ("spinnaker", "Spinnaker"),
+]
+_DETECTOR_TYPES = [t for t, _ in _DETECTOR_TYPE_LABELS]
+_DETECTOR_DISPLAY_NAMES = [label for _, label in _DETECTOR_TYPE_LABELS]
+_DET_LABEL_TO_TYPE = {label: t for t, label in _DETECTOR_TYPE_LABELS}
+_DET_TYPE_TO_LABEL = {t: label for t, label in _DETECTOR_TYPE_LABELS}
+
 _CONTROLLER_TYPE_LABELS: list[tuple[str, str]] = [
     ("newport_xps", "NewportXPS C/D"),
     ("aerotech_a1", "Automation1"),
@@ -191,7 +201,7 @@ class _TableRow(wx.Panel):
 
 
 class _DetectorRow(_TableRow):
-    _PROPS = [2, 10, 14, 2]
+    _PROPS = [2, 8, 4, 12, 2]
 
     def __init__(
         self,
@@ -210,6 +220,9 @@ class _DetectorRow(_TableRow):
         self.active_dot = RadioDot(self, value=active, tooltip="Set as active detector")
         self.active_dot.set_action(lambda: on_make_active(self))
         self.name_ctrl = DarkTextCtrl(self, value=detector.name, placeholder=_PLACEHOLDER_DETECTOR_NAME)
+        display = _DET_TYPE_TO_LABEL.get(detector.type, _DETECTOR_DISPLAY_NAMES[0])
+        sel = _DETECTOR_DISPLAY_NAMES.index(display) if display in _DETECTOR_DISPLAY_NAMES else 0
+        self.type_combo = DarkCombo(self, choices=_DETECTOR_DISPLAY_NAMES, selection=sel)
         self.prefix_ctrl = DarkTextCtrl(self, value=detector.pv_prefix, placeholder=_PLACEHOLDER_DETECTOR_PREFIX)
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
         self._remove_btn.set_action(lambda: on_remove(self))
@@ -226,14 +239,18 @@ class _DetectorRow(_TableRow):
         x += widths[0]
         self._place(self.name_ctrl, x, widths[1])
         x += widths[1]
-        self._place(self.prefix_ctrl, x, widths[2])
+        self._place(self.type_combo, x, widths[2])
         x += widths[2]
-        self._place(self._remove_btn, x, widths[3])
+        self._place(self.prefix_ctrl, x, widths[3])
+        x += widths[3]
+        self._place(self._remove_btn, x, widths[4])
 
     def to_detector(self) -> DetectorConfig:
+        det_type = _DET_LABEL_TO_TYPE.get(self.type_combo.GetStringSelection(), _DETECTOR_TYPES[0])
         return DetectorConfig(
             name=self.name_ctrl.GetValue().strip(),
             pv_prefix=self.prefix_ctrl.GetValue().strip(),
+            type=det_type,
         )
 
     def set_active_visual(self, active: bool) -> None:
@@ -663,7 +680,7 @@ class DetectorsConfigView(wx.Panel):
     def _build_layout(self) -> None:
         self._detectors_section = _Section(self, "Detectors")
         d_body = self._detectors_section.body
-        self._det_header = _TableHeader(d_body, ["", "Name", "PV prefix", ""], [2, 10, 14, 2])
+        self._det_header = _TableHeader(d_body, ["", "Name", "Type", "PV prefix", ""], [2, 8, 4, 12, 2])
         self._detector_rows_panel = _DarkScrolledPanel(d_body)
         self._detector_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_detector_btn = FlatButton(d_body, "+ Add detector")
