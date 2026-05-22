@@ -84,7 +84,7 @@ _TYPE_TO_LABEL = {t: label for t, label in _CONTROLLER_TYPE_LABELS}
 
 _CONTROLLER_TYPE_PARAMS: dict[str, list[tuple[str, str]]] = {
     "newport_xps": [("host", "e.g. 192.168.0.1"), ("username", "Administrator"), ("password", "")],
-    "aerotech_a1": [("ip", "e.g. 192.168.0.2"), ("axis_name", "e.g. Theta"), ("counts_per_unit", "e.g. 1491308.09")],
+    "aerotech_a1": [("ip", "e.g. 192.168.0.2"), ("axis_name", "e.g. Theta"), ("counts_per_unit", "e.g. 1491308.09"), ("trigger_pv_16", "e.g. 13IDD:EDIO24_1:Bo16"), ("trigger_pv_17", "e.g. 13IDD:EDIO24_1:Bo17")],
 }
 
 

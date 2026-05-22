@@ -60,6 +60,32 @@ class NewportXPSModel:
         )
         _log.debug("NewportXPSModel connected to %s", p["host"])
 
+        group = p.get("xps_group")
+        positioner = p.get("xps_positioner")
+        omega_range = abs(spec.end - spec.start)
+
+        if group and positioner and spec.points == 1:
+            self._xps.define_line_trajectories_general(
+                stop_values=[[0, 0, 0, omega_range]],
+                scan_time=spec.exposure,
+                pulse_time=0.1,
+                accel_values=None,
+            )
+            _log.debug("NewportXPSModel wide trajectory defined (range=%.4f exposure=%.4f)", omega_range, spec.exposure)
+
+        elif group and positioner and spec.points > 1:
+            total_time = spec.exposure * spec.points
+            self._xps.define_line_trajectories_general(
+                stop_values=[[0, 0, 0, omega_range]],
+                scan_time=total_time,
+                pulse_time=spec.exposure,
+                accel_values=None,
+            )
+            _log.debug(
+                "NewportXPSModel step trajectory defined (range=%.4f exposure=%.4f points=%d)",
+                omega_range, spec.exposure, spec.points,
+            )
+
     def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
         if self._aborted:
             _log.info("NewportXPSModel aborted before run()")
@@ -70,9 +96,19 @@ class NewportXPSModel:
         positioner = p.get("xps_positioner")
 
         if group and positioner and spec.points == 1:
-            self._run_wide_trajectory(spec, group, positioner)
+            if not self._aborted:
+                self._xps.run_line_trajectory_general()
+                _log.debug("NewportXPSModel wide trajectory complete")
             if not self._aborted:
                 on_point(0, spec.end)
+            return
+
+        if group and positioner and spec.points > 1:
+            if not self._aborted:
+                self._xps.run_line_trajectory_general()
+                _log.debug("NewportXPSModel step trajectory complete (points=%d)", spec.points)
+            if not self._aborted:
+                on_point(spec.points - 1, spec.end)
             return
 
         for i, pos in enumerate(spec.positions()):
@@ -81,19 +117,6 @@ class NewportXPSModel:
                 break
             on_point(i, pos)
             _log.debug("NewportXPSModel point %d/%d pos=%.4f", i + 1, spec.points, pos)
-
-    def _run_wide_trajectory(self, spec: ScanSpec, group: str, positioner: str) -> None:
-        omega_range = abs(spec.end - spec.start)
-        self._xps.define_line_trajectories_general(
-            stop_values=[[0, 0, 0, omega_range]],
-            scan_time=spec.exposure,
-            pulse_time=0.1,
-            accel_values=None,
-        )
-        if self._aborted:
-            return
-        self._xps.run_line_trajectory_general()
-        _log.debug("NewportXPSModel wide trajectory complete (range=%.4f exposure=%.4f)", omega_range, spec.exposure)
 
     def abort(self) -> None:
         self._aborted = True

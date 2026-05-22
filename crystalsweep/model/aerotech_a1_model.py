@@ -66,8 +66,6 @@ class AerotechA1Model:
 
         if PyAutomation is None:
             raise RuntimeError(_MISSING)
-        if spec.points < 1:
-            raise ValueError(f"points must be >= 1, got {spec.points}.")
         if spec.exposure <= 0:
             raise ValueError(f"exposure must be > 0, got {spec.exposure}.")
 
@@ -91,6 +89,20 @@ class AerotechA1Model:
         self._automation.enable_controller()
         _log.debug("AerotechA1Model connected and enabled (%s, axis=%s)", p["ip"], p["axis_name"])
 
+        travel_direction = int(p.get("travel_direction", 1))
+        trajectory = Trajectory(
+            start_position=spec.start,
+            end_position=spec.end,
+            exposure=spec.exposure,
+            number_of_pulses=spec.points,
+            travel_direction=travel_direction,
+        )
+        self._automation.load_trajectory(trajectory)
+        _log.debug(
+            "AerotechA1Model: trajectory loaded (start=%.4f end=%.4f exposure=%.4f points=%d dir=%d)",
+            spec.start, spec.end, spec.exposure, spec.points, travel_direction,
+        )
+
     def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
         if self._aborted:
             _log.info("AerotechA1Model aborted before run()")
@@ -101,22 +113,6 @@ class AerotechA1Model:
             if not self._aborted:
                 on_point(0, spec.end)
             return
-
-        travel_direction = int(spec.controller_params.get("travel_direction", 1))
-
-        trajectory = Trajectory(
-            start_position=spec.start,
-            end_position=spec.end,
-            exposure=spec.exposure,
-            number_of_pulses=spec.points,
-            travel_direction=travel_direction,
-        )
-
-        self._automation.load_trajectory(trajectory)
-        _log.debug(
-            "AerotechA1Model: trajectory loaded (start=%.4f end=%.4f exposure=%.4f points=%d dir=%d)",
-            spec.start, spec.end, spec.exposure, spec.points, travel_direction,
-        )
 
         if self._aborted:
             _log.info("AerotechA1Model aborted before run_trajectory()")

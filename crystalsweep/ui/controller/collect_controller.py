@@ -176,6 +176,8 @@ class CollectController:
                 self._run_still(point, idx, total, config)
             elif point.scan_type == "wide":
                 self._run_wide(point, idx, total, config)
+            elif point.scan_type == "step":
+                self._run_step(point, idx, total, config)
             else:
                 _log.info("Scan type %r not yet implemented, skipping point %s", point.scan_type, point.label)
                 wx.CallAfter(
@@ -221,6 +223,63 @@ class CollectController:
         wx.CallAfter(self._start_point_timer, idx, total, exposure)
         done_event.wait()
         wx.CallAfter(self._stop_point_timer, idx, total)
+
+        if error_holder:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: {error_holder[0]}",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+
+    def _run_step(self, point: CollectionPoint, idx: int, total: int, config) -> None:
+        done_event = threading.Event()
+        error_holder: list[Exception] = []
+
+        try:
+            exposure = float(point.time) if point.time else 1.0
+            step_size = float(point.step) if point.step else 1.0
+            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
+            omega_end = float(point.rotation_end) if point.rotation_end else 0.0
+        except ValueError:
+            exposure = 1.0
+            step_size = 1.0
+            omega_start = 0.0
+            omega_end = 0.0
+
+        n_frames = max(1, round(abs(omega_end - omega_start) / step_size)) if step_size > 0 else 1
+        total_duration = exposure * n_frames
+
+        frame_holder: list[tuple[int, int]] = [(0, n_frames)]
+
+        def on_frame(frame: int, total_frames: int) -> None:
+            frame_holder[0] = (frame, total_frames)
+            wx.CallAfter(
+                self._view.collect.set_progress,
+                idx, total,
+                frame, total_frames,
+            )
+
+        def on_done() -> None:
+            print(f"[collect] [{idx}/{total}] {point.label}: step scan complete ({n_frames} frames)")
+            done_event.set()
+
+        def on_error(exc: Exception) -> None:
+            error_holder.append(exc)
+            print(f"[collect] [{idx}/{total}] {point.label}: ERROR — {exc}")
+            done_event.set()
+
+        use_slew = self._view.collection_table.slew_scan
+
+        try:
+            self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew)
+        except RuntimeError as exc:
+            wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
+            return
+
+        wx.CallAfter(self._view.collect.set_progress, idx, total, 0, n_frames)
+        done_event.wait()
+        wx.CallAfter(self._view.collect.set_progress, idx, total, n_frames, n_frames)
 
         if error_holder:
             wx.CallAfter(

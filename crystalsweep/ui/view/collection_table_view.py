@@ -20,7 +20,7 @@ import wx
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
 from crystalsweep.ui.view.custom.theme import BG_CARD, BG_ELEVATED, BG_SURFACE, FG_PRIMARY, FG_SECONDARY, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, MUTED_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, FlatButton
+from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, MUTED_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton
 
 __all__ = ["CollectionTableView"]
 
@@ -488,6 +488,10 @@ class CollectionTableView(wx.Panel):
         self.Bind(wx.EVT_SIZE, self._on_size)
 
     @property
+    def slew_scan(self) -> bool:
+        return self._slew_scan_toggle.GetValue()
+
+    @property
     def min_content_width(self) -> int:
         return self._min_content_width()
 
@@ -516,8 +520,13 @@ class CollectionTableView(wx.Panel):
         self._clear_btn.SetMinSize((70, 22))
         self._clear_btn.set_action(self._on_clear_clicked)
 
+        self._slew_scan_toggle = DarkToggle(self, "Slew scanning")
+        self._slew_scan_toggle.SetBackgroundColour(BG_CARD)
+        self._slew_scan_toggle.SetValue(True)
+
         title_row = wx.BoxSizer(wx.HORIZONTAL)
         title_row.AddStretchSpacer()
+        title_row.Add(self._slew_scan_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._delete_selected_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._clear_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
 

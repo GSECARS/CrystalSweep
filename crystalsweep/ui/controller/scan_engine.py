@@ -15,6 +15,7 @@
 
 import logging
 import threading
+import time
 from typing import Callable
 
 from epics import caget, caput
@@ -46,11 +47,25 @@ class ScanEngine:
         return self._thread is not None and self._thread.is_alive()
 
     def pre_scan(self, point: CollectionPoint, config: BeamlineConfig) -> str | None:
-        """Validate a point before scanning.
+        """Validate a point before scanning and configure hardware routing gates.
 
         Returns an error string if the scan cannot proceed, or None if OK.
-        Currently always returns None (empty pre-scan hook).
+        Sets any trigger_pv_* entries from the rotation motor's controller params to 0
+        so PSO pulses are routed correctly to the detector.
         """
+        rotation_cfg = config.rotation_motor
+        if rotation_cfg is not None:
+            controller_cfg = next(
+                (c for c in config.controllers if c.name == rotation_cfg.controller), None
+            )
+            if controller_cfg is not None:
+                for key, pv in controller_cfg.params.items():
+                    if key.startswith("trigger_pv_"):
+                        try:
+                            caput(pv, 0, wait=True)
+                            _log.debug("pre_scan: set %s (%s) = 0", key, pv)
+                        except Exception as exc:
+                            _log.warning("pre_scan: failed to set %s (%s): %s", key, pv, exc)
         return None
 
     def run_still(
@@ -94,6 +109,141 @@ class ScanEngine:
 
         self._thread = threading.Thread(target=_worker, daemon=True, name="scan-still")
         self._thread.start()
+
+    def run_step(
+        self,
+        point: CollectionPoint,
+        config: BeamlineConfig,
+        on_frame: Callable[[int, int], None],
+        on_done: Callable[[], None],
+        on_error: Callable[[Exception], None],
+        slew: bool = True,
+    ) -> None:
+        """Execute a step scan: slew trajectory (default) or per-angle EPICS stills."""
+        if self.is_running:
+            raise RuntimeError("A scan is already in progress.")
+
+        rotation_cfg = config.rotation_motor
+        if rotation_cfg is None:
+            on_error(ValueError("No rotation motor configured."))
+            return
+
+        det = config.active_detector_config
+        if det is None or not det.pv_prefix.strip():
+            on_error(ValueError("No active detector configured."))
+            return
+
+        try:
+            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
+            omega_end = float(point.rotation_end) if point.rotation_end else 0.0
+            step_size = float(point.step) if point.step else 1.0
+            exposure = float(point.time) if point.time else 1.0
+        except ValueError as exc:
+            on_error(exc)
+            return
+
+        if step_size <= 0:
+            on_error(ValueError(f"Step size must be > 0, got {step_size}."))
+            return
+        if omega_start == omega_end:
+            on_error(ValueError("rotation_start and rotation_end must differ for a step scan."))
+            return
+
+        n_frames = max(1, round(abs(omega_end - omega_start) / step_size))
+
+        controller_cfg = next((c for c in config.controllers if c.name == rotation_cfg.controller), None)
+        params = dict(controller_cfg.params) if controller_cfg else {}
+        if rotation_cfg.xps_group:
+            params["xps_group"] = rotation_cfg.xps_group
+        if rotation_cfg.xps_positioner:
+            params["xps_positioner"] = rotation_cfg.xps_positioner
+
+        controller_type = controller_cfg.type if controller_cfg else rotation_cfg.controller
+
+        spec = ScanSpec(
+            pv=rotation_cfg.pv,
+            start=omega_start,
+            end=omega_end,
+            points=n_frames,
+            exposure=exposure,
+            controller_params=params,
+        )
+
+        detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
+        driver = get_driver(controller_type)
+        self._driver = driver
+
+        prefix = det.pv_prefix.strip()
+        if not prefix.endswith(":"):
+            prefix += ":"
+        acquire_pv = f"{prefix}cam1:Acquire"
+
+        _EPICS_TYPES = {"epics", "step"}
+
+        if not slew or controller_type in _EPICS_TYPES:
+            def _worker_epics() -> None:
+                try:
+                    driver.prepare(spec)
+                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
+                    caput(f"{pv_base}.VAL", omega_start, wait=True)
+                    detector.arm_plugin(n_frames)
+                    for frame_idx in range(n_frames):
+                        if self._driver is None:
+                            break
+                        angle = omega_start + frame_idx * step_size
+                        caput(f"{pv_base}.VAL", angle, wait=True)
+                        detector.collect_frame(exposure)
+                        on_frame(frame_idx + 1, n_frames)
+                    on_done()
+                except Exception as exc:
+                    _log.exception("ScanEngine step-epics error")
+                    on_error(exc)
+                finally:
+                    self._driver = None
+
+            self._thread = threading.Thread(target=_worker_epics, daemon=True, name="scan-step-epics")
+            self._thread.start()
+
+        else:
+            pv_base = rotation_cfg.pv.removesuffix(".VAL")
+
+            def _worker_slew() -> None:
+                try:
+                    driver.prepare(spec)
+                    caput(f"{pv_base}.VAL", omega_start, wait=True)
+                    detector.collect_step(exposure, n_frames)
+
+                    import threading as _threading
+                    traj_done = _threading.Event()
+
+                    def _run_traj() -> None:
+                        driver.run(spec, lambda i, pos: None)
+                        traj_done.set()
+
+                    _threading.Thread(target=_run_traj, daemon=True, name="scan-step-traj").start()
+
+                    last_reported = -1
+                    while not traj_done.is_set() or caget(acquire_pv):
+                        captured = detector.frames_captured()
+                        if captured != last_reported:
+                            on_frame(captured, n_frames)
+                            last_reported = captured
+                        time.sleep(0.05)
+
+                    captured = detector.frames_captured()
+                    if captured != last_reported:
+                        on_frame(captured, n_frames)
+
+                    _log.debug("ScanEngine step-slew: detector readout complete")
+                    on_done()
+                except Exception as exc:
+                    _log.exception("ScanEngine step-slew error")
+                    on_error(exc)
+                finally:
+                    self._driver = None
+
+            self._thread = threading.Thread(target=_worker_slew, daemon=True, name="scan-step-slew")
+            self._thread.start()
 
     def run_wide(
         self,
@@ -165,7 +315,7 @@ class ScanEngine:
                 detector.collect_wide(exposure)
                 driver.run(spec, lambda i, pos: None)
                 while caget(acquire_pv):
-                    pass
+                    time.sleep(0.05)
                 _log.debug("ScanEngine wide: detector readout complete")
                 on_done()
             except Exception as exc:

@@ -21,7 +21,7 @@ import logging
 import time
 from typing import Protocol, runtime_checkable
 
-from epics import caput
+from epics import caget, caput
 
 __all__ = ["DetectorModel", "ADEigerModel", "ADPilatusModel", "ADSpinnakerModel", "get_detector_model"]
 
@@ -42,6 +42,10 @@ def _file_plugin(file_format: str) -> str:
 class DetectorModel(Protocol):
     """Protocol for area detector models."""
 
+    def frames_captured(self) -> int:
+        """Return the current value of NumImagesCounter_RBV — frames acquired so far."""
+        ...
+
     def save_hdf5(self) -> None:
         """Arm the HDF5 file writer plugin to capture one frame."""
         ...
@@ -52,6 +56,27 @@ class DetectorModel(Protocol):
 
     def save_cbf(self) -> None:
         """Arm the CBF file writer plugin to capture one frame."""
+        ...
+
+    def arm_plugin(self, n_frames: int) -> None:
+        """Set the file writer plugin to capture n_frames into a single file and start capturing.
+
+        Call once before an EPICS step loop so all frames land in one file.
+        """
+        ...
+
+    def collect_frame(self, exposure: float) -> None:
+        """Trigger one frame in internal mode and block until complete, without re-arming the plugin.
+
+        Use inside an EPICS step loop after arm_plugin() has been called.
+        """
+        ...
+
+    def collect_step(self, exposure: float, n_frames: int) -> None:
+        """Arm the detector for n_frames externally-triggered frames and fire Acquire non-blocking.
+
+        Used for slew-step scans where the controller sends one hardware pulse per frame.
+        """
         ...
 
     def collect_wide(self, exposure: float) -> None:
@@ -80,6 +105,9 @@ class ADEigerModel:
         self._prefix = prefix
         self._plugin = _file_plugin(file_format)
 
+    def frames_captured(self) -> int:
+        return int(caget(f"{self._prefix}cam1:NumImagesCounter_RBV") or 0)
+
     def save_hdf5(self) -> None:
         p = self._prefix
         caput(f"{p}HDF1:NumCapture", 1)
@@ -94,6 +122,45 @@ class ADEigerModel:
         p = self._prefix
         caput(f"{p}CBF1:NumCapture", 1)
         caput(f"{p}CBF1:Capture", 1)
+
+    def arm_plugin(self, n_frames: int) -> None:
+        p = self._prefix
+        plugin = self._plugin
+        if plugin == "HDF1":
+            caput(f"{p}HDF1:NumCapture", n_frames)
+            caput(f"{p}HDF1:Capture", 1)
+        elif plugin == "TIFF1":
+            caput(f"{p}TIFF1:NumCapture", n_frames)
+            caput(f"{p}TIFF1:Capture", 1)
+        else:
+            caput(f"{p}CBF1:NumCapture", n_frames)
+            caput(f"{p}CBF1:Capture", 1)
+        _log.debug("ADEigerModel arm_plugin: %s plugin=%s n_frames=%d", p, plugin, n_frames)
+
+    def collect_frame(self, exposure: float) -> None:
+        p = self._prefix
+        acq_time = max(0.001, exposure * 0.99 - 0.001)
+        caput(f"{p}cam1:TriggerMode", 0, wait=True)
+        caput(f"{p}cam1:AcquirePeriod", acq_time, wait=True)
+        caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
+        caput(f"{p}cam1:NumImages", 1, wait=True)
+        caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
+        _log.debug("ADEigerModel collect_frame: %s exposure=%.4f done", p, exposure)
+
+    def collect_step(self, exposure: float, n_frames: int) -> None:
+        p = self._prefix
+        plugin = self._plugin
+        acq_time = max(0.001, exposure * 0.99 - 0.001)
+
+        caput(f"{p}cam1:TriggerMode", 2, wait=True)
+        caput(f"{p}cam1:AcquirePeriod", acq_time, wait=True)
+        caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
+        caput(f"{p}cam1:NumImages", n_frames, wait=True)
+
+        self.arm_plugin(n_frames)
+
+        caput(f"{p}cam1:Acquire", 1)
+        _log.debug("ADEigerModel step: %s plugin=%s exposure=%.4f n_frames=%d armed", p, plugin, exposure, n_frames)
 
     def collect_wide(self, exposure: float) -> None:
         p = self._prefix
@@ -151,6 +218,9 @@ class ADPilatusModel:
         self._prefix = prefix
         self._plugin = _file_plugin(file_format)
 
+    def frames_captured(self) -> int:
+        return int(caget(f"{self._prefix}cam1:NumImagesCounter_RBV") or 0)
+
     def save_hdf5(self) -> None:
         p = self._prefix
         caput(f"{p}HDF1:NumCapture", 1)
@@ -165,6 +235,43 @@ class ADPilatusModel:
         p = self._prefix
         caput(f"{p}CBF1:NumCapture", 1)
         caput(f"{p}CBF1:Capture", 1)
+
+    def arm_plugin(self, n_frames: int) -> None:
+        p = self._prefix
+        plugin = self._plugin
+        if plugin == "HDF1":
+            caput(f"{p}HDF1:NumCapture", n_frames)
+            caput(f"{p}HDF1:Capture", 1)
+        elif plugin == "TIFF1":
+            caput(f"{p}TIFF1:NumCapture", n_frames)
+            caput(f"{p}TIFF1:Capture", 1)
+        else:
+            caput(f"{p}CBF1:NumCapture", n_frames)
+            caput(f"{p}CBF1:Capture", 1)
+        _log.debug("ADPilatusModel arm_plugin: %s plugin=%s n_frames=%d", p, plugin, n_frames)
+
+    def collect_frame(self, exposure: float) -> None:
+        p = self._prefix
+        acq_time = max(0.001, exposure)
+        caput(f"{p}cam1:TriggerMode", 0, wait=True)
+        caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
+        caput(f"{p}cam1:NumImages", 1, wait=True)
+        caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
+        _log.debug("ADPilatusModel collect_frame: %s exposure=%.4f done", p, exposure)
+
+    def collect_step(self, exposure: float, n_frames: int) -> None:
+        p = self._prefix
+        plugin = self._plugin
+        acq_time = max(0.001, exposure - 0.001)
+
+        caput(f"{p}cam1:TriggerMode", 3, wait=True)
+        caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
+        caput(f"{p}cam1:NumImages", n_frames, wait=True)
+
+        self.arm_plugin(n_frames)
+
+        caput(f"{p}cam1:Acquire", 1)
+        _log.debug("ADPilatusModel step: %s plugin=%s exposure=%.4f n_frames=%d armed", p, plugin, exposure, n_frames)
 
     def collect_wide(self, exposure: float) -> None:
         p = self._prefix
@@ -224,6 +331,9 @@ class ADSpinnakerModel:
         self._prefix = prefix
         self._plugin = _file_plugin(file_format)
 
+    def frames_captured(self) -> int:
+        return int(caget(f"{self._prefix}cam1:NumImagesCounter_RBV") or 0)
+
     def save_hdf5(self) -> None:
         p = self._prefix
         caput(f"{p}HDF1:NumCapture", 1)
@@ -238,6 +348,43 @@ class ADSpinnakerModel:
         p = self._prefix
         caput(f"{p}CBF1:NumCapture", 1)
         caput(f"{p}CBF1:Capture", 1)
+
+    def arm_plugin(self, n_frames: int) -> None:
+        p = self._prefix
+        plugin = self._plugin
+        if plugin == "HDF1":
+            caput(f"{p}HDF1:NumCapture", n_frames)
+            caput(f"{p}HDF1:Capture", 1)
+        elif plugin == "TIFF1":
+            caput(f"{p}TIFF1:NumCapture", n_frames)
+            caput(f"{p}TIFF1:Capture", 1)
+        else:
+            caput(f"{p}CBF1:NumCapture", n_frames)
+            caput(f"{p}CBF1:Capture", 1)
+        _log.debug("ADSpinnakerModel arm_plugin: %s plugin=%s n_frames=%d", p, plugin, n_frames)
+
+    def collect_frame(self, exposure: float) -> None:
+        p = self._prefix
+        acq_time = max(0.001, exposure)
+        caput(f"{p}cam1:TriggerMode", "Off", wait=True)
+        caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
+        caput(f"{p}cam1:NumImages", 1, wait=True)
+        caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
+        _log.debug("ADSpinnakerModel collect_frame: %s exposure=%.4f done", p, exposure)
+
+    def collect_step(self, exposure: float, n_frames: int) -> None:
+        p = self._prefix
+        plugin = self._plugin
+        acq_time = max(0.001, exposure)
+
+        caput(f"{p}cam1:TriggerMode", "On", wait=True)
+        caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
+        caput(f"{p}cam1:NumImages", n_frames, wait=True)
+
+        self.arm_plugin(n_frames)
+
+        caput(f"{p}cam1:Acquire", 1)
+        _log.debug("ADSpinnakerModel step: %s plugin=%s exposure=%.4f n_frames=%d armed", p, plugin, exposure, n_frames)
 
     def collect_wide(self, exposure: float) -> None:
         p = self._prefix
