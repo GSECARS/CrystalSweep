@@ -16,7 +16,7 @@ import logging
 import struct
 import zlib
 from dataclasses import dataclass, field
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from time import sleep
 from typing import Protocol
 
@@ -58,7 +58,7 @@ class ADViewerModel:
     poll_interval: float = field(default=0.1)
     poll_join_timeout: float = field(default=1.0)
     default_request: str = field(default="field(value,codec,compressedSize,uncompressedSize,dimension,uniqueId)")
-    monitor_request: str = field(default="field(value,codec,compressedSize,uncompressedSize,dimension)")
+    monitor_request: str = field(default="field(value,codec,compressedSize,uncompressedSize,dimension,uniqueId)")
 
     _context: Context = field(init=False, compare=False, repr=False, default_factory=lambda: Context("pva"))
     _pv_name: str = field(init=False, compare=False, repr=False, default="")
@@ -66,12 +66,17 @@ class ADViewerModel:
     _subscription: Subscription | None = field(init=False, compare=False, repr=False, default=None)
     _polling_thread: Thread | None = field(init=False, compare=False, repr=False, default=None)
     _stop_polling: Event = field(init=False, compare=False, repr=False, default_factory=Event)
+    _last_unique_id: int = field(init=False, compare=False, repr=False, default=-1)
+    _sub_lock: Lock = field(init=False, compare=False, repr=False, default_factory=Lock)
+    _active: bool = field(init=False, compare=False, repr=False, default=False)
 
     def subscribe(self, pv_name: str, frame_callback: FrameCallback) -> None:
         """Start monitoring *pv_name* and deliver frames to *frame_callback*."""
         self.unsubscribe()
         self._pv_name = pv_name
         self._frame_callback = frame_callback
+        self._last_unique_id = -1
+        self._active = True
         if self.use_polling:
             _log.info("AD viewer subscribing to %s (polling @ %.0f Hz)", pv_name, 1.0 / self.poll_interval)
             self._stop_polling.clear()
@@ -79,23 +84,39 @@ class ADViewerModel:
             self._polling_thread.start()
         else:
             _log.info("AD viewer subscribing to %s (monitor mode)", pv_name)
-            self._subscription = self._context.monitor(
-                name=self._pv_name,
-                cb=self._on_ntndarray,
-                request=self.monitor_request,
-            )
+            self._open_subscription()
 
     def unsubscribe(self) -> None:
         """Stop monitoring the current PV, if any."""
+        self._active = False
         if self.use_polling:
             self._stop_polling.set()
             if self._polling_thread is not None and self._polling_thread.is_alive():
                 self._polling_thread.join(timeout=self.poll_join_timeout)
             self._polling_thread = None
         else:
+            with self._sub_lock:
+                if self._subscription is not None:
+                    self._subscription.close()
+                    self._subscription = None
+
+    def _open_subscription(self) -> None:
+        """Open a fresh monitor subscription (must be called from a non-p4p-callback thread)."""
+        with self._sub_lock:
+            if not self._active:
+                return
             if self._subscription is not None:
                 self._subscription.close()
                 self._subscription = None
+            try:
+                self._subscription = self._context.monitor(
+                    name=self._pv_name,
+                    cb=self._on_ntndarray,
+                    request=self.monitor_request,
+                    notify_disconnect=False,
+                )
+            except Exception:
+                _log.debug("Monitor resubscribe aborted (context closed or inactive)")
 
     def _poll_loop(self) -> None:
         """Background loop: fetch latest PV value at ``poll_interval`` Hz."""
@@ -127,8 +148,22 @@ class ADViewerModel:
         if isinstance(value, Exception):
             _log.error("PV %s monitor error: %s", self._pv_name, value)
             return
-        _log.debug("New frame received via PV monitor")
+        if not self._active:
+            return
+        if "value" not in value.changedSet():
+            Thread(target=self._open_subscription, daemon=True).start()
+            return
+        try:
+            uid = int(value.get("uniqueId", -1))
+        except Exception:
+            uid = -1
+        if uid != -1 and uid == self._last_unique_id:
+            Thread(target=self._open_subscription, daemon=True).start()
+            return
+        self._last_unique_id = uid
+        _log.debug("New frame received via PV monitor (uniqueId=%s)", uid)
         self._process_image(value)
+        Thread(target=self._open_subscription, daemon=True).start()
 
     def _decompress(self, compressed_bytes: bytes, codec_name: str, scalar_type: int, compressed_size: int, uncompressed_size: int) -> np.ndarray:
         """Decompress a compressed NTNDArray payload."""
