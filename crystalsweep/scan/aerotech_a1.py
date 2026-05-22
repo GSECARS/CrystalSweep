@@ -4,7 +4,7 @@
 # File: crystalsweep/scan/aerotech_a1.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Aerotech Automation1 slew-scan driver using the pyautomation library.
+# Aerotech Automation1 slew-scan driver using the automation1 library.
 # Executes a single continuous trajectory (start → end) with hardware-timed
 # detector pulses — one pulse per point, all triggered by the controller.
 #
@@ -14,11 +14,12 @@
 #   counts_per_unit - encoder counts per physical unit (e.g. 1491308.09)
 #
 # Optional controller_params:
+#   username            - Automation1 username (default "")
+#   password            - Automation1 password (default "")
 #   travel_direction    - 1 (positive) or -1 (negative), default 1
 #   pso_distance_input  - PSO distance input enum name, default "iXC4ePrimaryFeedback"
 #   pso_window_input    - PSO window input enum name, default "iXC4ePrimaryFeedback"
 #   pso_output_pin      - PSO output pin enum name, default "iXC4eAuxiliaryMarkerDifferential"
-#   verbose             - bool, default False
 # ----------------------------------------------------------------------------------
 # Copyright (c) 2026 GSECARS, The University of Chicago, USA
 # Copyright (c) 2026 NSF SEES, USA
@@ -36,9 +37,8 @@ _log = logging.getLogger(__name__)
 _MISSING = "pyautomation is not installed. Run: pip install pyautomation"
 
 try:
-    from pyautomation import PyAutomation
+    from pyautomation import PyAutomation, PsoDistanceInput, PsoOutputPin, PsoWindowInput
     from pyautomation.controller import AutomationAxis
-    from pyautomation.enums import PsoDistanceInput, PsoOutputPin, PsoWindowInput
     from pyautomation.modules import Trajectory
 except ImportError:
     PyAutomation = None  # type: ignore[assignment,misc]
@@ -52,8 +52,9 @@ except ImportError:
 class AerotechA1Driver:
     """Slew-scan driver for Aerotech Automation1 controllers.
 
-    Builds a Trajectory and runs it as a single continuous motion.
-    on_point is called once after the trajectory completes (index=0, position=spec.end).
+    Executes a single continuous trajectory (start → end) with hardware-timed
+    PSO pulses. on_point is called once after the trajectory completes
+    (index=0, position=spec.end).
     """
 
     def __init__(self) -> None:

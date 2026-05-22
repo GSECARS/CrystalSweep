@@ -227,6 +227,9 @@ class BeamlineConfigController:
             self._set_status_all(f"Save failed: {exc}", error=True)
             return
 
+        if config.controllers:
+            self._model.controllers.apply_config(config.controllers)
+
         self._reload_all_open(config)
         self._set_status_all(f"Saved to {path}.")
         self._apply(config)

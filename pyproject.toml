@@ -49,6 +49,8 @@ dependencies = [
     "blosc>=1.11.4",
     "bitshuffle>=0.5.2",
     "pyepics>=3.5.9",
+    "pyautomation>=0.0.1",
+    "newportxps>=2026.1.1",
 ]
 
 [dependency-groups]

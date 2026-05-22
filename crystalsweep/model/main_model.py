@@ -18,6 +18,7 @@ from crystalsweep.model.ad_viewer_model import ADViewerModel
 from crystalsweep.model.beamline_config_model import BeamlineConfigModel
 from crystalsweep.model.collection_model import CollectionTableModel
 from crystalsweep.model.collection_settings_model import CollectionSettingsModel
+from crystalsweep.model.controller_connection_model import ControllerConnectionModel
 from crystalsweep.model.epics_model import EpicsModel
 from crystalsweep.model.file_settings_model import FileSettingsModel
 from crystalsweep.model.image_loader_model import ImageLoaderModel
@@ -32,6 +33,7 @@ class MainModel:
 
     beamline: BeamlineConfigModel = field(init=False, compare=False, repr=False, default_factory=BeamlineConfigModel)
     ad_viewer: ADViewerModel = field(init=False, compare=False, repr=False, default_factory=ADViewerModel)
+    controllers: ControllerConnectionModel = field(init=False, compare=False, repr=False, default_factory=ControllerConnectionModel)
     epics: EpicsModel = field(init=False, compare=False, repr=False, default_factory=EpicsModel)
     file_settings: FileSettingsModel = field(init=False, compare=False, repr=False, default_factory=FileSettingsModel)
     collection_settings: CollectionSettingsModel = field(init=False, compare=False, repr=False, default_factory=CollectionSettingsModel)
@@ -43,4 +45,6 @@ class MainModel:
         """Load the previously remembered active beamline configuration, if available."""
         active_name = self.beamline.get_remembered_active_name()
         if active_name and self.beamline.exists(active_name):
-            self.beamline.load(active_name)
+            cfg = self.beamline.load(active_name)
+            if cfg.controllers:
+                self.controllers.apply_config(cfg.controllers)
