@@ -104,7 +104,7 @@ class IntegrationModel:
     ) -> tuple[np.ndarray, np.ndarray, str]:
         """Extracts the intensity profile along a line between two pixels."""
 
-        h, w = frame.shape
+        h, w = frame.shape[:2]
         length = math.hypot(x2 - x1, y2 - y1)
         npt = max(2, int(round(length)))
 
@@ -122,7 +122,7 @@ class IntegrationModel:
         fx = xi - xi0
         fy = yi - yi0
 
-        img = frame.astype(np.float64)
+        img = frame.mean(axis=2).astype(np.float64) if frame.ndim == 3 else frame.astype(np.float64)
         wx_00 = (1 - fx) * (1 - fy)
         wx_10 = fx * (1 - fy)
         wx_01 = (1 - fx) * fy

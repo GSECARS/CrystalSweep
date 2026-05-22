@@ -15,6 +15,7 @@
 
 import logging
 from pathlib import Path
+from threading import Lock
 
 import numpy as np
 import wx
@@ -35,6 +36,8 @@ class ADViewerController:
         """Initialises the controller, wires up bindings, and starts the PV stream."""
         self._model = model
         self._view = view
+        self._pending_frame: np.ndarray | None = None
+        self._pending_lock = Lock()
 
         self._view.ad_viewer.bind_load_file(self._on_load_file)
         self._view.ad_viewer.bind_load_poni(self._on_load_poni)
@@ -62,11 +65,20 @@ class ADViewerController:
         )
 
     def _on_new_frame(self, frame: np.ndarray) -> None:
-        """Deliver a detector frame to the view on the GUI thread."""
-        wx.CallAfter(self._on_new_frame_gui, frame)
+        """Deliver a detector frame to the view on the GUI thread, dropping frames if busy."""
+        with self._pending_lock:
+            already_pending = self._pending_frame is not None
+            self._pending_frame = frame
+        if not already_pending:
+            wx.CallAfter(self._on_new_frame_gui)
 
-    def _on_new_frame_gui(self, frame: np.ndarray) -> None:
+    def _on_new_frame_gui(self) -> None:
         """Handle a new frame on the GUI thread: update image and optionally ROI plot."""
+        with self._pending_lock:
+            frame = self._pending_frame
+            self._pending_frame = None
+        if frame is None:
+            return
         self._view.ad_viewer.update_frame(frame)
         current_frame = self._view.ad_viewer.current_frame
         if current_frame is None:
@@ -198,12 +210,14 @@ class ADViewerController:
 
     def _run_roi_fallback(self, frame: np.ndarray, x1: int, y1: int, x2: int, y2: int) -> None:
         """Compute column-sum integration over the ROI and push results to the view."""
-        h, w = frame.shape
+        h, w = frame.shape[:2]
         x1c = max(0, min(x1, w - 1))
         x2c = max(x1c + 1, min(x2, w))
         y1c = max(0, min(y1, h - 1))
         y2c = max(y1c + 1, min(y2, h))
         roi = frame[y1c:y2c, x1c:x2c].astype(np.float64)
+        if roi.ndim == 3:
+            roi = roi.mean(axis=2)
         ys = roi.sum(axis=0)
         xs = np.arange(x1c, x1c + len(ys), dtype=np.float64)
         self._view.ad_viewer.set_integration_data(xs, ys, "Pixel")

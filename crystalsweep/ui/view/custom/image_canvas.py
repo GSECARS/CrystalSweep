@@ -141,8 +141,12 @@ class ImageCanvas(wx.Panel):
     def set_image(self, image: np.ndarray) -> None:
         if image is None or image.size == 0:
             return
+        is_rgb = image.ndim == 3 and image.shape[2] in (3, 4)
         raw = np.clip(np.nan_to_num(image.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0), 0, None)
-        self._raw_image = raw
+        if is_rgb:
+            self._raw_image = raw[:, :, :3] if raw.shape[2] == 4 else raw
+        else:
+            self._raw_image = raw
         self._data_min = float(raw.min())
         self._data_max = float(raw.max())
         if self._auto_scale:
@@ -181,7 +185,7 @@ class ImageCanvas(wx.Panel):
 
     def reset_view(self) -> None:
         if self._raw_image is not None:
-            h, w = self._raw_image.shape
+            h, w = self._raw_image.shape[:2]
             self._view.camera.set_range(x=(0, w), y=(0, h))
         self._roi_img_coords = None
         self._roi_line.visible = False
@@ -217,11 +221,12 @@ class ImageCanvas(wx.Panel):
         return self._canvas.native
 
     def _compute_auto_clim(self, img: np.ndarray) -> tuple[float, float]:
+        flat = img.reshape(-1) if img.ndim > 2 else img.reshape(-1)
         if self._filter_gaps:
-            nonzero = img[img > 0]
+            nonzero = flat[flat > 0]
             if nonzero.size > 0:
                 return float(np.percentile(nonzero, 1)), float(np.percentile(nonzero, 99))
-        return float(img.min()), float(img.max())
+        return float(flat.min()), float(flat.max())
 
     def _screen_to_image(self, sx: int, sy: int) -> tuple[float, float] | None:
         if self._raw_image is None:
@@ -277,10 +282,11 @@ class ImageCanvas(wx.Panel):
                 self._canvas.update()
             return
         ix, iy = int(img_pos[0]), int(img_pos[1])
-        h, w = self._raw_image.shape
+        h, w = self._raw_image.shape[:2]
         if 0 <= ix < w and 0 <= iy < h:
-            intensity = self._raw_image[iy, ix]
+            pixel = self._raw_image[iy, ix]
             _, canvas_h = self._canvas.size
+            intensity = float(np.mean(pixel)) if self._raw_image.ndim == 3 else float(pixel)
             text = f"x: {ix}  y: {iy}  I: {intensity:.4g}"
             if self._d_spacing_func is not None:
                 d = self._d_spacing_func(ix, iy)
@@ -441,7 +447,7 @@ class ImageCanvas(wx.Panel):
 
     def _on_right_dclick(self, event: wx.MouseEvent) -> None:
         if self._raw_image is not None:
-            h, w = self._raw_image.shape
+            h, w = self._raw_image.shape[:2]
             self._view.camera.set_range(x=(0, w), y=(0, h))
         self._roi_img_coords = None
         self._roi_line.visible = False
