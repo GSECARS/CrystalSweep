@@ -234,7 +234,7 @@ class ADViewerView(wx.Panel):
         self._next_btn.Show(visible)
         self._frame_ctrl.Show(visible)
         if visible:
-            self._frame_ctrl.SetValue(str(current_index))
+            self._frame_ctrl.SetValue(str(current_index + 1))
         self._reposition_overlay_buttons()
 
     def _on_roi_or_line_cleared(self) -> None:
@@ -355,9 +355,9 @@ class ADViewerView(wx.Panel):
 
     def _on_frame_ctrl_enter(self, event: wx.Event) -> None:
         try:
-            index = max(0, min(int(self._frame_ctrl.GetValue()), self._total_frames - 1))
+            index = max(1, min(int(self._frame_ctrl.GetValue()), self._total_frames)) - 1
         except ValueError:
-            self._frame_ctrl.SetValue(str(self._current_frame_index))
+            self._frame_ctrl.SetValue(str(self._current_frame_index + 1))
             event.Skip()
             return
         self._navigate_to(index)
@@ -365,7 +365,7 @@ class ADViewerView(wx.Panel):
 
     def _navigate_to(self, index: int) -> None:
         self._current_frame_index = index
-        self._frame_ctrl.SetValue(str(index))
+        self._frame_ctrl.SetValue(str(index + 1))
         if self._frame_nav_cb is not None:
             self._frame_nav_cb(index)
 
