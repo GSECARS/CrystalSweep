@@ -67,6 +67,8 @@ class MainController:
     def run(self) -> None:
         """Starts the main application loop."""
         self._view.display_window()
-        if not self._beamline_config_controller.has_active_config():
-            wx.CallAfter(self._beamline_config_controller.open_dialog)
+        if self._beamline_config_controller.has_active_config():
+            self._view.set_active_config_name(self._model.beamline.active.name)
+        else:
+            wx.CallAfter(self._beamline_config_controller.open_general)
         self._app.MainLoop()

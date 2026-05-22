@@ -4,8 +4,9 @@
 # File: crystalsweep/ui/controller/beamline_config_controller.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Controller bridging the beamline configuration model and a modal configuration
-# dialog opened from the File menu.
+# Controller bridging the beamline configuration model and the four modal
+# configuration dialogs (General, Detectors, Controllers, Positioners) plus
+# File-menu load / save / save-as actions.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -20,7 +21,13 @@ from typing import Callable
 import wx
 
 from crystalsweep.model import BeamlineConfig, MainModel
-from crystalsweep.ui.view import BeamlineConfigDialog, BeamlineConfigView, MainView
+from crystalsweep.ui.view import (
+    ControllersConfigDialog,
+    DetectorsConfigDialog,
+    GeneralConfigDialog,
+    MainView,
+    PositionersConfigDialog,
+)
 
 __all__ = ["BeamlineConfigController"]
 
@@ -28,7 +35,7 @@ _log = logging.getLogger(__name__)
 
 
 class BeamlineConfigController:
-    """Bridges the beamline configuration model and the modal config dialog."""
+    """Bridges the beamline configuration model and the four config dialogs."""
 
     def __init__(
         self,
@@ -39,106 +46,168 @@ class BeamlineConfigController:
         self._model = model
         self._view = view
         self._on_config_applied = on_config_applied
-        self._dialog: BeamlineConfigDialog | None = None
 
-        self._view.bind_open_configuration(self.open_dialog)
+        self._general_dlg: GeneralConfigDialog | None = None
+        self._detectors_dlg: DetectorsConfigDialog | None = None
+        self._controllers_dlg: ControllersConfigDialog | None = None
+        self._positioners_dlg: PositionersConfigDialog | None = None
+
+        self._view.bind_open_general(self.open_general)
+        self._view.bind_open_detectors(self.open_detectors)
+        self._view.bind_open_controllers(self.open_controllers)
+        self._view.bind_open_positioners(self.open_positioners)
+        self._view.bind_load_config(self.load_config)
+        self._view.bind_save_config(self.save_config)
+        self._view.bind_save_config_as(self.save_config_as)
 
     def has_active_config(self) -> bool:
         return self._model.beamline.has_active
 
-    def open_dialog(self) -> None:
-        """Show the configuration dialog (creating it lazily)."""
-        if self._dialog is None:
-            self._dialog = BeamlineConfigDialog(self._view)
-            self._wire_panel(self._dialog.config_panel)
-            self._dialog.Bind(wx.EVT_CLOSE, self._on_dialog_close)
-
-        self._refresh_choices(active=self._model.beamline.active.name)
-        self._dialog.config_panel.load_config(self._model.beamline.active)
-        if not self._model.beamline.has_active:
-            available = self._model.beamline.list_config_names()
-            if available:
-                self._dialog.config_panel.set_status(
-                    "No active configuration. Pick one above or create a new one.",
-                )
-            else:
-                self._dialog.config_panel.set_status(
-                    "No configurations found. Click 'New' to create your first one.",
-                )
-        self._dialog.Show()
-        self._dialog.Raise()
-
-    def _wire_panel(self, panel: BeamlineConfigView) -> None:
-        panel.bind_active_config_changed(self._on_active_changed)
-        panel.bind_create(self._on_create)
-        panel.bind_save(self._on_save)
-
-    def _refresh_choices(self, active: str | None = None) -> None:
-        if self._dialog is None:
-            return
+    def load_config(self) -> None:
         names = self._model.beamline.list_config_names()
-        self._dialog.config_panel.set_available_configs(names, active=active)
+        if not names:
+            wx.MessageBox("No configurations found. Create one via Save config as.", "No configurations", wx.OK | wx.ICON_INFORMATION)
+            return
+        with wx.SingleChoiceDialog(self._view, "Select a configuration to load:", "Load configuration", names) as dlg:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            name = dlg.GetStringSelection()
+        self._switch_to(name)
 
-    def _on_dialog_close(self, event: wx.CloseEvent) -> None:
-        # Hide instead of destroying so the dialog state is reused next time it is opened.
-        if self._dialog is not None:
-            self._dialog.Hide()
+    def save_config(self) -> None:
+        cfg = self._model.beamline.active
+        if not cfg.name:
+            self.save_config_as()
+            return
+        self._save(self._build_updated_config(cfg.name))
+
+    def save_config_as(self) -> None:
+        with wx.TextEntryDialog(self._view, "Configuration name (e.g. 2026-2):", "Save configuration as") as dlg:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            name = dlg.GetValue().strip()
+        if not name:
+            return
+        self._save(self._build_updated_config(name))
+
+    def open_general(self) -> None:
+        if self._general_dlg is None:
+            self._general_dlg = GeneralConfigDialog(self._view)
+            self._general_dlg.config_panel.bind_save(self.save_config)
+            self._general_dlg.Bind(wx.EVT_CLOSE, lambda e: self._hide_dialog(self._general_dlg, e))
+
+        self._general_dlg.config_panel.load_config(self._model.beamline.active)
+        self._show(self._general_dlg)
+
+    def open_detectors(self) -> None:
+        if self._detectors_dlg is None:
+            self._detectors_dlg = DetectorsConfigDialog(self._view)
+            self._detectors_dlg.config_panel.bind_save(self.save_config)
+            self._detectors_dlg.Bind(wx.EVT_CLOSE, lambda e: self._hide_dialog(self._detectors_dlg, e))
+
+        self._detectors_dlg.config_panel.load_config(self._model.beamline.active)
+        self._show(self._detectors_dlg)
+
+    def open_controllers(self) -> None:
+        if self._controllers_dlg is None:
+            self._controllers_dlg = ControllersConfigDialog(self._view)
+            self._controllers_dlg.config_panel.bind_save(self.save_config)
+            self._controllers_dlg.Bind(wx.EVT_CLOSE, lambda e: self._hide_dialog(self._controllers_dlg, e))
+
+        self._controllers_dlg.config_panel.load_config(self._model.beamline.active)
+        self._show(self._controllers_dlg)
+
+    def open_positioners(self) -> None:
+        if self._positioners_dlg is None:
+            self._positioners_dlg = PositionersConfigDialog(self._view)
+            self._positioners_dlg.config_panel.bind_save(self.save_config)
+            self._positioners_dlg.Bind(wx.EVT_CLOSE, lambda e: self._hide_dialog(self._positioners_dlg, e))
+
+        cfg = self._model.beamline.active
+        panel = self._positioners_dlg.config_panel
+        panel.set_controller_names([c.name for c in cfg.controllers if c.name])
+        panel.load_config(cfg)
+        self._show(self._positioners_dlg)
+
+    def _show(self, dlg: wx.Dialog) -> None:
+        dlg.Show()
+        dlg.Raise()
+
+    @staticmethod
+    def _hide_dialog(dlg: wx.Dialog | None, event: wx.CloseEvent) -> None:
+        if dlg is not None:
+            dlg.Hide()
         event.Veto() if event.CanVeto() else event.Skip()
 
     def _apply(self, cfg: BeamlineConfig) -> None:
         self._model.beamline.remember_active(cfg.name)
+        self._view.set_active_config_name(cfg.name)
         if self._on_config_applied is not None:
             self._on_config_applied(cfg)
 
-    def _on_active_changed(self, name: str) -> None:
+    def _reload_all_open(self, cfg: BeamlineConfig) -> None:
+        if self._general_dlg is not None:
+            self._general_dlg.config_panel.load_config(cfg)
+        if self._detectors_dlg is not None:
+            self._detectors_dlg.config_panel.load_config(cfg)
+        if self._controllers_dlg is not None:
+            self._controllers_dlg.config_panel.load_config(cfg)
+        if self._positioners_dlg is not None:
+            p = self._positioners_dlg.config_panel
+            p.set_controller_names([c.name for c in cfg.controllers if c.name])
+            p.load_config(cfg)
+
+    def _switch_to(self, name: str) -> None:
         try:
             cfg = self._model.beamline.load(name)
         except Exception as exc:
             _log.exception("Failed to load beamline config %s", name)
             wx.MessageBox(f"Failed to load configuration '{name}':\n{exc}", "Error", wx.OK | wx.ICON_ERROR)
             return
-
-        if self._dialog is not None:
-            self._dialog.config_panel.load_config(cfg)
-            self._dialog.config_panel.set_status(f"Loaded '{name}'.")
+        self._reload_all_open(cfg)
         self._apply(cfg)
 
-    def _on_create(self, name: str) -> None:
-        if self._model.beamline.exists(name):
-            wx.MessageBox(f"A configuration named '{name}' already exists.", "Already exists", wx.OK | wx.ICON_WARNING)
-            return
-        try:
-            cfg = self._model.beamline.create_blank(name)
-        except Exception as exc:
-            _log.exception("Failed to create beamline config %s", name)
-            wx.MessageBox(f"Failed to create configuration '{name}':\n{exc}", "Error", wx.OK | wx.ICON_ERROR)
-            return
-        self._refresh_choices(active=name)
-        if self._dialog is not None:
-            self._dialog.config_panel.load_config(cfg)
-            self._dialog.config_panel.set_status(f"Created '{name}'.")
-        self._apply(cfg)
+    def _build_updated_config(self, name: str) -> BeamlineConfig:
+        """Merge edits from all open panels into a single BeamlineConfig."""
+        base = self._model.beamline.active
 
-    def _on_save(self, config: BeamlineConfig) -> None:
-        if self._dialog is None:
-            return
-        panel = self._dialog.config_panel
+        beamline = self._general_dlg.config_panel.beamline_name() if self._general_dlg else base.beamline
 
-        if not config.name:
-            panel.set_status("No configuration selected. Use 'New' to create one.", error=True)
+        if self._detectors_dlg:
+            detectors, active_detector = self._detectors_dlg.config_panel.collect_detectors()
+        else:
+            detectors, active_detector = base.detectors, base.active_detector
+
+        controllers = self._controllers_dlg.config_panel.collect_controllers() if self._controllers_dlg else base.controllers
+
+        if self._positioners_dlg:
+            rotation_motor = self._positioners_dlg.config_panel.collect_rotation_motor()
+            motors = self._positioners_dlg.config_panel.collect_motors()
+        else:
+            rotation_motor, motors = base.rotation_motor, base.motors
+
+        return BeamlineConfig(
+            name=name,
+            beamline=beamline,
+            rotation_motor=rotation_motor,
+            detectors=detectors,
+            active_detector=active_detector,
+            controllers=controllers,
+            motors=motors,
+        )
+
+    def _save(self, config: BeamlineConfig) -> None:
+        if not config.detectors:
+            self._set_status_all("At least one detector is required.", error=True)
             return
 
         if config.rotation_motor is None or not config.rotation_motor.pv.strip():
-            panel.set_status("Rotation stage PV is required.", error=True)
-            return
-
-        if not config.detectors:
-            panel.set_status("At least one detector is required.", error=True)
+            self._set_status_all("Rotation stage PV is required.", error=True)
             return
 
         shorthands = [m.shorthand for m in config.motors if m.shorthand]
         if len(shorthands) != len(set(shorthands)):
-            panel.set_status("Motor shorthands must be unique.", error=True)
+            self._set_status_all("Motor shorthands must be unique.", error=True)
             return
 
         all_motors = [config.rotation_motor] + list(config.motors) if config.rotation_motor else list(config.motors)
@@ -147,7 +216,7 @@ class BeamlineConfigController:
         def _check_pvs() -> None:
             offline = [pv for pv in pvs if not self._model.epics.is_online(pv)]
             if offline:
-                wx.CallAfter(panel.set_status, f"Warning: PV(s) unreachable: {', '.join(offline)}", True)
+                wx.CallAfter(self._set_status_all, f"Warning: PV(s) unreachable: {', '.join(offline)}", True)
 
         threading.Thread(target=_check_pvs, daemon=True).start()
 
@@ -155,9 +224,14 @@ class BeamlineConfigController:
             path = self._model.beamline.save(config)
         except Exception as exc:
             _log.exception("Failed to save beamline config %s", config.name)
-            panel.set_status(f"Save failed: {exc}", error=True)
+            self._set_status_all(f"Save failed: {exc}", error=True)
             return
 
-        self._refresh_choices(active=config.name)
-        panel.set_status(f"Saved to {path}.")
+        self._reload_all_open(config)
+        self._set_status_all(f"Saved to {path}.")
         self._apply(config)
+
+    def _set_status_all(self, text: str, error: bool = False) -> None:
+        for dlg in (self._general_dlg, self._detectors_dlg, self._controllers_dlg, self._positioners_dlg):
+            if dlg is not None:
+                dlg.config_panel.set_status(text, error)

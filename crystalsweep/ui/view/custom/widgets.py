@@ -17,6 +17,7 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.theme import (
+    ACCENT,
     ACCENT_HOVER,
     BG_CARD,
     BG_ELEVATED,
@@ -990,7 +991,7 @@ class _DarkMenuButton(wx.Control):
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
         font = scaled_font(12)
-        gc.SetFont(font, FG_PRIMARY)
+        gc.SetFont(font, FG_SECONDARY)
         tw, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, (w - tw) / 2, (h - th) / 2)
 
@@ -1016,8 +1017,26 @@ class DarkMenuBar(wx.Panel):
         super().__init__(parent, size=(-1, _MENU_BAR_H), style=wx.BORDER_NONE)
         self.SetBackgroundColour(_MENU_BAR_BG)
         self._menus: list[tuple[_DarkMenuButton, list[str | None], list[str | None], list[Callable[[], None] | None]]] = []
+        self._btn_count: int = 0
         self._sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self._config_prefix = wx.StaticText(self, label="")
+        self._config_prefix.SetBackgroundColour(_MENU_BAR_BG)
+        self._config_prefix.SetForegroundColour(FG_SECONDARY)
+        self._config_prefix.SetFont(scaled_font(11))
+        self._config_name = wx.StaticText(self, label="")
+        self._config_name.SetBackgroundColour(_MENU_BAR_BG)
+        self._config_name.SetForegroundColour(ACCENT)
+        self._config_name.SetFont(scaled_font(11))
+        self._sizer.AddStretchSpacer(1)
+        self._sizer.Add(self._config_prefix, 0, wx.ALIGN_CENTER_VERTICAL)
+        self._sizer.Add(self._config_name, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 12)
         self.SetSizer(self._sizer)
+
+    def set_config_name(self, name: str) -> None:
+        """Update the active configuration name shown on the right of the menu bar."""
+        self._config_prefix.SetLabel("Active config: ")
+        self._config_name.SetLabel(name)
+        self.Layout()
 
     def append_menu(
         self,
@@ -1030,7 +1049,23 @@ class DarkMenuBar(wx.Panel):
         idx = len(self._menus)
         btn.Bind(wx.EVT_BUTTON, lambda e, i=idx: self._open_menu(i))
         self._menus.append((btn, items, shortcuts, callbacks))
-        self._sizer.Add(btn, 0, wx.EXPAND)
+        self._sizer.Insert(self._btn_count, btn, 0, wx.EXPAND)
+        self._btn_count += 1
+        self.Layout()
+
+    def append_action(self, title: str, callback: Callable[[], None]) -> None:
+        """Add a menu button that fires callback directly on click (no dropdown)."""
+        btn = _DarkMenuButton(self, title)
+
+        def _on_click(_event: wx.CommandEvent) -> None:
+            btn.set_active(True)
+            callback()
+            btn.set_active(False)
+
+        btn.Bind(wx.EVT_BUTTON, _on_click)
+        self._menus.append((btn, [], [], []))
+        self._sizer.Insert(self._btn_count, btn, 0, wx.EXPAND)
+        self._btn_count += 1
         self.Layout()
 
     def _open_menu(self, menu_idx: int) -> None:

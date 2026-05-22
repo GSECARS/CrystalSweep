@@ -13,7 +13,16 @@
 # ----------------------------------------------------------------------------------
 
 from crystalsweep.ui.view.ad_viewer_view import ADViewerView
-from crystalsweep.ui.view.beamline_config_view import BeamlineConfigDialog, BeamlineConfigView
+from crystalsweep.ui.view.beamline_config_view import (
+    ControllersConfigDialog,
+    ControllersConfigView,
+    DetectorsConfigDialog,
+    DetectorsConfigView,
+    GeneralConfigDialog,
+    GeneralConfigView,
+    PositionersConfigDialog,
+    PositionersConfigView,
+)
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
@@ -31,8 +40,14 @@ from crystalsweep.ui.view.main_view import MainView
 __all__ = [
     "ADViewerView",
     "CollectView",
-    "BeamlineConfigDialog",
-    "BeamlineConfigView",
+    "ControllersConfigDialog",
+    "ControllersConfigView",
+    "DetectorsConfigDialog",
+    "DetectorsConfigView",
+    "GeneralConfigDialog",
+    "GeneralConfigView",
+    "PositionersConfigDialog",
+    "PositionersConfigView",
     "CollectionSettingsView",
     "CollectionTableView",
     "COLORMAP_NAMES",

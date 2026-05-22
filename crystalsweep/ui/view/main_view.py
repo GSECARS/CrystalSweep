@@ -39,7 +39,13 @@ class MainView(wx.Frame):
         super(MainView, self).__init__(None, wx.ID_ANY)
 
         self._version = version
-        self._open_config_cb: Callable[[], None] | None = None
+        self._open_general_cb: Callable[[], None] | None = None
+        self._open_detectors_cb: Callable[[], None] | None = None
+        self._open_controllers_cb: Callable[[], None] | None = None
+        self._open_positioners_cb: Callable[[], None] | None = None
+        self._load_config_cb: Callable[[], None] | None = None
+        self._save_config_cb: Callable[[], None] | None = None
+        self._save_config_as_cb: Callable[[], None] | None = None
 
         self._splitter = ThemedSplitter(self)
         self._splitter.SetSashGravity(0.0)
@@ -87,42 +93,101 @@ class MainView(wx.Frame):
         self.Show(True)
         wx.CallAfter(self._set_initial_sash)
 
-    def bind_open_configuration(self, callback: Callable[[], None]) -> None:
-        """Set the handler invoked when File -> Configuration is selected."""
-        self._open_config_cb = callback
+    def bind_open_general(self, callback: Callable[[], None]) -> None:
+        self._open_general_cb = callback
+
+    def bind_open_detectors(self, callback: Callable[[], None]) -> None:
+        self._open_detectors_cb = callback
+
+    def bind_open_controllers(self, callback: Callable[[], None]) -> None:
+        self._open_controllers_cb = callback
+
+    def bind_open_positioners(self, callback: Callable[[], None]) -> None:
+        self._open_positioners_cb = callback
+
+    def set_active_config_name(self, name: str) -> None:
+        if self._menu_bar is not None:
+            self._menu_bar.set_config_name(name)
+
+    def bind_load_config(self, callback: Callable[[], None]) -> None:
+        self._load_config_cb = callback
+
+    def bind_save_config(self, callback: Callable[[], None]) -> None:
+        self._save_config_cb = callback
+
+    def bind_save_config_as(self, callback: Callable[[], None]) -> None:
+        self._save_config_as_cb = callback
 
     def _build_menu_bar(self) -> DarkMenuBar | None:
         if sys.platform == "darwin":
             menu_bar = wx.MenuBar()
+
             file_menu = wx.Menu()
-            config_item = file_menu.Append(wx.ID_ANY, "Configuration\tCtrl+,", "Edit beamline configuration")
+            load_item = file_menu.Append(wx.ID_ANY, "Load config\tCtrl+O")
+            save_item = file_menu.Append(wx.ID_SAVE, "Save config\tCtrl+S")
+            save_as_item = file_menu.Append(wx.ID_SAVEAS, "Save config as\tCtrl+Shift+S")
             file_menu.AppendSeparator()
-            exit_item = file_menu.Append(wx.ID_EXIT, "Exit\tCtrl+Q", "Close the application")
+            exit_item = file_menu.Append(wx.ID_EXIT, "Exit\tCtrl+Q")
             menu_bar.Append(file_menu, "&File")
+
+            general_menu = wx.Menu()
+            general_item = general_menu.Append(wx.ID_ANY, "General\tCtrl+1")
+            menu_bar.Append(general_menu, "&General")
+
+            detectors_menu = wx.Menu()
+            detectors_item = detectors_menu.Append(wx.ID_ANY, "Detectors\tCtrl+2")
+            menu_bar.Append(detectors_menu, "&Detectors")
+
+            controllers_menu = wx.Menu()
+            controllers_item = controllers_menu.Append(wx.ID_ANY, "Controllers\tCtrl+3")
+            menu_bar.Append(controllers_menu, "C&ontrollers")
+
+            positioners_menu = wx.Menu()
+            positioners_item = positioners_menu.Append(wx.ID_ANY, "Positioners\tCtrl+4")
+            menu_bar.Append(positioners_menu, "&Positioners")
+
             self.SetMenuBar(menu_bar)
-            self.Bind(wx.EVT_MENU, self._on_open_configuration, config_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._load_config_cb), load_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._save_config_cb), save_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._save_config_as_cb), save_as_item)
             self.Bind(wx.EVT_MENU, lambda _e: self.Close(), exit_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_general_cb), general_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_detectors_cb), detectors_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_controllers_cb), controllers_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_positioners_cb), positioners_item)
             return None
 
         bar = DarkMenuBar(self)
         bar.append_menu(
             title="File",
-            items=["Configuration", None, "Exit"],
-            shortcuts=["Ctrl+,", None, "Ctrl+Q"],
-            callbacks=[self._on_open_configuration, None, self._on_exit],
+            items=["Load config", "Save config", "Save config as", None, "Exit"],
+            shortcuts=["Ctrl+O", "Ctrl+S", "Ctrl+Shift+S", None, "Ctrl+Q"],
+            callbacks=[
+                lambda: self._fire(self._load_config_cb),
+                lambda: self._fire(self._save_config_cb),
+                lambda: self._fire(self._save_config_as_cb),
+                None,
+                self._on_exit,
+            ],
         )
-        accel = wx.AcceleratorTable([
-            wx.AcceleratorEntry(wx.ACCEL_CTRL, ord(","), wx.ID_ANY),
-            wx.AcceleratorEntry(wx.ACCEL_CTRL, ord("Q"), wx.ID_EXIT),
-        ])
+        bar.append_action("General", lambda: self._fire(self._open_general_cb))
+        bar.append_action("Detectors", lambda: self._fire(self._open_detectors_cb))
+        bar.append_action("Controllers", lambda: self._fire(self._open_controllers_cb))
+        bar.append_action("Positioners", lambda: self._fire(self._open_positioners_cb))
+
+        accel = wx.AcceleratorTable(
+            [
+                wx.AcceleratorEntry(wx.ACCEL_CTRL, ord("Q"), wx.ID_EXIT),
+            ]
+        )
         self.SetAcceleratorTable(accel)
-        self.Bind(wx.EVT_MENU, lambda _e: self._on_open_configuration(), id=wx.ID_ANY)
         self.Bind(wx.EVT_MENU, lambda _e: self.Close(), id=wx.ID_EXIT)
         return bar
 
-    def _on_open_configuration(self, _event: wx.CommandEvent | None = None) -> None:
-        if self._open_config_cb is not None:
-            self._open_config_cb()
+    @staticmethod
+    def _fire(cb: Callable[[], None] | None) -> None:
+        if cb is not None:
+            cb()
 
     def _on_exit(self) -> None:
         self.Close()

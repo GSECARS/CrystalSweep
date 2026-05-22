@@ -4,8 +4,8 @@
 # File: crystalsweep/ui/view/beamline_config_view.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Beamline configuration panel and modal dialog: edit beamline name, detectors,
-# controllers, rotation stage, and motors with a consistent table-styled UI.
+# Beamline configuration panels and modal dialogs: General, Detectors, Controllers,
+# and Positioners (rotation stage + motors) with a consistent table-styled UI.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -21,43 +21,41 @@ from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerC
 from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, DANGER, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
 from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton, RadioDot
 
-__all__ = ["BeamlineConfigDialog", "BeamlineConfigView"]
+__all__ = [
+    "GeneralConfigView",
+    "GeneralConfigDialog",
+    "DetectorsConfigView",
+    "DetectorsConfigDialog",
+    "ControllersConfigView",
+    "ControllersConfigDialog",
+    "PositionersConfigView",
+    "PositionersConfigDialog",
+]
 
+_ROW_H = 28
+_HEADER_H = 30
+_ROW_ALT = wx.Colour(32, 32, 36)
+_HEADER_BG = wx.Colour(22, 22, 26)
+_BORDER = wx.Colour(50, 50, 56)
+_PAD = 6
 
-# ---------------------------------------------------------------------------
-# Shared table styling constants (mirror collection_table_view)
-# ---------------------------------------------------------------------------
-_ROW_H      = 28
-_HEADER_H   = 30
-_ROW_ALT    = wx.Colour(32, 32, 36)
-_HEADER_BG  = wx.Colour(22, 22, 26)
-_BORDER     = wx.Colour(50, 50, 56)
-_PAD        = 6
-_REMOVE_W   = 32
-
-# ---------------------------------------------------------------------------
-# Placeholder strings
-# ---------------------------------------------------------------------------
-_PLACEHOLDER_BEAMLINE            = "e.g. 13-IDD"
-_PLACEHOLDER_ROTATION_SHORT      = "e.g. omega"
+_PLACEHOLDER_BEAMLINE = "e.g. 13-IDD"
+_PLACEHOLDER_ROTATION_SHORT = "e.g. omega"
 _PLACEHOLDER_ROTATION_DESCRIPTION = "e.g. rotation"
-_PLACEHOLDER_ROTATION_PV         = "e.g. 13IDD:m7.VAL"
-_PLACEHOLDER_DETECTOR_NAME       = "e.g. Eiger 9M"
-_PLACEHOLDER_DETECTOR_PREFIX     = "e.g. 13EIG2_9M:"
-_PLACEHOLDER_CONTROLLER_NAME     = "e.g. xps1"
-_PLACEHOLDER_MOTOR_SHORT         = "e.g. vert"
-_PLACEHOLDER_MOTOR_DESCRIPTION   = "e.g. vertical"
-_PLACEHOLDER_MOTOR_PV            = "e.g. 13IDD:m1.VAL"
-_PLACEHOLDER_MOTOR_PRECISION     = "4"
+_PLACEHOLDER_ROTATION_PV = "e.g. 13IDD:m7.VAL"
+_PLACEHOLDER_DETECTOR_NAME = "e.g. Eiger 9M"
+_PLACEHOLDER_DETECTOR_PREFIX = "e.g. 13EIG2_9M:"
+_PLACEHOLDER_CONTROLLER_NAME = "e.g. xps1"
+_PLACEHOLDER_MOTOR_SHORT = "e.g. vert"
+_PLACEHOLDER_MOTOR_DESCRIPTION = "e.g. vertical"
+_PLACEHOLDER_MOTOR_PV = "e.g. 13IDD:m1.VAL"
+_PLACEHOLDER_MOTOR_PRECISION = "4"
 
-# ---------------------------------------------------------------------------
-# Controller type definitions
-# ---------------------------------------------------------------------------
 _CONTROLLER_TYPE_LABELS: list[tuple[str, str]] = [
     ("newport_xps", "NewportXPS C/D"),
     ("aerotech_a1", "Automation1"),
 ]
-_CONTROLLER_TYPES        = [t for t, _ in _CONTROLLER_TYPE_LABELS]
+_CONTROLLER_TYPES = [t for t, _ in _CONTROLLER_TYPE_LABELS]
 _CONTROLLER_DISPLAY_NAMES = [label for _, label in _CONTROLLER_TYPE_LABELS]
 _LABEL_TO_TYPE = {label: t for t, label in _CONTROLLER_TYPE_LABELS}
 _TYPE_TO_LABEL = {t: label for t, label in _CONTROLLER_TYPE_LABELS}
@@ -67,22 +65,11 @@ _CONTROLLER_TYPE_PARAMS: dict[str, list[tuple[str, str]]] = {
     "aerotech_a1": [("ip", "e.g. 192.168.0.2"), ("axis_name", "e.g. Theta"), ("counts_per_unit", "e.g. 1491308.09")],
 }
 
-# ---------------------------------------------------------------------------
-# Callbacks
-# ---------------------------------------------------------------------------
-class _ActiveConfigChangedCallback(Protocol):
-    def __call__(self, name: str) -> None: ...
 
 class _ConfigSaveCallback(Protocol):
-    def __call__(self, config: BeamlineConfig) -> None: ...
-
-class _CreateConfigCallback(Protocol):
-    def __call__(self, name: str) -> None: ...
+    def __call__(self) -> None: ...
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 def _label(parent: wx.Window, text: str, bold: bool = False, secondary: bool = False) -> wx.StaticText:
     lbl = wx.StaticText(parent, label=text)
     lbl.SetBackgroundColour(parent.GetBackgroundColour())
@@ -112,9 +99,6 @@ class _Section(wx.Panel):
         self.SetSizer(sizer)
 
 
-# ---------------------------------------------------------------------------
-# Generic painted table header
-# ---------------------------------------------------------------------------
 class _TableHeader(wx.Panel):
     """Painted column-header bar matching the collection table style."""
 
@@ -158,9 +142,6 @@ class _TableHeader(wx.Panel):
         gc.StrokeLine(0, h - 1, w, h - 1)
 
 
-# ---------------------------------------------------------------------------
-# Generic painted table row base
-# ---------------------------------------------------------------------------
 class _TableRow(wx.Panel):
     """Base for a painted data row with absolute-positioned controls."""
 
@@ -207,11 +188,7 @@ class _TableRow(wx.Panel):
         ctrl.SetSize(x + _PAD, 4, cw - _PAD * 2, _ROW_H - 8)
 
 
-# ---------------------------------------------------------------------------
-# Detector table
-# ---------------------------------------------------------------------------
 class _DetectorRow(_TableRow):
-    # proportions: [active(radio), name, prefix, remove]
     _PROPS = [2, 10, 14, 2]
 
     def __init__(
@@ -242,12 +219,13 @@ class _DetectorRow(_TableRow):
             return
         widths = self._col_widths(w)
         x = 0
-        # active radio — centre in first col
         rw, rh = self.active_dot.GetBestSize()
         self.active_dot.SetSize(x + (widths[0] - rw) // 2, (_ROW_H - rh) // 2, rw, rh)
         x += widths[0]
-        self._place(self.name_ctrl, x, widths[1]);   x += widths[1]
-        self._place(self.prefix_ctrl, x, widths[2]); x += widths[2]
+        self._place(self.name_ctrl, x, widths[1])
+        x += widths[1]
+        self._place(self.prefix_ctrl, x, widths[2])
+        x += widths[2]
         self._place(self._remove_btn, x, widths[3])
 
     def to_detector(self) -> DetectorConfig:
@@ -260,11 +238,7 @@ class _DetectorRow(_TableRow):
         self.active_dot.set_value(active)
 
 
-# ---------------------------------------------------------------------------
-# Controller table
-# ---------------------------------------------------------------------------
 class _ControllerRow(_TableRow):
-    # proportions: [name, type, params..., remove]
     _PROPS = [5, 5, 18, 2]
 
     def __init__(
@@ -306,8 +280,10 @@ class _ControllerRow(_TableRow):
             return
         widths = self._col_widths(w)
         x = 0
-        self._place(self.name_ctrl, x, widths[0]);   x += widths[0]
-        self._place(self.type_combo, x, widths[1]);   x += widths[1]
+        self._place(self.name_ctrl, x, widths[0])
+        x += widths[0]
+        self._place(self.type_combo, x, widths[1])
+        x += widths[1]
         self._params_panel.SetSize(x + _PAD, 4, widths[2] - _PAD * 2, _ROW_H - 8)
         x += widths[2]
         self._place(self._remove_btn, x, widths[3])
@@ -338,8 +314,11 @@ class _ControllerRow(_TableRow):
     def _on_type_changed(self, value: str) -> None:
         self._build_params(_LABEL_TO_TYPE.get(value, _CONTROLLER_TYPES[0]), {})
         self._reposition()
-        self.GetParent().FitInside()
-        self.GetParent().Layout()
+        p = self.GetParent()
+        if hasattr(p, "_sync"):
+            p._sync()
+        else:
+            p.Layout()
 
     def to_controller(self) -> ControllerConfig:
         params = {k: ctrl.GetValue().strip() for k, ctrl in self._param_ctrls.items() if ctrl.GetValue().strip()}
@@ -349,11 +328,7 @@ class _ControllerRow(_TableRow):
         return self.name_ctrl.GetValue().strip()
 
 
-# ---------------------------------------------------------------------------
-# Rotation stage row (single painted row — no scrolling needed)
-# ---------------------------------------------------------------------------
 class _RotationRow(_TableRow):
-    # proportions: [short, description, pv, prec, controller]
     _PROPS = [3, 6, 10, 2, 7]
 
     def __init__(self, parent: wx.Window, motor: MotorConfig | None) -> None:
@@ -386,11 +361,7 @@ class _RotationRow(_TableRow):
             self.controller_combo.SetSelection(choices.index(selected))
 
 
-# ---------------------------------------------------------------------------
-# Motor table
-# ---------------------------------------------------------------------------
 class _MotorRow(_TableRow):
-    # proportions: [short, description, pv, prec, map, controller, remove]
     _PROPS = [3, 6, 10, 2, 2, 6, 2]
 
     def __init__(
@@ -433,11 +404,11 @@ class _MotorRow(_TableRow):
         ):
             self._place(ctrl, x, cw)
             x += cw
-        # mapping toggle — centre vertically
         tw, th = self.mapping_toggle.GetBestSize()
         self.mapping_toggle.SetSize(x + (widths[4] - tw) // 2, (_ROW_H - th) // 2, tw, th)
         x += widths[4]
-        self._place(self.controller_combo, x, widths[5]); x += widths[5]
+        self._place(self.controller_combo, x, widths[5])
+        x += widths[5]
         self._place(self._remove_btn, x, widths[6])
 
     def update_controller_choices(self, controller_names: list[str]) -> None:
@@ -462,44 +433,121 @@ class _MotorRow(_TableRow):
         )
 
 
-# ---------------------------------------------------------------------------
-# Main config panel
-# ---------------------------------------------------------------------------
-class BeamlineConfigView(wx.Panel):
-    """Beamline configuration editor panel."""
+def _restripe(rows: list, sizer: wx.BoxSizer) -> None:
+    for i, row in enumerate(rows):
+        row.SetBackgroundColour(BG_CARD if i % 2 == 0 else _ROW_ALT)
+        row.Refresh()
+
+
+def _status_label(parent: wx.Panel) -> wx.StaticText:
+    lbl = wx.StaticText(parent, label="")
+    lbl.SetBackgroundColour(POPUP_BG)
+    lbl.SetForegroundColour(FG_SECONDARY)
+    lbl.SetFont(scaled_font(11))
+    return lbl
+
+
+class _DarkScrolledPanel(wx.Panel):
+    """A viewport + DarkScrollBar container that replaces wx.ScrolledWindow for
+    dark-themed table rows. Children are stacked in a vertical sizer inside a
+    plain panel; the DarkScrollBar keeps them in sync."""
+
+    def __init__(self, parent: wx.Window, row_height: int = _ROW_H) -> None:
+        super().__init__(parent, style=wx.BORDER_NONE)
+        self.SetBackgroundColour(BG_CARD)
+        self._row_h = row_height
+        self._offset: int = 0
+
+        self._viewport = wx.Panel(self, style=wx.BORDER_NONE)
+        self._viewport.SetBackgroundColour(BG_CARD)
+
+        self.rows_sizer = wx.BoxSizer(wx.VERTICAL)
+        self._content = wx.Panel(self._viewport, style=wx.BORDER_NONE)
+        self._content.SetBackgroundColour(BG_CARD)
+        self._content.SetSizer(self.rows_sizer)
+
+        self._scrollbar = DarkScrollBar(self, on_scroll=self._on_sb_scroll)
+
+        outer = wx.BoxSizer(wx.HORIZONTAL)
+        outer.Add(self._viewport, 1, wx.EXPAND)
+        outer.Add(self._scrollbar, 0, wx.EXPAND)
+        self.SetSizer(outer)
+
+        self._viewport.Bind(wx.EVT_SIZE, self._on_viewport_size)
+        self._viewport.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
+        self._content.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
+
+    def add_row(self, row: wx.Window) -> None:
+        self.rows_sizer.Add(row, 0, wx.EXPAND)
+        self._content.Layout()
+        self._sync()
+
+    def remove_row(self, row: wx.Window) -> None:
+        self.rows_sizer.Detach(row)
+        self._content.Layout()
+        self._sync()
+
+    def clear_rows(self) -> None:
+        self.rows_sizer.Clear(delete_windows=False)
+        self._content.Layout()
+        self._sync()
+
+    def bind_mousewheel(self, window: wx.Window) -> None:
+        window.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
+
+    def _content_height(self) -> int:
+        return self._content.GetBestSize().height
+
+    def _viewport_height(self) -> int:
+        return self._viewport.GetClientSize().height
+
+    def _max_offset(self) -> int:
+        return max(0, self._content_height() - self._viewport_height())
+
+    def _apply_offset(self) -> None:
+        self._offset = max(0, min(self._offset, self._max_offset()))
+        w = self._viewport.GetClientSize().width
+        h = max(self._content_height(), self._viewport_height())
+        self._content.SetSize(0, -self._offset, w, h)
+        self._sync_scrollbar()
+
+    def _sync_scrollbar(self) -> None:
+        total = self._content_height()
+        visible = self._viewport_height()
+        if total <= visible:
+            self._scrollbar.update(0.0, 1.0)
+        else:
+            self._scrollbar.update(self._offset / (total - visible), visible / total)
+
+    def _sync(self) -> None:
+        self._apply_offset()
+
+    def _on_sb_scroll(self, fraction: float) -> None:
+        self._offset = int(fraction * self._max_offset())
+        self._apply_offset()
+
+    def _on_viewport_size(self, event: wx.SizeEvent) -> None:
+        event.Skip()
+        self._apply_offset()
+
+    def _on_wheel(self, event: wx.MouseEvent) -> None:
+        delta = event.GetWheelRotation() // event.GetWheelDelta()
+        self._offset = max(0, min(self._offset - delta * self._row_h, self._max_offset()))
+        self._apply_offset()
+        event.Skip()
+
+
+class GeneralConfigView(wx.Panel):
+    """General configuration: beamline name."""
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
         self.SetBackgroundColour(POPUP_BG)
         self.SetForegroundColour(POPUP_FG)
-
-        self._detector_rows: list[_DetectorRow] = []
-        self._controller_rows: list[_ControllerRow] = []
-        self._motor_rows: list[_MotorRow] = []
-        self._on_active_changed_cb: _ActiveConfigChangedCallback | None = None
-        self._on_save_cb: _ConfigSaveCallback | None = None
-        self._on_create_cb: _CreateConfigCallback | None = None
-        self._available_names: list[str] = []
-        self._current_name: str = ""
-
+        self._on_save_cb: Callable[[], None] | None = None
         self._build_layout()
 
     def _build_layout(self) -> None:
-        # --- config selector ---
-        selector_panel = wx.Panel(self)
-        selector_panel.SetBackgroundColour(POPUP_BG)
-        self._config_combo = DarkCombo(selector_panel, choices=[])
-        self._config_combo.Bind(wx.EVT_CHOICE, self._on_combo_choice)
-        self._create_btn = FlatButton(selector_panel, "New")
-        self._create_btn.SetMinSize((70, 28))
-        self._create_btn.set_action(self._on_create_clicked)
-        sel_row = wx.BoxSizer(wx.HORIZONTAL)
-        sel_row.Add(_label(selector_panel, "Configuration", bold=True), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        sel_row.Add(self._config_combo, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        sel_row.Add(self._create_btn, 0, wx.ALIGN_CENTER_VERTICAL)
-        selector_panel.SetSizer(sel_row)
-
-        # --- beamline name ---
         self._beamline_section = _Section(self, "Beamline")
         b_body = self._beamline_section.body
         self._beamline_ctrl = DarkTextCtrl(b_body, placeholder=_PLACEHOLDER_BEAMLINE)
@@ -509,15 +557,50 @@ class BeamlineConfigView(wx.Panel):
         b_sizer.Add(self._beamline_ctrl, 0, wx.EXPAND)
         b_body.SetSizer(b_sizer)
 
-        # --- detectors ---
+        self._status_label = _status_label(self)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+        outer.Add(self._beamline_section, 0, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.SetSizer(outer)
+        self.SetMinSize((400, -1))
+
+    def bind_save(self, callback: Callable[[], None]) -> None:
+        self._on_save_cb = callback
+
+    def load_config(self, config: BeamlineConfig) -> None:
+        self._beamline_ctrl.SetValue(config.beamline)
+        self.set_status("")
+
+    def beamline_name(self) -> str:
+        return self._beamline_ctrl.GetValue().strip()
+
+    def set_status(self, text: str, error: bool = False) -> None:
+        self._status_label.SetForegroundColour(DANGER if error else FG_SECONDARY)
+        self._status_label.SetLabel(text)
+        self.Layout()
+
+    def trigger_save(self) -> None:
+        if self._on_save_cb is not None:
+            self._on_save_cb()
+
+
+class DetectorsConfigView(wx.Panel):
+    """Detectors configuration: manage detector list."""
+
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent)
+        self.SetBackgroundColour(POPUP_BG)
+        self.SetForegroundColour(POPUP_FG)
+        self._detector_rows: list[_DetectorRow] = []
+        self._on_save_cb: Callable[[], None] | None = None
+        self._build_layout()
+
+    def _build_layout(self) -> None:
         self._detectors_section = _Section(self, "Detectors")
         d_body = self._detectors_section.body
         self._det_header = _TableHeader(d_body, ["", "Name", "PV prefix", ""], [2, 10, 14, 2])
-        self._detector_rows_panel = wx.ScrolledWindow(d_body, style=wx.VSCROLL)
-        self._detector_rows_panel.SetBackgroundColour(BG_CARD)
-        self._detector_rows_panel.SetScrollRate(0, _ROW_H)
-        self._detector_rows_sizer = wx.BoxSizer(wx.VERTICAL)
-        self._detector_rows_panel.SetSizer(self._detector_rows_sizer)
+        self._detector_rows_panel = _DarkScrolledPanel(d_body)
         self._detector_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_detector_btn = FlatButton(d_body, "+ Add detector")
         self._add_detector_btn.SetMinSize((-1, 26))
@@ -528,130 +611,25 @@ class BeamlineConfigView(wx.Panel):
         d_sizer.Add(self._add_detector_btn, 0, wx.EXPAND)
         d_body.SetSizer(d_sizer)
 
-        # --- controllers ---
-        self._controllers_section = _Section(self, "Controllers")
-        ctrl_body = self._controllers_section.body
-        self._ctrl_header = _TableHeader(ctrl_body, ["Name", "Type", "Connection params", ""], [5, 5, 18, 2])
-        self._controller_rows_panel = wx.ScrolledWindow(ctrl_body, style=wx.VSCROLL)
-        self._controller_rows_panel.SetBackgroundColour(BG_CARD)
-        self._controller_rows_panel.SetScrollRate(0, _ROW_H)
-        self._controller_rows_sizer = wx.BoxSizer(wx.VERTICAL)
-        self._controller_rows_panel.SetSizer(self._controller_rows_sizer)
-        self._controller_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_controller_btn = FlatButton(ctrl_body, "+ Add controller")
-        self._add_controller_btn.SetMinSize((-1, 26))
-        self._add_controller_btn.set_action(self._on_add_controller_clicked)
-        ctrl_sizer = wx.BoxSizer(wx.VERTICAL)
-        ctrl_sizer.Add(self._ctrl_header, 0, wx.EXPAND)
-        ctrl_sizer.Add(self._controller_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
-        ctrl_sizer.Add(self._add_controller_btn, 0, wx.EXPAND)
-        ctrl_body.SetSizer(ctrl_sizer)
-
-        # --- rotation stage ---
-        self._rotation_section = _Section(self, "Rotation Stage")
-        r_body = self._rotation_section.body
-        self._rot_header = _TableHeader(r_body, ["Short", "Description", "PV \u2731", "Prec", "Controller"], [3, 6, 10, 2, 7])
-        self._rotation_row = _RotationRow(r_body, None)
-        r_sizer = wx.BoxSizer(wx.VERTICAL)
-        r_sizer.Add(self._rot_header, 0, wx.EXPAND)
-        r_sizer.Add(self._rotation_row, 0, wx.EXPAND)
-        r_body.SetSizer(r_sizer)
-
-        # --- motors ---
-        self._motors_section = _Section(self, "Motors")
-        m_body = self._motors_section.body
-        self._mot_header = _TableHeader(m_body, ["Short", "Description", "PV", "Prec", "Map", "Controller", ""], [3, 6, 10, 2, 2, 6, 2])
-        self._motor_rows_panel = wx.ScrolledWindow(m_body, style=wx.VSCROLL)
-        self._motor_rows_panel.SetBackgroundColour(BG_CARD)
-        self._motor_rows_panel.SetScrollRate(0, _ROW_H)
-        self._motor_rows_sizer = wx.BoxSizer(wx.VERTICAL)
-        self._motor_rows_panel.SetSizer(self._motor_rows_sizer)
-        self._motor_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_motor_btn = FlatButton(m_body, "+ Add motor")
-        self._add_motor_btn.SetMinSize((-1, 26))
-        self._add_motor_btn.set_action(self._on_add_motor_clicked)
-        m_sizer = wx.BoxSizer(wx.VERTICAL)
-        m_sizer.Add(self._mot_header, 0, wx.EXPAND)
-        m_sizer.Add(self._motor_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
-        m_sizer.Add(self._add_motor_btn, 0, wx.EXPAND)
-        m_body.SetSizer(m_sizer)
-
-        # --- save / status ---
-        self._save_btn = FlatButton(self, "Save configuration")
-        self._save_btn.SetMinSize((-1, 32))
-        self._save_btn.set_action(self._on_save_clicked)
-        self._status_label = wx.StaticText(self, label="")
-        self._status_label.SetBackgroundColour(POPUP_BG)
-        self._status_label.SetForegroundColour(FG_SECONDARY)
-        self._status_label.SetFont(scaled_font(11))
+        self._status_label = _status_label(self)
 
         outer = wx.BoxSizer(wx.VERTICAL)
-        outer.Add(selector_panel, 0, wx.EXPAND | wx.ALL, 10)
-        outer.Add(self._beamline_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
-        outer.Add(self._detectors_section, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
-        outer.Add(self._controllers_section, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
-        outer.Add(self._rotation_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
-        outer.Add(self._motors_section, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
-        outer.Add(self._save_btn, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
-        outer.Add(self._status_label, 0, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._detectors_section, 1, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
         self.SetMinSize((500, -1))
 
-    # --- public API ---
-    def bind_active_config_changed(self, callback: _ActiveConfigChangedCallback) -> None:
-        self._on_active_changed_cb = callback
-
-    def bind_save(self, callback: _ConfigSaveCallback) -> None:
+    def bind_save(self, callback: Callable[[], None]) -> None:
         self._on_save_cb = callback
 
-    def bind_create(self, callback: _CreateConfigCallback) -> None:
-        self._on_create_cb = callback
-
-    def set_available_configs(self, names: list[str], active: str | None = None) -> None:
-        self._available_names = list(names)
-        sel = 0
-        if active and active in self._available_names:
-            sel = self._available_names.index(active)
-            self._current_name = active
-        elif self._available_names:
-            self._current_name = self._available_names[0]
-        else:
-            self._current_name = ""
-        self._config_combo.SetChoices(self._available_names, selection=sel)
-
     def load_config(self, config: BeamlineConfig) -> None:
-        self._current_name = config.name
-        self._beamline_ctrl.SetValue(config.beamline)
-
         self._clear_detector_rows()
         for idx, detector in enumerate(config.detectors):
             self._append_detector_row(detector, active=idx == config.active_detector)
-
-        self._clear_controller_rows()
-        for controller in config.controllers:
-            self._append_controller_row(controller)
-
-        rm = config.rotation_motor
-        self._rotation_row.short_ctrl.SetValue(rm.shorthand if rm else "")
-        self._rotation_row.description_ctrl.SetValue(rm.description if rm else "")
-        self._rotation_row.pv_ctrl.SetValue(rm.pv if rm else "")
-        self._rotation_row.precision_ctrl.SetValue(str(rm.precision) if rm else "4")
-        self._refresh_rotation_controller_choices(selected=rm.controller if rm else "epics")
-
-        self._clear_motor_rows()
-        for motor in config.motors:
-            self._append_motor_row(motor)
-
-        if config.name and config.name in self._available_names:
-            self._config_combo.SetSelection(self._available_names.index(config.name))
-
-        self._detector_rows_panel.FitInside()
-        self._controller_rows_panel.FitInside()
-        self._motor_rows_panel.FitInside()
         self.Layout()
         self.set_status("")
 
-    def collect_config(self) -> BeamlineConfig:
+    def collect_detectors(self) -> tuple[tuple[DetectorConfig, ...], int]:
         detectors: list[DetectorConfig] = []
         active_index = -1
         for row in self._detector_rows:
@@ -663,60 +641,36 @@ class BeamlineConfigView(wx.Panel):
             detectors.append(det)
         if detectors and active_index == -1:
             active_index = 0
-
-        rot_pv = self._rotation_row.pv_ctrl.GetValue().strip()
-        try:
-            rot_precision = max(0, int(self._rotation_row.precision_ctrl.GetValue().strip()))
-        except ValueError:
-            rot_precision = 4
-        rotation_motor = (
-            MotorConfig(
-                shorthand=self._rotation_row.short_ctrl.GetValue().strip(),
-                description=self._rotation_row.description_ctrl.GetValue().strip(),
-                pv=rot_pv,
-                precision=rot_precision,
-                controller=self._rotation_row.controller_combo.GetStringSelection() or "epics",
-            )
-            if rot_pv
-            else None
-        )
-
-        controllers = tuple(row.to_controller() for row in self._controller_rows if row.to_controller().name)
-        motors = tuple(row.to_motor() for row in self._motor_rows if row.to_motor().shorthand)
-        return BeamlineConfig(
-            name=self._current_name,
-            beamline=self._beamline_ctrl.GetValue().strip(),
-            rotation_motor=rotation_motor,
-            detectors=tuple(detectors),
-            active_detector=active_index,
-            controllers=controllers,
-            motors=motors,
-        )
+        return tuple(detectors), active_index
 
     def set_status(self, text: str, error: bool = False) -> None:
         self._status_label.SetForegroundColour(DANGER if error else FG_SECONDARY)
         self._status_label.SetLabel(text)
         self.Layout()
 
-    # --- detector management ---
+    def trigger_save(self) -> None:
+        if self._on_save_cb is not None:
+            self._on_save_cb()
+
     def _clear_detector_rows(self) -> None:
         for row in self._detector_rows:
-            self._detector_rows_sizer.Detach(row)
+            self._detector_rows_panel.remove_row(row)
             row.Destroy()
         self._detector_rows.clear()
-        self._detector_rows_panel.Layout()
 
     def _append_detector_row(self, detector: DetectorConfig, active: bool) -> None:
         index = len(self._detector_rows)
         row = _DetectorRow(
-            self._detector_rows_panel, detector, active, index,
+            self._detector_rows_panel._content,
+            detector,
+            active,
+            index,
             on_make_active=self._on_make_detector_active,
             on_remove=self._on_remove_detector,
         )
-        self._detector_rows_sizer.Add(row, 0, wx.EXPAND)
+        self._detector_rows_panel.bind_mousewheel(row)
         self._detector_rows.append(row)
-        self._detector_rows_panel.FitInside()
-        self._detector_rows_panel.Layout()
+        self._detector_rows_panel.add_row(row)
 
     def _on_add_detector_clicked(self) -> None:
         self._append_detector_row(DetectorConfig(), active=not self._detector_rows)
@@ -730,34 +684,89 @@ class BeamlineConfigView(wx.Panel):
             return
         was_active = row.active_dot.get_value()
         self._detector_rows.remove(row)
-        self._detector_rows_sizer.Detach(row)
+        self._detector_rows_panel.remove_row(row)
         row.Destroy()
         if was_active and self._detector_rows:
             self._detector_rows[0].set_active_visual(True)
-        self._restripe(self._detector_rows, self._detector_rows_sizer)
-        self._detector_rows_panel.FitInside()
-        self._detector_rows_panel.Layout()
+        _restripe(self._detector_rows, self._detector_rows_panel.rows_sizer)
 
-    # --- controller management ---
+
+class ControllersConfigView(wx.Panel):
+    """Controllers configuration: manage motion controller list."""
+
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent)
+        self.SetBackgroundColour(POPUP_BG)
+        self.SetForegroundColour(POPUP_FG)
+        self._controller_rows: list[_ControllerRow] = []
+        self._on_save_cb: Callable[[], None] | None = None
+        self._build_layout()
+
+    def _build_layout(self) -> None:
+        self._controllers_section = _Section(self, "Controllers")
+        ctrl_body = self._controllers_section.body
+        self._ctrl_header = _TableHeader(ctrl_body, ["Name", "Type", "Connection params", ""], [5, 5, 18, 2])
+        self._controller_rows_panel = _DarkScrolledPanel(ctrl_body)
+        self._controller_rows_panel.SetMinSize((-1, _ROW_H * 3))
+        self._add_controller_btn = FlatButton(ctrl_body, "+ Add controller")
+        self._add_controller_btn.SetMinSize((-1, 26))
+        self._add_controller_btn.set_action(self._on_add_controller_clicked)
+        ctrl_sizer = wx.BoxSizer(wx.VERTICAL)
+        ctrl_sizer.Add(self._ctrl_header, 0, wx.EXPAND)
+        ctrl_sizer.Add(self._controller_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
+        ctrl_sizer.Add(self._add_controller_btn, 0, wx.EXPAND)
+        ctrl_body.SetSizer(ctrl_sizer)
+
+        self._status_label = _status_label(self)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+        outer.Add(self._controllers_section, 1, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.SetSizer(outer)
+        self.SetMinSize((560, -1))
+
+    def bind_save(self, callback: Callable[[], None]) -> None:
+        self._on_save_cb = callback
+
+    def load_config(self, config: BeamlineConfig) -> None:
+        self._clear_controller_rows()
+        for controller in config.controllers:
+            self._append_controller_row(controller)
+        self.Layout()
+        self.set_status("")
+
+    def collect_controllers(self) -> tuple[ControllerConfig, ...]:
+        return tuple(row.to_controller() for row in self._controller_rows if row.to_controller().name)
+
+    def controller_names(self) -> list[str]:
+        return [r.controller_name() for r in self._controller_rows if r.controller_name()]
+
+    def set_status(self, text: str, error: bool = False) -> None:
+        self._status_label.SetForegroundColour(DANGER if error else FG_SECONDARY)
+        self._status_label.SetLabel(text)
+        self.Layout()
+
+    def trigger_save(self) -> None:
+        if self._on_save_cb is not None:
+            self._on_save_cb()
+
     def _clear_controller_rows(self) -> None:
         for row in self._controller_rows:
-            self._controller_rows_sizer.Detach(row)
+            self._controller_rows_panel.remove_row(row)
             row.Destroy()
         self._controller_rows.clear()
-        self._controller_rows_panel.Layout()
 
     def _append_controller_row(self, controller: ControllerConfig) -> None:
         index = len(self._controller_rows)
         row = _ControllerRow(
-            self._controller_rows_panel, controller, index,
+            self._controller_rows_panel._content,
+            controller,
+            index,
             on_remove=self._on_remove_controller,
-            on_name_changed=self._refresh_motor_controller_choices,
         )
-        self._controller_rows_sizer.Add(row, 0, wx.EXPAND)
+        self._controller_rows_panel.bind_mousewheel(row)
         self._controller_rows.append(row)
-        self._controller_rows_panel.FitInside()
-        self._controller_rows_panel.Layout()
-        self._refresh_motor_controller_choices()
+        self._controller_rows_panel.add_row(row)
 
     def _on_add_controller_clicked(self) -> None:
         self._append_controller_row(ControllerConfig(name="", type=_CONTROLLER_TYPES[0]))
@@ -766,41 +775,120 @@ class BeamlineConfigView(wx.Panel):
         if row not in self._controller_rows:
             return
         self._controller_rows.remove(row)
-        self._controller_rows_sizer.Detach(row)
+        self._controller_rows_panel.remove_row(row)
         row.Destroy()
-        self._restripe(self._controller_rows, self._controller_rows_sizer)
-        self._controller_rows_panel.FitInside()
-        self._controller_rows_panel.Layout()
-        self._refresh_motor_controller_choices()
+        _restripe(self._controller_rows, self._controller_rows_panel.rows_sizer)
 
-    def _refresh_motor_controller_choices(self) -> None:
-        names = [r.controller_name() for r in self._controller_rows if r.controller_name()]
+
+class PositionersConfigView(wx.Panel):
+    """Positioners configuration: rotation stage and motors."""
+
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent)
+        self.SetBackgroundColour(POPUP_BG)
+        self.SetForegroundColour(POPUP_FG)
+        self._motor_rows: list[_MotorRow] = []
+        self._controller_names: list[str] = []
+        self._on_save_cb: Callable[[], None] | None = None
+        self._build_layout()
+
+    def _build_layout(self) -> None:
+        self._rotation_section = _Section(self, "Rotation Stage")
+        r_body = self._rotation_section.body
+        self._rot_header = _TableHeader(r_body, ["Short", "Description", "PV", "Prec", "Controller"], [3, 6, 10, 2, 7])
+        self._rotation_row = _RotationRow(r_body, None)
+        r_sizer = wx.BoxSizer(wx.VERTICAL)
+        r_sizer.Add(self._rot_header, 0, wx.EXPAND)
+        r_sizer.Add(self._rotation_row, 0, wx.EXPAND)
+        r_body.SetSizer(r_sizer)
+
+        self._motors_section = _Section(self, "Motors")
+        m_body = self._motors_section.body
+        self._mot_header = _TableHeader(m_body, ["Short", "Description", "PV", "Prec", "Map", "Controller", ""], [3, 6, 10, 2, 2, 6, 2])
+        self._motor_rows_panel = _DarkScrolledPanel(m_body)
+        self._motor_rows_panel.SetMinSize((-1, _ROW_H * 3))
+        self._add_motor_btn = FlatButton(m_body, "+ Add motor")
+        self._add_motor_btn.SetMinSize((-1, 26))
+        self._add_motor_btn.set_action(self._on_add_motor_clicked)
+        m_sizer = wx.BoxSizer(wx.VERTICAL)
+        m_sizer.Add(self._mot_header, 0, wx.EXPAND)
+        m_sizer.Add(self._motor_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
+        m_sizer.Add(self._add_motor_btn, 0, wx.EXPAND)
+        m_body.SetSizer(m_sizer)
+
+        self._status_label = _status_label(self)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+        outer.Add(self._rotation_section, 0, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._motors_section, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.SetSizer(outer)
+        self.SetMinSize((560, -1))
+
+    def bind_save(self, callback: Callable[[], None]) -> None:
+        self._on_save_cb = callback
+
+    def set_controller_names(self, names: list[str]) -> None:
+        self._controller_names = names
         for row in self._motor_rows:
             row.update_controller_choices(names)
         self._refresh_rotation_controller_choices()
 
-    def _refresh_rotation_controller_choices(self, selected: str | None = None) -> None:
-        names = [r.controller_name() for r in self._controller_rows if r.controller_name()]
-        choices = ["epics"] + names
-        current = selected or self._rotation_row.controller_combo.GetStringSelection() or "epics"
-        self._rotation_row.update_controller_choices(choices, selected=current)
+    def load_config(self, config: BeamlineConfig) -> None:
+        rm = config.rotation_motor
+        self._rotation_row.short_ctrl.SetValue(rm.shorthand if rm else "")
+        self._rotation_row.description_ctrl.SetValue(rm.description if rm else "")
+        self._rotation_row.pv_ctrl.SetValue(rm.pv if rm else "")
+        self._rotation_row.precision_ctrl.SetValue(str(rm.precision) if rm else "4")
+        self._refresh_rotation_controller_choices(selected=rm.controller if rm else "epics")
 
-    # --- motor management ---
+        self._clear_motor_rows()
+        for motor in config.motors:
+            self._append_motor_row(motor)
+
+        self.Layout()
+        self.set_status("")
+
+    def collect_rotation_motor(self) -> MotorConfig | None:
+        rot_pv = self._rotation_row.pv_ctrl.GetValue().strip()
+        try:
+            rot_precision = max(0, int(self._rotation_row.precision_ctrl.GetValue().strip()))
+        except ValueError:
+            rot_precision = 4
+        if not rot_pv:
+            return None
+        return MotorConfig(
+            shorthand=self._rotation_row.short_ctrl.GetValue().strip(),
+            description=self._rotation_row.description_ctrl.GetValue().strip(),
+            pv=rot_pv,
+            precision=rot_precision,
+            controller=self._rotation_row.controller_combo.GetStringSelection() or "epics",
+        )
+
+    def collect_motors(self) -> tuple[MotorConfig, ...]:
+        return tuple(row.to_motor() for row in self._motor_rows if row.to_motor().shorthand)
+
+    def set_status(self, text: str, error: bool = False) -> None:
+        self._status_label.SetForegroundColour(DANGER if error else FG_SECONDARY)
+        self._status_label.SetLabel(text)
+        self.Layout()
+
+    def trigger_save(self) -> None:
+        if self._on_save_cb is not None:
+            self._on_save_cb()
+
     def _clear_motor_rows(self) -> None:
         for row in self._motor_rows:
-            self._motor_rows_sizer.Detach(row)
+            self._motor_rows_panel.remove_row(row)
             row.Destroy()
         self._motor_rows.clear()
-        self._motor_rows_panel.Layout()
 
     def _append_motor_row(self, motor: MotorConfig) -> None:
         index = len(self._motor_rows)
-        names = [r.controller_name() for r in self._controller_rows if r.controller_name()]
-        row = _MotorRow(self._motor_rows_panel, motor, names, index, on_remove=self._on_remove_motor)
-        self._motor_rows_sizer.Add(row, 0, wx.EXPAND)
+        row = _MotorRow(self._motor_rows_panel._content, motor, self._controller_names, index, on_remove=self._on_remove_motor)
+        self._motor_rows_panel.bind_mousewheel(row)
         self._motor_rows.append(row)
-        self._motor_rows_panel.FitInside()
-        self._motor_rows_panel.Layout()
+        self._motor_rows_panel.add_row(row)
 
     def _on_add_motor_clicked(self) -> None:
         self._append_motor_row(MotorConfig(shorthand="", description="", pv=""))
@@ -809,71 +897,47 @@ class BeamlineConfigView(wx.Panel):
         if row not in self._motor_rows:
             return
         self._motor_rows.remove(row)
-        self._motor_rows_sizer.Detach(row)
+        self._motor_rows_panel.remove_row(row)
         row.Destroy()
-        self._restripe(self._motor_rows, self._motor_rows_sizer)
-        self._motor_rows_panel.FitInside()
-        self._motor_rows_panel.Layout()
+        _restripe(self._motor_rows, self._motor_rows_panel.rows_sizer)
 
-    # --- helpers ---
-    @staticmethod
-    def _restripe(rows: list, sizer: wx.BoxSizer) -> None:
-        """Reapply alternating row colours after a removal."""
-        for i, row in enumerate(rows):
-            row.SetBackgroundColour(BG_CARD if i % 2 == 0 else _ROW_ALT)
-            row.Refresh()
-
-    # --- events ---
-    def _on_combo_choice(self, name: str) -> None:
-        if not name or name == self._current_name:
-            return
-        self._current_name = name
-        if self._on_active_changed_cb is not None:
-            self._on_active_changed_cb(name)
-
-    def _on_create_clicked(self) -> None:
-        with wx.TextEntryDialog(self, "Configuration name (e.g. 2026-2)", "New configuration") as dlg:
-            if dlg.ShowModal() != wx.ID_OK:
-                return
-            name = dlg.GetValue().strip()
-        if not name:
-            return
-        if self._on_create_cb is not None:
-            self._on_create_cb(name)
-
-    def _on_save_clicked(self) -> None:
-        if self._on_save_cb is not None:
-            self._on_save_cb(self.collect_config())
+    def _refresh_rotation_controller_choices(self, selected: str | None = None) -> None:
+        choices = ["epics"] + self._controller_names
+        current = selected or self._rotation_row.controller_combo.GetStringSelection() or "epics"
+        self._rotation_row.update_controller_choices(choices, selected=current)
 
 
-# ---------------------------------------------------------------------------
-# Dialog wrapper
-# ---------------------------------------------------------------------------
-class BeamlineConfigDialog(wx.Dialog):
-    """Top-level dialog that wraps BeamlineConfigView with a dark scrollbar."""
+class _ConfigDialog(wx.Dialog):
+    """Generic scrollable dialog wrapper; pressing Enter triggers save."""
 
-    def __init__(self, parent: wx.Window) -> None:
-        super().__init__(
-            parent,
-            title="Beamline configuration",
-            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
-        )
+    def __init__(self, parent: wx.Window, title: str, size: tuple[int, int] = (680, 500)) -> None:
+        super().__init__(parent, title=title, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
         self.SetBackgroundColour(BG_SURFACE)
         self._viewport = wx.Panel(self, style=wx.BORDER_NONE)
         self._viewport.SetBackgroundColour(BG_SURFACE)
         self._scroll_offset: int = 0
-        self.config_panel = BeamlineConfigView(self._viewport)
+        self.config_panel = self._make_panel(self._viewport)
         self._scrollbar = DarkScrollBar(self, on_scroll=self._on_sb_scroll)
         self._viewport.Bind(wx.EVT_SIZE, self._on_viewport_size)
         self._viewport.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
         self.config_panel.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
+        self.Bind(wx.EVT_CHAR_HOOK, self._on_char_hook)
         outer = wx.BoxSizer(wx.HORIZONTAL)
         outer.Add(self._viewport, 1, wx.EXPAND)
         outer.Add(self._scrollbar, 0, wx.EXPAND)
         self.SetSizer(outer)
-        self.SetSize(680, 720)
-        self.SetMinSize((520, 560))
+        self.SetSize(*size)
+        self.SetMinSize((420, 320))
         self.CentreOnParent()
+
+    def _make_panel(self, viewport: wx.Panel) -> wx.Panel:
+        raise NotImplementedError
+
+    def _on_char_hook(self, event: wx.KeyEvent) -> None:
+        if event.GetKeyCode() == wx.WXK_RETURN and not event.ShiftDown():
+            self.config_panel.trigger_save()
+        else:
+            event.Skip()
 
     def _content_height(self) -> int:
         return self.config_panel.GetBestSize().height
@@ -912,3 +976,35 @@ class BeamlineConfigDialog(wx.Dialog):
         self._scroll_offset = max(0, min(self._scroll_offset - delta * 20, self._max_offset()))
         self._apply_offset()
         event.Skip()
+
+
+class GeneralConfigDialog(_ConfigDialog):
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent, "General configuration", size=(520, 200))
+
+    def _make_panel(self, viewport: wx.Panel) -> GeneralConfigView:
+        return GeneralConfigView(viewport)
+
+
+class DetectorsConfigDialog(_ConfigDialog):
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent, "Detectors configuration", size=(620, 380))
+
+    def _make_panel(self, viewport: wx.Panel) -> DetectorsConfigView:
+        return DetectorsConfigView(viewport)
+
+
+class ControllersConfigDialog(_ConfigDialog):
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent, "Controllers configuration", size=(700, 380))
+
+    def _make_panel(self, viewport: wx.Panel) -> ControllersConfigView:
+        return ControllersConfigView(viewport)
+
+
+class PositionersConfigDialog(_ConfigDialog):
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent, "Positioners configuration", size=(680, 500))
+
+    def _make_panel(self, viewport: wx.Panel) -> PositionersConfigView:
+        return PositionersConfigView(viewport)
