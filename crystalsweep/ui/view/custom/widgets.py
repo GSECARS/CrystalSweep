@@ -551,6 +551,7 @@ class DarkToggle(wx.Panel):
         self._label = label
         self._value = value
         self._hovered = False
+        self._locked = False
         self._callback: Callable[[bool], None] | None = None
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self.SetBackgroundColour(POPUP_BG)
@@ -587,6 +588,10 @@ class DarkToggle(wx.Panel):
         self._value = value
         self.Refresh()
 
+    def SetLocked(self, locked: bool) -> None:
+        self._locked = locked
+        self.Refresh()
+
     def Bind(self, event, handler, source=None, id=wx.ID_ANY, id2=wx.ID_ANY):
         if event == wx.EVT_CHECKBOX:
             self._callback = handler
@@ -602,7 +607,19 @@ class DarkToggle(wx.Panel):
         gc.DrawRectangle(0, 0, w, h)
         cy = h / 2
         bx, by = 4, cy - self._BOX_H / 2
-        if self._value:
+        if self._locked:
+            if self._value:
+                locked_colour = wx.Colour(
+                    int(PONI_LOADED.Red() * 0.5),
+                    int(PONI_LOADED.Green() * 0.5),
+                    int(PONI_LOADED.Blue() * 0.5),
+                )
+                gc.SetBrush(wx.Brush(locked_colour))
+                gc.SetPen(wx.Pen(locked_colour, 1))
+            else:
+                gc.SetBrush(wx.Brush(BG_ELEVATED))
+                gc.SetPen(wx.Pen(wx.Colour(60, 60, 60), 1))
+        elif self._value:
             gc.SetBrush(wx.Brush(PONI_LOADED))
             gc.SetPen(wx.Pen(PONI_LOADED, 1))
         else:
@@ -610,7 +627,8 @@ class DarkToggle(wx.Panel):
             gc.SetPen(wx.Pen(SEP_COLOUR, 1))
         gc.DrawRoundedRectangle(bx, by, self._BOX_W, self._BOX_H, self._R)
         if self._value:
-            gc.SetPen(wx.Pen(BG_SURFACE, 2))
+            pen_colour = BG_SURFACE if not self._locked else wx.Colour(100, 100, 100)
+            gc.SetPen(wx.Pen(pen_colour, 2))
             gc.SetBrush(wx.TRANSPARENT_BRUSH)
             path = gc.CreatePath()
             path.MoveToPoint(bx + 3, by + self._BOX_H / 2)
@@ -618,11 +636,14 @@ class DarkToggle(wx.Panel):
             path.AddLineToPoint(bx + self._BOX_W - 3, by + 3)
             gc.StrokePath(path)
         font = scaled_font(12)
-        gc.SetFont(font, FG_SECONDARY)
+        text_colour = wx.Colour(100, 100, 100) if self._locked else FG_SECONDARY
+        gc.SetFont(font, text_colour)
         _, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, bx + self._BOX_W + 8, cy - th / 2)
 
     def _on_click(self, event: wx.MouseEvent) -> None:
+        if self._locked:
+            return
         self._value = not self._value
         self.Refresh()
         if self._callback is not None:

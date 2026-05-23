@@ -330,6 +330,23 @@ class FileSettingsView(wx.Panel):
     def set_tif(self, value: bool) -> None:
         self._tif_toggle.SetValue(value)
 
+    def set_detector_format(self, format_key: str | None) -> None:
+        if format_key == "hdf5":
+            self._hdf5_toggle.SetValue(True)
+            self._hdf5_toggle.SetLocked(True)
+        else:
+            self._hdf5_toggle.SetLocked(False)
+        if format_key == "cbf":
+            self._cbf_toggle.SetValue(True)
+            self._cbf_toggle.SetLocked(True)
+        else:
+            self._cbf_toggle.SetLocked(False)
+        if format_key == "tif":
+            self._tif_toggle.SetValue(True)
+            self._tif_toggle.SetLocked(True)
+        else:
+            self._tif_toggle.SetLocked(False)
+
     def set_crysalis(self, value: bool) -> None:
         self._crysalis_toggle.SetValue(value)
 

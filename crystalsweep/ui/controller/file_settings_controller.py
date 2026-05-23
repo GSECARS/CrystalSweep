@@ -59,7 +59,14 @@ class FileSettingsController:
     def sync_from_detector(self) -> None:
         """Fetch FilePath, FileName and FileNumber from the active detector — updates all three fields."""
         self._push_file_number_width()
+        self._sync_format_from_detector()
         self._fetch_from_detector(update_directory=True, update_filename=True, update_frame=True)
+
+    def _sync_format_from_detector(self) -> None:
+        cfg = self._model.beamline.active
+        det = cfg.active_detector_config if cfg else None
+        fmt = det.file_format if det else None
+        self._view.file_settings.set_detector_format(fmt)
 
     def push_to_detector(self) -> None:
         """Push current file settings (path, filename, frame number, template) to the active detector plugin."""
@@ -162,6 +169,7 @@ class FileSettingsController:
         fs.set_tif(m.use_tif)
         fs.set_crysalis(m.use_crysalis)
         fs.set_apex(m.use_apex)
+        self._sync_format_from_detector()
 
     def _on_filename_changed(self, value: str) -> None:
         self._model.file_settings.filename = value
