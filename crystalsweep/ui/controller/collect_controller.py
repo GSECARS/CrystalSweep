@@ -18,6 +18,7 @@ import threading
 import time as _time
 
 import wx
+from epics import caget, caput
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import CollectionPoint
@@ -148,6 +149,15 @@ class CollectController:
         config = self._model.beamline.active
         file_settings = self._model.file_settings
 
+        rotation_cfg = config.rotation_motor
+        original_rotation: float | None = None
+        if rotation_cfg is not None:
+            try:
+                raw = caget(rotation_cfg.pv)
+                original_rotation = float(raw) if raw is not None else None
+            except Exception:
+                original_rotation = None
+
         for idx, point in enumerate(points, start=1):
             if self._abort_event.is_set():
                 break
@@ -191,6 +201,13 @@ class CollectController:
                     wx.Colour(220, 160, 40),
                 )
                 continue
+
+        if original_rotation is not None and rotation_cfg is not None:
+            try:
+                caput(rotation_cfg.pv, original_rotation, wait=True)
+                _log.debug("Restored rotation motor to %.4f", original_rotation)
+            except Exception as exc:
+                _log.warning("Failed to restore rotation motor position: %s", exc)
 
         wx.CallAfter(self._stop_elapsed_timer)
         if self._abort_event.is_set():
