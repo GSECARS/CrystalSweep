@@ -52,6 +52,7 @@ __all__ = [
     "DEFAULT_SCHEME",
     "MUTED_SCHEME",
     "DarkCombo",
+    "DarkConfirmDialog",
     "DarkMenuBar",
     "DarkScrollBar",
     "DarkTextCtrl",
@@ -1415,3 +1416,50 @@ class ThemedSplitter(wx.SplitterWindow):
         new_event.SetPosition(pt)
         wx.PostEvent(self, new_event)
         event.Skip()
+
+
+class DarkConfirmDialog(wx.Dialog):
+    """Dark-themed Yes/No confirmation dialog."""
+
+    def __init__(self, parent: wx.Window, message: str, title: str) -> None:
+        super().__init__(parent, title=title, style=wx.DEFAULT_DIALOG_STYLE)
+        self.SetBackgroundColour(BG_SURFACE)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        msg_label = wx.StaticText(self, label=message)
+        msg_label.SetForegroundColour(FG_PRIMARY)
+        msg_label.SetBackgroundColour(BG_SURFACE)
+        msg_label.SetFont(scaled_font(12))
+        msg_label.Wrap(380)
+        outer.Add(msg_label, 0, wx.ALL, 20)
+
+        sep = wx.Panel(self, size=(-1, 1))
+        sep.SetBackgroundColour(SEP_COLOUR)
+        outer.Add(sep, 0, wx.EXPAND)
+
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        btn_sizer.AddStretchSpacer()
+
+        btn_yes = FlatButton(self, "Yes", DANGER_SCHEME)
+        btn_yes.set_action(lambda: self.EndModal(wx.ID_YES))
+        btn_yes.SetMinSize((80, 28))
+
+        btn_no = FlatButton(self, "No")
+        btn_no.set_action(lambda: self.EndModal(wx.ID_NO))
+        btn_no.SetMinSize((80, 28))
+
+        btn_sizer.Add(btn_yes, 0, wx.ALL, 8)
+        btn_sizer.Add(btn_no, 0, wx.TOP | wx.BOTTOM | wx.RIGHT, 8)
+        outer.Add(btn_sizer, 0, wx.EXPAND)
+
+        self.SetSizer(outer)
+        self.Fit()
+        self.CentreOnParent()
+        self.Bind(wx.EVT_CHAR_HOOK, self._on_key)
+
+    def _on_key(self, event: wx.KeyEvent) -> None:
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.EndModal(wx.ID_NO)
+        else:
+            event.Skip()
