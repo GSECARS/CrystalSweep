@@ -27,6 +27,8 @@ from crystalsweep.ui.view.custom.theme import (
     DANGER,
     DANGER_HOVER,
     DANGER_PRESS,
+    DISABLED_BG,
+    DISABLED_FG,
     FG_PRIMARY,
     FG_SECONDARY,
     ICON_SIZE,
@@ -101,6 +103,11 @@ class FlatButton(wx.Control):
         self._label = label
         self.Refresh()
 
+    def Enable(self, enable: bool = True) -> bool:
+        result = super().Enable(enable)
+        self.Refresh()
+        return result
+
     def _on_size(self, event: wx.SizeEvent) -> None:
         self.Refresh()
         event.Skip()
@@ -109,7 +116,10 @@ class FlatButton(wx.Control):
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
-        if self._pressed:
+        enabled = self.IsEnabled()
+        if not enabled:
+            bg = DISABLED_BG
+        elif self._pressed:
             bg = self._press_bg
         elif self._hovered:
             bg = self._hover_bg
@@ -121,7 +131,12 @@ class FlatButton(wx.Control):
         gc.SetBrush(wx.Brush(bg))
         gc.DrawRoundedRectangle(0, 0, w, h, 4)
         font = scaled_font(12)
-        fg = self._hover_fg if (self._hovered or self._pressed) else self._idle_fg
+        if not enabled:
+            fg = DISABLED_FG
+        elif self._hovered or self._pressed:
+            fg = self._hover_fg
+        else:
+            fg = self._idle_fg
         gc.SetFont(font, fg)
         tw, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, (w - tw) / 2, (h - th) / 2)
@@ -138,11 +153,15 @@ class FlatButton(wx.Control):
         event.Skip()
 
     def _on_press(self, event: wx.MouseEvent) -> None:
+        if not self.IsEnabled():
+            return
         self._pressed = True
         self.Refresh()
         event.Skip()
 
     def _on_release(self, event: wx.MouseEvent) -> None:
+        if not self.IsEnabled():
+            return
         was_pressed = self._pressed
         self._pressed = False
         self.Refresh()
@@ -291,14 +310,22 @@ class IconButton(wx.Panel):
         self.Refresh()
         event.Skip()
 
+    def Enable(self, enable: bool = True) -> bool:
+        result = super().Enable(enable)
+        self.Refresh()
+        return result
+
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
+        enabled = self.IsEnabled()
         gc.SetBrush(wx.Brush(self._idle_bg))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
-        if self._pressed:
+        if not enabled:
+            bg = self._idle_bg
+        elif self._pressed:
             bg = BTN_PRESS_BG
         elif self._hovered:
             bg = BTN_HOVER_BG
@@ -310,7 +337,11 @@ class IconButton(wx.Panel):
         gc.SetAntialiasMode(wx.ANTIALIAS_DEFAULT)
         offset = (w - self._icon_size) / 2
         gc.Translate(offset, offset)
+        if not enabled:
+            gc.BeginLayer(0.25)
         self._draw_fn(gc, self._icon_size)
+        if not enabled:
+            gc.EndLayer()
 
     def _on_leave(self, event: wx.MouseEvent) -> None:
         self.set_hovered(False)
@@ -321,11 +352,15 @@ class IconButton(wx.Panel):
         event.Skip()
 
     def _on_press(self, event: wx.MouseEvent) -> None:
+        if not self.IsEnabled():
+            return
         self._pressed = True
         self.Refresh()
         event.Skip()
 
     def _on_release(self, event: wx.MouseEvent) -> None:
+        if not self.IsEnabled():
+            return
         if self._pressed:
             self._pressed = False
             self.Refresh()
@@ -420,6 +455,10 @@ class DarkTextCtrl(wx.Panel):
             bg = wx.Colour(70, 28, 28) if error else BG_ELEVATED
             self._ctrl.SetBackgroundColour(bg)
             self.Refresh()
+
+    def Enable(self, enable: bool = True) -> bool:
+        self.set_disabled(not enable)
+        return True
 
     def set_disabled(self, disabled: bool) -> None:
         if disabled == self._disabled:
@@ -519,7 +558,7 @@ class DarkTextCtrl(wx.Panel):
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
         if self._disabled:
-            bg = BG_SURFACE
+            bg = DISABLED_BG
         elif self._error:
             bg = wx.Colour(70, 28, 28)
         else:
@@ -529,7 +568,7 @@ class DarkTextCtrl(wx.Panel):
         gc.DrawRoundedRectangle(0, 0, w, h, 3)
         if self._editing:
             return
-        fg = FG_SECONDARY if self._disabled else FG_PRIMARY
+        fg = DISABLED_FG if self._disabled else FG_PRIMARY
         x_pad = 6
         if self._value:
             gc.SetFont(self._font, fg)
@@ -608,17 +647,8 @@ class DarkToggle(wx.Panel):
         cy = h / 2
         bx, by = 4, cy - self._BOX_H / 2
         if self._locked:
-            if self._value:
-                locked_colour = wx.Colour(
-                    int(PONI_LOADED.Red() * 0.5),
-                    int(PONI_LOADED.Green() * 0.5),
-                    int(PONI_LOADED.Blue() * 0.5),
-                )
-                gc.SetBrush(wx.Brush(locked_colour))
-                gc.SetPen(wx.Pen(locked_colour, 1))
-            else:
-                gc.SetBrush(wx.Brush(BG_ELEVATED))
-                gc.SetPen(wx.Pen(wx.Colour(60, 60, 60), 1))
+            gc.SetBrush(wx.Brush(DISABLED_BG))
+            gc.SetPen(wx.Pen(DISABLED_FG, 1))
         elif self._value:
             gc.SetBrush(wx.Brush(PONI_LOADED))
             gc.SetPen(wx.Pen(PONI_LOADED, 1))
@@ -627,7 +657,7 @@ class DarkToggle(wx.Panel):
             gc.SetPen(wx.Pen(SEP_COLOUR, 1))
         gc.DrawRoundedRectangle(bx, by, self._BOX_W, self._BOX_H, self._R)
         if self._value:
-            pen_colour = BG_SURFACE if not self._locked else wx.Colour(100, 100, 100)
+            pen_colour = DISABLED_FG if self._locked else BG_SURFACE
             gc.SetPen(wx.Pen(pen_colour, 2))
             gc.SetBrush(wx.TRANSPARENT_BRUSH)
             path = gc.CreatePath()
@@ -636,7 +666,7 @@ class DarkToggle(wx.Panel):
             path.AddLineToPoint(bx + self._BOX_W - 3, by + 3)
             gc.StrokePath(path)
         font = scaled_font(12)
-        text_colour = wx.Colour(100, 100, 100) if self._locked else FG_SECONDARY
+        text_colour = DISABLED_FG if self._locked else FG_SECONDARY
         gc.SetFont(font, text_colour)
         _, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, bx + self._BOX_W + 8, cy - th / 2)
@@ -690,6 +720,11 @@ class DarkCombo(wx.Panel):
         self.InvalidateBestSize()
         self.Refresh()
 
+    def Enable(self, enable: bool = True) -> bool:
+        result = super().Enable(enable)
+        self.Refresh()
+        return result
+
     def Bind(self, event, handler, source=None, id=wx.ID_ANY, id2=wx.ID_ANY):
         if event == wx.EVT_CHOICE:
             self._callback = handler
@@ -710,17 +745,25 @@ class DarkCombo(wx.Panel):
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(BTN_HOVER_BG if self._hovered else BG_ELEVATED))
-        gc.SetPen(wx.Pen(SEP_COLOUR, 1))
+        enabled = self.IsEnabled()
+        if not enabled:
+            bg = DISABLED_BG
+        elif self._hovered:
+            bg = BTN_HOVER_BG
+        else:
+            bg = BG_ELEVATED
+        gc.SetBrush(wx.Brush(bg))
+        gc.SetPen(wx.Pen(DISABLED_FG if not enabled else SEP_COLOUR, 1))
         gc.DrawRoundedRectangle(0, 0, w, h, 4)
         font = scaled_font(12)
         label = self.GetStringSelection()
-        colour = self._choice_colours.get(label, FG_PRIMARY)
+        colour = DISABLED_FG if not enabled else self._choice_colours.get(label, FG_PRIMARY)
         gc.SetFont(font, colour)
         _, th = gc.GetTextExtent(label)
         gc.DrawText(label, 8, (h - th) / 2)
+        arrow_colour = DISABLED_FG if not enabled else FG_SECONDARY
         arrow_x, arrow_y = w - 16, h / 2
-        gc.SetPen(wx.Pen(FG_SECONDARY, 1))
+        gc.SetPen(wx.Pen(arrow_colour, 1))
         path = gc.CreatePath()
         path.MoveToPoint(arrow_x - 4, arrow_y - 2)
         path.AddLineToPoint(arrow_x, arrow_y + 2)
@@ -728,7 +771,7 @@ class DarkCombo(wx.Panel):
         gc.StrokePath(path)
 
     def _on_click(self, event: wx.MouseEvent) -> None:
-        if not self._choices:
+        if not self._choices or not self.IsEnabled():
             return
         popup = _DarkMenuPopup(self, self._choices, self._selection, on_select=self._select, choice_colours=self._choice_colours)
         w, h = self.GetSize()
@@ -991,11 +1034,19 @@ class _DarkMenuButton(wx.Control):
         tw, _ = dc.GetTextExtent(self._label)
         return wx.Size(tw + 20, _MENU_BAR_H)
 
+    def Enable(self, enable: bool = True) -> bool:
+        result = super().Enable(enable)
+        self.Refresh()
+        return result
+
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
-        if self._active:
+        enabled = self.IsEnabled()
+        if not enabled:
+            bg = _MENU_BAR_BG
+        elif self._active:
             bg = _MENU_BTN_ACTIVE
         elif self._hovered:
             bg = _MENU_BTN_HOVER
@@ -1005,7 +1056,7 @@ class _DarkMenuButton(wx.Control):
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
         font = scaled_font(12)
-        gc.SetFont(font, FG_SECONDARY)
+        gc.SetFont(font, DISABLED_FG if not enabled else FG_SECONDARY)
         tw, th = gc.GetTextExtent(self._label)
         gc.DrawText(self._label, (w - tw) / 2, (h - th) / 2)
 
@@ -1020,6 +1071,8 @@ class _DarkMenuButton(wx.Control):
         event.Skip()
 
     def _on_press(self, event: wx.MouseEvent) -> None:
+        if not self.IsEnabled():
+            return
         wx.PostEvent(self, wx.CommandEvent(wx.EVT_BUTTON.typeId, self.GetId()))
         event.Skip()
 
@@ -1045,6 +1098,11 @@ class DarkMenuBar(wx.Panel):
         self._sizer.Add(self._config_prefix, 0, wx.ALIGN_CENTER_VERTICAL)
         self._sizer.Add(self._config_name, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 12)
         self.SetSizer(self._sizer)
+
+    def Enable(self, enable: bool = True) -> bool:
+        for btn, _, _, _ in self._menus:
+            btn.Enable(enable)
+        return True
 
     def set_config_name(self, name: str) -> None:
         """Update the active configuration name shown on the right of the menu bar."""

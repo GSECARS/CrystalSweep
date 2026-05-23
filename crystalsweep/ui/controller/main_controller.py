@@ -50,6 +50,7 @@ class MainController:
         self._collection_settings_controller = CollectionSettingsController(model=self._model, view=self._view)
         self._collection_controller = CollectionTableController(model=self._model, view=self._view.collection_table)
         self._collect_controller = CollectController(model=self._model, view=self._view)
+        self._collect_controller.bind_collecting_changed(self._on_collecting_changed)
         self._collection_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
         self._collection_settings_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
         self._ad_viewer_controller = ADViewerController(model=self._model, view=self._view)
@@ -58,6 +59,10 @@ class MainController:
             view=self._view,
             on_config_applied=self._on_config_applied,
         )
+
+    def _on_collecting_changed(self, collecting: bool) -> None:
+        self._view.set_ui_collecting(collecting)
+        self._beamline_config_controller.set_collecting(collecting)
 
     def _on_config_applied(self, cfg) -> None:
         self._ad_viewer_controller.resubscribe_detector()

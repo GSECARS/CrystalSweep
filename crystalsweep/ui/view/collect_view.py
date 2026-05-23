@@ -211,6 +211,7 @@ class CollectView(wx.Panel):
 
     def set_collecting(self, collecting: bool) -> None:
         self._collecting = collecting
+        self._test_mode_toggle.SetLocked(collecting)
         if collecting:
             self._collect_btn.SetLabel("Abort")
             self._collect_btn._idle_bg = _ABORT_SCHEME[0]

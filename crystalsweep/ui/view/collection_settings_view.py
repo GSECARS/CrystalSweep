@@ -505,6 +505,15 @@ class CollectionSettingsView(wx.Panel):
         current_type = SCAN_TYPES[self._type_combo._selection]
         self._update_rotation_labels(current_type)
 
+    def set_enabled(self, enabled: bool) -> None:
+        for ctrl in (
+            self._type_combo, self._exposure_ctrl,
+            self._rot_start_ctrl, self._rot_end_ctrl, self._rot_range_ctrl,
+            self._step_ctrl, self._add_btn, self._update_selected_btn,
+        ):
+            ctrl.Enable(enabled)
+        self._map_toggle.SetLocked(not enabled)
+
     def set_scan_type(self, scan_type: ScanType) -> None:
         if scan_type in SCAN_TYPES:
             self._type_combo.SetSelection(list(SCAN_TYPES).index(scan_type))

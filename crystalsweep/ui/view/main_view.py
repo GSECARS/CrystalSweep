@@ -46,7 +46,9 @@ class MainView(wx.Frame):
         self._load_config_cb: Callable[[], None] | None = None
         self._save_config_cb: Callable[[], None] | None = None
         self._save_config_as_cb: Callable[[], None] | None = None
+        self._abort_cb: Callable[[], None] | None = None
 
+        self._collecting = False
         self._splitter = ThemedSplitter(self)
         self._splitter.SetSashGravity(0.0)
         self._splitter.SetMinimumPaneSize(180)
@@ -109,6 +111,14 @@ class MainView(wx.Frame):
         if self._menu_bar is not None:
             self._menu_bar.set_config_name(name)
 
+    def set_ui_collecting(self, collecting: bool) -> None:
+        self._collecting = collecting
+        if self._menu_bar is not None:
+            self._menu_bar.Enable(not collecting)
+        self.file_settings.set_enabled(not collecting)
+        self.collection_settings.set_enabled(not collecting)
+        self.collect.set_collecting(collecting)
+
     def bind_load_config(self, callback: Callable[[], None]) -> None:
         self._load_config_cb = callback
 
@@ -117,6 +127,9 @@ class MainView(wx.Frame):
 
     def bind_save_config_as(self, callback: Callable[[], None]) -> None:
         self._save_config_as_cb = callback
+
+    def bind_abort(self, callback: Callable[[], None]) -> None:
+        self._abort_cb = callback
 
     def _build_menu_bar(self) -> DarkMenuBar | None:
         if sys.platform == "darwin":
@@ -232,6 +245,15 @@ class MainView(wx.Frame):
 
     def _close_event_handler(self, event: wx.CloseEvent) -> None:
         """Runs when trying to close the main window."""
+        if self._collecting:
+            style = wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING
+            result = Popup(self, "Collection is in progress. Abort and close?", "Collection in Progress", style=style)
+            if result == wx.ID_YES:
+                self._fire(self._abort_cb)
+                event.Skip()
+            else:
+                event.Veto()
+            return
         style = wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION
         result = Popup(self, "Are you sure you want to close the application?", "Close Application", style=style)
         event.Skip() if result == wx.ID_YES else event.Veto()

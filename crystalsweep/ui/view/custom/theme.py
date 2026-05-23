@@ -56,6 +56,9 @@ DANGER = wx.Colour(180, 40, 40)
 DANGER_HOVER = wx.Colour(210, 55, 55)
 DANGER_PRESS = wx.Colour(150, 30, 30)
 
+DISABLED_BG = wx.Colour(33, 33, 36)
+DISABLED_FG = wx.Colour(90, 90, 96)
+
 ICON_FG = wx.Colour(200, 200, 210)
 ICON_SIZE = 20
 

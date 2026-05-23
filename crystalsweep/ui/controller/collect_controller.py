@@ -16,6 +16,7 @@
 import logging
 import threading
 import time as _time
+from typing import Callable
 
 import wx
 from epics import caget, caput
@@ -42,6 +43,7 @@ class CollectController:
         self._abort_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._start_time: float = 0.0
+        self._on_collecting_changed: Callable[[bool], None] | None = None
         self._elapsed_timer = wx.Timer()
         self._elapsed_timer.Bind(wx.EVT_TIMER, self._on_elapsed_tick)
 
@@ -54,7 +56,11 @@ class CollectController:
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
+        self._view.bind_abort(self._on_abort)
         self.refresh_eta()
+
+    def bind_collecting_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_collecting_changed = callback
 
     def _on_collect(self) -> None:
         if self._view.collect.test_mode:
@@ -72,6 +78,8 @@ class CollectController:
 
         self._abort_event.clear()
         self._start_time = _time.monotonic()
+        if self._on_collecting_changed is not None:
+            self._on_collecting_changed(True)
         self._view.collect.set_status_collecting()
         self._elapsed_timer.Start(1000)
         self._thread = threading.Thread(target=self._run, args=(points,), daemon=True, name="collect-loop")
@@ -210,13 +218,13 @@ class CollectController:
                 _log.warning("Failed to restore rotation motor position: %s", exc)
 
         wx.CallAfter(self._stop_elapsed_timer)
+        if self._on_collecting_changed is not None:
+            wx.CallAfter(self._on_collecting_changed, False)
         if self._abort_event.is_set():
             wx.CallAfter(self._view.collect.set_status, "Aborted", wx.Colour(220, 160, 40))
-            wx.CallAfter(self._view.collect.set_collecting, False)
         else:
             wx.CallAfter(self._view.collect.set_progress, total, total, point_fraction=1.0)
             wx.CallAfter(self._view.collect.set_status, "Done", wx.Colour(99, 179, 237))
-            wx.CallAfter(self._view.collect.set_collecting, False)
 
     def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None) -> None:
         done_event = threading.Event()

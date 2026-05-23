@@ -302,6 +302,21 @@ class FileSettingsView(wx.Panel):
     def bind_apex_calibration(self, callback: Callable[[Path], None]) -> None:
         self._on_apex_calibration_cb = callback
 
+    def set_enabled(self, enabled: bool) -> None:
+        for ctrl in (
+            self._filename_ctrl, self._filename_update_btn,
+            self._frame_ctrl, self._frame_reset_btn, self._frame_update_btn,
+            self._path_ctrl, self._path_browse_btn, self._path_update_btn,
+            self._map_ext_ctrl, self._crysalis_cal_btn, self._apex_cal_btn,
+        ):
+            ctrl.Enable(enabled)
+        for toggle in (
+            self._hdf5_toggle, self._cbf_toggle, self._tif_toggle,
+            self._crysalis_toggle, self._apex_toggle,
+        ):
+            toggle.SetLocked(not enabled)
+        self._path_status_label.Enable(True)
+
     def set_file_number_width(self, width: int) -> None:
         self._file_number_width = max(1, width)
         self._validate_path()

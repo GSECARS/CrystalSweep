@@ -63,6 +63,14 @@ class BeamlineConfigController:
     def has_active_config(self) -> bool:
         return self._model.beamline.has_active
 
+    def set_collecting(self, collecting: bool) -> None:
+        for dlg in (self._general_dlg, self._detectors_dlg, self._controllers_dlg, self._positioners_dlg):
+            if dlg is not None:
+                if collecting:
+                    dlg.Hide()
+                else:
+                    dlg.Enable(True)
+
     def load_config(self) -> None:
         names = self._model.beamline.list_config_names()
         if not names:
