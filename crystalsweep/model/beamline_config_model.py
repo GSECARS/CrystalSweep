@@ -79,6 +79,43 @@ class BeamlineConfig:
     active_detector: int = -1
     motors: tuple[MotorConfig, ...] = field(default_factory=tuple)
     controllers: tuple[ControllerConfig, ...] = field(default_factory=tuple)
+    path_prefix_local: str = ""
+    path_prefix_remote: str = ""
+
+    def translate_path(self, local_path: str) -> str:
+        """Return *local_path* with the local prefix replaced by the remote prefix.
+
+        If either prefix is empty the path is returned unchanged.
+        """
+        loc = self.path_prefix_local.strip()
+        rem = self.path_prefix_remote.strip()
+        if not loc or not rem:
+            return local_path
+        norm = local_path.replace("\\", "/")
+        loc_norm = loc.replace("\\", "/").rstrip("/")
+        rem_norm = rem.rstrip("/")
+        if norm.lower().startswith(loc_norm.lower()):
+            remainder = norm[len(loc_norm):]
+            return rem_norm + remainder
+        return local_path
+
+    def translate_path_reverse(self, remote_path: str) -> str:
+        """Return *remote_path* with the remote prefix replaced by the local prefix.
+
+        Restores the Windows path from what the IOC reports back.
+        If either prefix is empty the path is returned unchanged.
+        """
+        loc = self.path_prefix_local.strip()
+        rem = self.path_prefix_remote.strip()
+        if not loc or not rem:
+            return remote_path
+        norm = remote_path.replace("\\", "/")
+        rem_norm = rem.rstrip("/")
+        loc_norm = loc.replace("\\", "/").rstrip("/")
+        if norm.lower().startswith(rem_norm.lower()):
+            remainder = norm[len(rem_norm):]
+            return loc_norm + remainder
+        return remote_path
 
     @property
     def is_empty(self) -> bool:
@@ -234,6 +271,8 @@ class BeamlineConfigModel:
             active_detector=active_detector,
             motors=motors,
             controllers=controllers,
+            path_prefix_local=str(data.get("path_prefix_local", "")),
+            path_prefix_remote=str(data.get("path_prefix_remote", "")),
         )
         self._active = cfg
         return cfg
@@ -245,6 +284,8 @@ class BeamlineConfigModel:
 
         payload: dict = {
             "beamline": config.beamline,
+            "path_prefix_local": config.path_prefix_local,
+            "path_prefix_remote": config.path_prefix_remote,
             "rotation_motor": (
                 {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision, "controller": config.rotation_motor.controller, "xps_group": config.rotation_motor.xps_group, "xps_positioner": config.rotation_motor.xps_positioner}
                 if config.rotation_motor is not None

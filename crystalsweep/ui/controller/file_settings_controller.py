@@ -15,9 +15,13 @@
 # ----------------------------------------------------------------------------------
 
 import logging
+import threading
 from pathlib import Path
 
+import wx
+
 from crystalsweep.model import MainModel
+from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.ui.view import MainView
 
 __all__ = ["FileSettingsController"]
@@ -49,6 +53,42 @@ class FileSettingsController:
         fs.bind_apex_calibration(self._on_apex_calibration)
 
         self._sync_view_from_model()
+        self.sync_from_detector()
+
+    def sync_from_detector(self) -> None:
+        """Fetch FilePath, FileName, FileNumber from the active detector plugin in a background thread."""
+        cfg = self._model.beamline.active
+        det = cfg.active_detector_config if cfg else None
+        if det is None or not det.pv_prefix.strip():
+            return
+
+        detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
+
+        def _fetch() -> None:
+            try:
+                directory, filename, file_number = detector.fetch_file_info()
+            except Exception as exc:
+                _log.warning("sync_from_detector: failed to fetch file info: %s", exc)
+                return
+            wx.CallAfter(self._apply_detector_file_info, directory, filename, file_number)
+
+        threading.Thread(target=_fetch, daemon=True, name="detector-file-sync").start()
+
+    def _apply_detector_file_info(self, directory: str, filename: str, file_number: int) -> None:
+        m = self._model.file_settings
+        fs = self._view.file_settings
+        cfg = self._model.beamline.active
+        if directory:
+            local_dir = cfg.translate_path_reverse(directory) if cfg else directory
+            path = Path(local_dir)
+            m.directory = path
+            fs.set_directory(path)
+        if filename:
+            m.filename = filename
+            fs.set_filename(filename)
+        m.frame_number = file_number
+        fs.set_frame_number(file_number)
+        _log.debug("sync_from_detector: remote_dir=%r local_dir=%r name=%r num=%d", directory, local_dir if directory else "", filename, file_number)
 
     def _sync_view_from_model(self) -> None:
         m = self._model.file_settings

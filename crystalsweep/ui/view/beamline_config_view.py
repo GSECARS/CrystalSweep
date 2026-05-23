@@ -40,6 +40,8 @@ _BORDER = wx.Colour(50, 50, 56)
 _PAD = 6
 
 _PLACEHOLDER_BEAMLINE = "e.g. 13-IDD"
+_PLACEHOLDER_PATH_LOCAL = "e.g. T:\\"
+_PLACEHOLDER_PATH_REMOTE = "e.g. /home/dac_user/cars6/Data"
 _PLACEHOLDER_ROTATION_SHORT = "e.g. omega"
 _PLACEHOLDER_ROTATION_DESCRIPTION = "e.g. rotation"
 _PLACEHOLDER_ROTATION_PV = "e.g. 13IDD:m7.VAL"
@@ -636,7 +638,7 @@ class _DarkScrolledPanel(wx.Panel):
 
 
 class GeneralConfigView(wx.Panel):
-    """General configuration: beamline name."""
+    """General configuration: beamline name and path prefix mapping."""
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
@@ -655,10 +657,24 @@ class GeneralConfigView(wx.Panel):
         b_sizer.Add(self._beamline_ctrl, 0, wx.EXPAND)
         b_body.SetSizer(b_sizer)
 
+        self._path_section = _Section(self, "Path mapping (Windows → IOC)")
+        p_body = self._path_section.body
+        self._path_local_ctrl = DarkTextCtrl(p_body, placeholder=_PLACEHOLDER_PATH_LOCAL)
+        self._path_local_ctrl.SetMinSize((-1, 28))
+        self._path_remote_ctrl = DarkTextCtrl(p_body, placeholder=_PLACEHOLDER_PATH_REMOTE)
+        self._path_remote_ctrl.SetMinSize((-1, 28))
+        p_sizer = wx.BoxSizer(wx.VERTICAL)
+        p_sizer.Add(_label(p_body, "Local prefix (leave blank to send path as-is)", secondary=True), 0, wx.BOTTOM, 4)
+        p_sizer.Add(self._path_local_ctrl, 0, wx.EXPAND | wx.BOTTOM, 8)
+        p_sizer.Add(_label(p_body, "Remote prefix (IOC path)", secondary=True), 0, wx.BOTTOM, 4)
+        p_sizer.Add(self._path_remote_ctrl, 0, wx.EXPAND)
+        p_body.SetSizer(p_sizer)
+
         self._status_label = _status_label(self)
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(self._beamline_section, 0, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._path_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
         self.SetMinSize((400, -1))
@@ -668,10 +684,18 @@ class GeneralConfigView(wx.Panel):
 
     def load_config(self, config: BeamlineConfig) -> None:
         self._beamline_ctrl.SetValue(config.beamline)
+        self._path_local_ctrl.SetValue(config.path_prefix_local)
+        self._path_remote_ctrl.SetValue(config.path_prefix_remote)
         self.set_status("")
 
     def beamline_name(self) -> str:
         return self._beamline_ctrl.GetValue().strip()
+
+    def path_prefix_local(self) -> str:
+        return self._path_local_ctrl.GetValue().strip()
+
+    def path_prefix_remote(self) -> str:
+        return self._path_remote_ctrl.GetValue().strip()
 
     def set_status(self, text: str, error: bool = False) -> None:
         self._status_label.SetForegroundColour(DANGER if error else FG_SECONDARY)
@@ -1084,7 +1108,7 @@ class _ConfigDialog(wx.Dialog):
 
 class GeneralConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "General configuration", size=(520, 200))
+        super().__init__(parent, "General configuration", size=(520, 340))
 
     def _make_panel(self, viewport: wx.Panel) -> GeneralConfigView:
         return GeneralConfigView(viewport)

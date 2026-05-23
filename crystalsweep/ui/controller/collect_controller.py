@@ -142,6 +142,7 @@ class CollectController:
     def _run(self, points: list[CollectionPoint]) -> None:
         total = len(points)
         config = self._model.beamline.active
+        file_settings = self._model.file_settings
 
         for idx, point in enumerate(points, start=1):
             if self._abort_event.is_set():
@@ -173,11 +174,11 @@ class CollectController:
             )
 
             if point.scan_type == "still":
-                self._run_still(point, idx, total, config)
+                self._run_still(point, idx, total, config, file_settings)
             elif point.scan_type == "wide":
-                self._run_wide(point, idx, total, config)
+                self._run_wide(point, idx, total, config, file_settings)
             elif point.scan_type == "step":
-                self._run_step(point, idx, total, config)
+                self._run_step(point, idx, total, config, file_settings)
             else:
                 _log.info("Scan type %r not yet implemented, skipping point %s", point.scan_type, point.label)
                 wx.CallAfter(
@@ -196,7 +197,7 @@ class CollectController:
             wx.CallAfter(self._view.collect.set_status, "Done", wx.Colour(99, 179, 237))
             wx.CallAfter(self._view.collect.set_collecting, False)
 
-    def _run_still(self, point: CollectionPoint, idx: int, total: int, config) -> None:
+    def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -215,7 +216,7 @@ class CollectController:
             done_event.set()
 
         try:
-            self._engine.run_still(point, config, on_done=on_done, on_error=on_error)
+            self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -232,7 +233,7 @@ class CollectController:
             )
             self._abort_event.set()
 
-    def _run_step(self, point: CollectionPoint, idx: int, total: int, config) -> None:
+    def _run_step(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -272,7 +273,7 @@ class CollectController:
         use_slew = self._view.collection_table.slew_scan
 
         try:
-            self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew)
+            self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew, file_settings=file_settings)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -289,7 +290,7 @@ class CollectController:
             )
             self._abort_event.set()
 
-    def _run_wide(self, point: CollectionPoint, idx: int, total: int, config) -> None:
+    def _run_wide(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -308,7 +309,7 @@ class CollectController:
             done_event.set()
 
         try:
-            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error)
+            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return

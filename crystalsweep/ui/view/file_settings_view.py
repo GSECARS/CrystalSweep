@@ -37,7 +37,9 @@ from crystalsweep.ui.view.custom.widgets import DarkTextCtrl, DarkToggle, IconBu
 
 __all__ = ["FileSettingsView"]
 
-
+_PATH_NO_DIR = wx.Colour(220, 160, 40)
+_PATH_EXISTS = wx.Colour(220, 160, 40)
+_PATH_OK = wx.Colour(46, 139, 78)
 
 
 class FileSettingsView(wx.Panel):
@@ -295,12 +297,15 @@ class FileSettingsView(wx.Panel):
 
     def set_filename(self, value: str) -> None:
         self._filename_ctrl.SetValue(value)
+        self._validate_path()
 
     def set_directory(self, path: Path) -> None:
         self._path_ctrl.SetValue(str(path) if path != Path() else "")
+        self._validate_path()
 
     def set_frame_number(self, value: int) -> None:
         self._frame_ctrl.SetValue(str(value))
+        self._validate_path()
 
     def set_map_ext(self, value: str) -> None:
         self._map_ext_ctrl.SetValue(value)
@@ -354,16 +359,21 @@ class FileSettingsView(wx.Panel):
             self._path_status_label.SetForegroundColour(FG_SECONDARY)
             self._path_status_label.Refresh()
             return
+        try:
+            frame = int(self._frame_ctrl.GetValue().strip())
+        except ValueError:
+            frame = 0
+        framed_name = f"{filename}_{frame:04d}"
         directory = Path(raw_path)
-        full_path = directory / filename
+        display_path = str(directory / framed_name)
         if not directory.exists():
-            self._path_status_label.SetLabel(str(full_path))
+            self._path_status_label.SetLabel(display_path)
             self._path_status_label.SetForegroundColour(_PATH_NO_DIR)
-        elif full_path.exists():
-            self._path_status_label.SetLabel(str(full_path))
+        elif any(directory.glob(f"{framed_name}*")):
+            self._path_status_label.SetLabel(display_path)
             self._path_status_label.SetForegroundColour(_PATH_EXISTS)
         else:
-            self._path_status_label.SetLabel(str(full_path))
+            self._path_status_label.SetLabel(display_path)
             self._path_status_label.SetForegroundColour(_PATH_OK)
         self._path_status_label.Refresh()
 

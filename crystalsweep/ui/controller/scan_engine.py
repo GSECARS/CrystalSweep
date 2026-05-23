@@ -16,6 +16,7 @@
 import logging
 import threading
 import time
+from pathlib import Path
 from typing import Callable
 
 from epics import caget, caput
@@ -23,6 +24,7 @@ from epics import caget, caput
 from crystalsweep.model.beamline_config_model import BeamlineConfig, MotorConfig
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
+from crystalsweep.model.file_settings_model import FileSettingsModel
 from crystalsweep.model.scan_model import ScanSpec, get_driver
 
 __all__ = ["ScanEngine"]
@@ -74,6 +76,7 @@ class ScanEngine:
         config: BeamlineConfig,
         on_done: Callable[[], None],
         on_error: Callable[[Exception], None],
+        file_settings: FileSettingsModel | None = None,
     ) -> None:
         """Move rotation motor to rotation_start and trigger one detector frame."""
         if self.is_running:
@@ -98,13 +101,20 @@ class ScanEngine:
         detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
 
         def _worker() -> None:
+            saved_auto_inc = 1
+            disable_inc = False
             try:
+                if file_settings is not None:
+                    remote_dir, filename, disable_inc = self._resolve_file_info(file_settings, point, config)
+                    saved_auto_inc = detector.set_file_info(remote_dir, filename, disable_inc)
                 detector.collect_still(exposure)
                 on_done()
             except Exception as exc:
                 _log.exception("ScanEngine still-scan error")
                 on_error(exc)
             finally:
+                if disable_inc:
+                    detector.restore_auto_increment(saved_auto_inc)
                 self._driver = None
 
         self._thread = threading.Thread(target=_worker, daemon=True, name="scan-still")
@@ -118,6 +128,7 @@ class ScanEngine:
         on_done: Callable[[], None],
         on_error: Callable[[Exception], None],
         slew: bool = True,
+        file_settings: FileSettingsModel | None = None,
     ) -> None:
         """Execute a step scan: slew trajectory (default) or per-angle EPICS stills."""
         if self.is_running:
@@ -182,7 +193,12 @@ class ScanEngine:
 
         if not slew or controller_type in _EPICS_TYPES:
             def _worker_epics() -> None:
+                saved_auto_inc = 1
+                disable_inc = False
                 try:
+                    if file_settings is not None:
+                        remote_dir, filename, disable_inc = self._resolve_file_info(file_settings, point, config)
+                        saved_auto_inc = detector.set_file_info(remote_dir, filename, disable_inc)
                     driver.prepare(spec)
                     pv_base = rotation_cfg.pv.removesuffix(".VAL")
                     caput(f"{pv_base}.VAL", omega_start, wait=True)
@@ -199,6 +215,8 @@ class ScanEngine:
                     _log.exception("ScanEngine step-epics error")
                     on_error(exc)
                 finally:
+                    if disable_inc:
+                        detector.restore_auto_increment(saved_auto_inc)
                     self._driver = None
 
             self._thread = threading.Thread(target=_worker_epics, daemon=True, name="scan-step-epics")
@@ -208,7 +226,12 @@ class ScanEngine:
             pv_base = rotation_cfg.pv.removesuffix(".VAL")
 
             def _worker_slew() -> None:
+                saved_auto_inc = 1
+                disable_inc = False
                 try:
+                    if file_settings is not None:
+                        remote_dir, filename, disable_inc = self._resolve_file_info(file_settings, point, config)
+                        saved_auto_inc = detector.set_file_info(remote_dir, filename, disable_inc)
                     driver.prepare(spec)
                     caput(f"{pv_base}.VAL", omega_start, wait=True)
                     detector.collect_step(exposure, n_frames)
@@ -240,6 +263,8 @@ class ScanEngine:
                     _log.exception("ScanEngine step-slew error")
                     on_error(exc)
                 finally:
+                    if disable_inc:
+                        detector.restore_auto_increment(saved_auto_inc)
                     self._driver = None
 
             self._thread = threading.Thread(target=_worker_slew, daemon=True, name="scan-step-slew")
@@ -251,6 +276,7 @@ class ScanEngine:
         config: BeamlineConfig,
         on_done: Callable[[], None],
         on_error: Callable[[Exception], None],
+        file_settings: FileSettingsModel | None = None,
     ) -> None:
         """Arm detector for external trigger, run the slew trajectory, wait for readout."""
         if self.is_running:
@@ -309,7 +335,12 @@ class ScanEngine:
         pv_base = rotation_cfg.pv.removesuffix(".VAL")
 
         def _worker() -> None:
+            saved_auto_inc = 1
+            disable_inc = False
             try:
+                if file_settings is not None:
+                    remote_dir, filename, disable_inc = self._resolve_file_info(file_settings, point, config)
+                    saved_auto_inc = detector.set_file_info(remote_dir, filename, disable_inc)
                 driver.prepare(spec)
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
                 detector.collect_wide(exposure)
@@ -322,6 +353,8 @@ class ScanEngine:
                 _log.exception("ScanEngine wide-scan error")
                 on_error(exc)
             finally:
+                if disable_inc:
+                    detector.restore_auto_increment(saved_auto_inc)
                 self._driver = None
 
         self._thread = threading.Thread(target=_worker, daemon=True, name="scan-wide")
@@ -386,6 +419,29 @@ class ScanEngine:
     def abort(self) -> None:
         if self._driver is not None:
             self._driver.abort()
+
+    @staticmethod
+    def _resolve_file_info(
+        file_settings: "FileSettingsModel",
+        point: "CollectionPoint",
+        config: "BeamlineConfig",
+    ) -> tuple[str, str, bool]:
+        """Return (remote_directory, filename, disable_auto_increment) for the given point.
+
+        The directory is translated from the local Windows path to the IOC
+        path using the prefix map stored in *config* (if configured).
+        If either prefix is empty the local path string is used as-is.
+        AutoIncrement is disabled when the collection point has a non-empty label.
+        """
+        local_dir = str(file_settings.directory)
+        remote_dir = config.translate_path(local_dir)
+        label = point.label.strip()
+        disable_auto_increment = bool(label)
+        if file_settings.filename and label:
+            filename = f"{file_settings.filename}_{label}"
+        else:
+            filename = file_settings.filename or label
+        return remote_dir, filename, disable_auto_increment
 
     @staticmethod
     def _find_motor(config: BeamlineConfig, shorthand: str) -> MotorConfig | None:

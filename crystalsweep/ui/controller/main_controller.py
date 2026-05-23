@@ -63,6 +63,7 @@ class MainController:
         self._ad_viewer_controller.resubscribe_detector()
         self._collection_controller.on_config_applied(cfg)
         self._collection_settings_controller.on_config_applied()
+        self._file_settings_controller.sync_from_detector()
 
     def run(self) -> None:
         """Starts the main application loop."""
