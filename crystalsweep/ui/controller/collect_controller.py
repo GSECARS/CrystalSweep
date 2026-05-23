@@ -31,6 +31,7 @@ __all__ = ["CollectController"]
 _log = logging.getLogger(__name__)
 
 _PROGRESS_INTERVAL_MS = 100
+_TRIGGERING_POLL_S = 0.05
 
 
 class CollectController:
@@ -230,6 +231,27 @@ class CollectController:
             wx.CallAfter(self._view.collect.set_progress, total, total, point_fraction=1.0)
             wx.CallAfter(self._view.collect.set_status, "Done", wx.Colour(99, 179, 237))
 
+    def _wait_for_eiger_triggering(self, pv_prefix: str) -> None:
+        prefix = pv_prefix.strip()
+        if not prefix.endswith(":"):
+            prefix += ":"
+        status_pv = f"{prefix}cam1:StatusMessage_RBV"
+        seen_idle = None
+        while not self._abort_event.is_set():
+            try:
+                val = caget(status_pv, as_string=True, timeout=1.0)
+                if isinstance(val, str):
+                    normalised = val.strip().lower()
+                    if seen_idle is None:
+                        seen_idle = normalised == "idle"
+                    if seen_idle and normalised != "idle":
+                        seen_idle = False
+                    if not seen_idle and normalised == "triggering":
+                        return
+            except Exception:
+                pass
+            _time.sleep(_TRIGGERING_POLL_S)
+
     def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
@@ -253,6 +275,10 @@ class CollectController:
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
+
+        det = config.active_detector_config
+        if det is not None and det.type == "eiger":
+            self._wait_for_eiger_triggering(det.pv_prefix)
 
         wx.CallAfter(self._start_point_timer, idx, total, exposure)
         done_event.wait()
@@ -350,6 +376,10 @@ class CollectController:
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
+
+        det = config.active_detector_config
+        if det is not None and det.type == "eiger":
+            self._wait_for_eiger_triggering(det.pv_prefix)
 
         wx.CallAfter(self._start_point_timer, idx, total, exposure)
         done_event.wait()
