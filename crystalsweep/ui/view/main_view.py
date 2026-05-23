@@ -117,6 +117,7 @@ class MainView(wx.Frame):
         self.file_settings.set_enabled(not collecting)
         self.collection_settings.set_enabled(not collecting)
         self.collect.set_collecting(collecting)
+        self.collection_table.set_collecting(collecting)
 
     def bind_load_config(self, callback: Callable[[], None]) -> None:
         self._load_config_cb = callback

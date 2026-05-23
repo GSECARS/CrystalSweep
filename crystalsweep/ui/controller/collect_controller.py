@@ -156,6 +156,7 @@ class CollectController:
         total = len(points)
         config = self._model.beamline.active
         file_settings = self._model.file_settings
+        all_points = self._model.collection.points
 
         rotation_cfg = config.rotation_motor
         original_rotation: float | None = None
@@ -169,6 +170,9 @@ class CollectController:
         for idx, point in enumerate(points, start=1):
             if self._abort_event.is_set():
                 break
+
+            model_index = all_points.index(point) if point in all_points else -1
+            wx.CallAfter(self._view.collection_table.set_active_row, model_index)
 
             wx.CallAfter(
                 self._view.collect.set_status,

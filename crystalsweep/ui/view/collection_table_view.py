@@ -19,7 +19,7 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import BG_CARD, BG_ELEVATED, BG_SURFACE, FG_PRIMARY, FG_SECONDARY, SEP_COLOUR, scaled_font
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BG_SURFACE, FG_PRIMARY, FG_SECONDARY, SEP_COLOUR, scaled_font
 from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, MUTED_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton
 
 __all__ = ["CollectionTableView"]
@@ -175,6 +175,8 @@ class _CollectionRow(wx.Panel):
         self._col_widths = col_widths
         self._selected = point.selected
         self._motor_precisions = motor_precisions
+        self._collecting = False
+        self._active = False
 
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_SIZE, self._on_size)
@@ -234,6 +236,8 @@ class _CollectionRow(wx.Panel):
 
         self._remove_btn_panel = wx.Panel(self, style=wx.BORDER_NONE)
         self._remove_btn_panel.SetBackgroundColour(BG_CARD)
+        self._remove_btn_panel.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self._remove_btn_panel.Bind(wx.EVT_PAINT, self._on_remove_panel_paint)
         self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=DANGER_SCHEME)
         self._remove_btn.SetMinSize((inner_h, inner_h))
         self._remove_btn.SetToolTip("Remove row")
@@ -256,6 +260,34 @@ class _CollectionRow(wx.Panel):
     def set_selected(self, selected: bool) -> None:
         self._selected = selected
         self.Refresh()
+
+    def set_collecting(self, collecting: bool) -> None:
+        self._collecting = collecting
+        disabled = collecting
+        self._label_ctrl.set_disabled(disabled)
+        for ctrl in self._motor_ctrls.values():
+            ctrl.set_disabled(disabled)
+        if self._get_btn is not None:
+            self._get_btn.Enable(not disabled)
+        if self._move_btn is not None:
+            self._move_btn.Enable(not disabled)
+        self._type_combo.Enable(not disabled)
+        scan_type = self.get_scan_type()
+        if disabled:
+            self._rot_start_ctrl.set_disabled(True)
+            self._rot_end_ctrl.set_disabled(True)
+            self._step_ctrl.set_disabled(True)
+            self._time_ctrl.set_disabled(True)
+        else:
+            self._apply_scan_type_state(scan_type)
+            self._time_ctrl.set_disabled(False)
+        self._remove_btn.Enable(not disabled)
+        self.Refresh()
+
+    def set_active(self, active: bool) -> None:
+        self._active = active
+        self.Refresh()
+        self._remove_btn_panel.Refresh()
 
     def refresh_from_point(self, point: "CollectionPoint") -> None:
         if point.scan_type in SCAN_TYPES:
@@ -332,7 +364,30 @@ class _CollectionRow(wx.Panel):
             x += cw
             gc.StrokeLine(x, 0, x, h)
 
+        if self._active:
+            gc.SetPen(wx.Pen(ACCENT, 2))
+            gc.SetBrush(wx.TRANSPARENT_BRUSH)
+            gc.StrokeLine(1, 1, w, 1)
+            gc.StrokeLine(1, h - 2, w, h - 2)
+            gc.StrokeLine(1, 1, 1, h - 2)
+
+    def _on_remove_panel_paint(self, _: wx.PaintEvent) -> None:
+        dc = wx.AutoBufferedPaintDC(self._remove_btn_panel)
+        gc = wx.GraphicsContext.Create(dc)
+        w, h = self._remove_btn_panel.GetClientSize()
+        gc.SetBrush(wx.Brush(self._remove_btn_panel.GetBackgroundColour()))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+        if self._active:
+            gc.SetPen(wx.Pen(ACCENT, 2))
+            gc.SetBrush(wx.TRANSPARENT_BRUSH)
+            gc.StrokeLine(w - 1, 1, w - 1, h - 1)
+            gc.StrokeLine(0, 1, w - 1, 1)
+            gc.StrokeLine(0, h - 2, w - 1, h - 2)
+
     def _on_click(self, event: wx.MouseEvent) -> None:
+        if self._collecting:
+            return
         if self._checkbox_rect().Contains(event.GetPosition()):
             self._selected = not self._selected
             self.Refresh()
@@ -398,9 +453,13 @@ class _HeaderRow(wx.Panel):
         self._col_widths = col_widths
         self._labels = self._build_labels(motor_shorthands, rotation_shorthand)
         self._all_selected = False
+        self._collecting = False
         self._on_select_all = on_select_all
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_LEFT_DOWN, self._on_click)
+
+    def set_collecting(self, collecting: bool) -> None:
+        self._collecting = collecting
 
     def update_col_widths(self, motor_shorthands: list[str], rotation_shorthand: str, col_widths: list[int]) -> None:
         self._col_widths = col_widths
@@ -448,6 +507,8 @@ class _HeaderRow(wx.Panel):
         gc.StrokeLine(0, h - 1, w, h - 1)
 
     def _on_click(self, event: wx.MouseEvent) -> None:
+        if self._collecting:
+            return
         if self._checkbox_rect().Contains(event.GetPosition()):
             self._all_selected = not self._all_selected
             self.Refresh()
@@ -486,6 +547,31 @@ class CollectionTableView(wx.Panel):
         self._build_layout()
         self.SetMinSize((self._min_content_width(), -1))
         self.Bind(wx.EVT_SIZE, self._on_size)
+
+    def set_collecting(self, collecting: bool) -> None:
+        self._delete_selected_btn.Enable(not collecting)
+        self._clear_btn.Enable(not collecting)
+        self._slew_scan_toggle.SetLocked(collecting)
+        self._header.set_collecting(collecting)
+        for row in self._rows:
+            row.set_collecting(collecting)
+        if not collecting:
+            self.set_active_row(None)
+
+    def set_active_row(self, index: int | None) -> None:
+        for i, row in enumerate(self._rows):
+            row.set_active(i == index)
+        if index is not None and 0 <= index < len(self._rows):
+            total = self._viewport.total_height()
+            vh = self._viewport.viewport_height()
+            if total > vh:
+                row_top = index * _ROW_H
+                row_bot = row_top + _ROW_H
+                offset = self._viewport._scroll_offset
+                if row_top < offset:
+                    self._viewport.scroll_to(row_top / max(1, total - vh))
+                elif row_bot > offset + vh:
+                    self._viewport.scroll_to((row_bot - vh) / max(1, total - vh))
 
     @property
     def slew_scan(self) -> bool:
