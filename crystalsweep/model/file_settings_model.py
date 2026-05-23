@@ -38,5 +38,5 @@ class FileSettingsModel:
     apex_calibration: Path | None = field(default=None)
 
     def reset_frame_number(self) -> None:
-        """Reset the frame number to zero."""
-        self.frame_number = 0
+        """Reset the frame number to one."""
+        self.frame_number = 1

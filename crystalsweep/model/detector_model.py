@@ -98,8 +98,8 @@ class DetectorModel(Protocol):
         """
         ...
 
-    def set_file_info(self, directory: str, filename: str, disable_auto_increment: bool = False) -> int:
-        """Write FilePath, FileName, and optionally disable AutoIncrement on the active plugin."""
+    def set_file_info(self, directory: str, filename: str, frame_number: int = 1, disable_auto_increment: bool = False, file_template: str = "") -> int:
+        """Write FilePath, FileName, FileNumber, FileTemplate, and optionally disable AutoIncrement on the active plugin."""
         ...
 
     def restore_auto_increment(self, saved_value: int) -> None:
@@ -147,18 +147,19 @@ class ADEigerModel:
         _log.debug("ADEigerModel fetch_file_info: %s plugin=%s dir=%r name=%r num=%d", p, plugin, directory, filename, file_number)
         return directory, filename, file_number
 
-    def set_file_info(self, directory: str, filename: str, disable_auto_increment: bool = False) -> int:
+    def set_file_info(self, directory: str, filename: str, frame_number: int = 1, disable_auto_increment: bool = False, file_template: str = "") -> int:
         p = self._prefix
         plugin = self._plugin
         caput(f"{p}{plugin}:FilePath", directory, wait=True)
         caput(f"{p}{plugin}:FileName", filename, wait=True)
+        caput(f"{p}{plugin}:FileNumber", frame_number, wait=True)
+        if file_template:
+            caput(f"{p}{plugin}:FileTemplate", file_template, wait=True)
         saved = 1
         if disable_auto_increment:
             saved = int(caget(f"{p}{plugin}:AutoIncrement") or 1)
-            current_file_number = int(caget(f"{p}{plugin}:FileNumber") or 0)
             caput(f"{p}{plugin}:AutoIncrement", 0, wait=True)
-            caput(f"{p}{plugin}:FileNumber", current_file_number, wait=True)
-        _log.debug("ADEigerModel set_file_info: %s plugin=%s dir=%r name=%r auto_inc_disabled=%s", p, plugin, directory, filename, disable_auto_increment)
+        _log.debug("ADEigerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s", p, plugin, directory, filename, frame_number, file_template, disable_auto_increment)
         return saved
 
     def restore_auto_increment(self, saved_value: int) -> None:
@@ -289,18 +290,19 @@ class ADPilatusModel:
         _log.debug("ADPilatusModel fetch_file_info: %s plugin=%s dir=%r name=%r num=%d", p, plugin, directory, filename, file_number)
         return directory, filename, file_number
 
-    def set_file_info(self, directory: str, filename: str, disable_auto_increment: bool = False) -> int:
+    def set_file_info(self, directory: str, filename: str, frame_number: int = 1, disable_auto_increment: bool = False, file_template: str = "") -> int:
         p = self._prefix
         plugin = self._plugin
         caput(f"{p}{plugin}:FilePath", directory, wait=True)
         caput(f"{p}{plugin}:FileName", filename, wait=True)
+        caput(f"{p}{plugin}:FileNumber", frame_number, wait=True)
+        if file_template:
+            caput(f"{p}{plugin}:FileTemplate", file_template, wait=True)
         saved = 1
         if disable_auto_increment:
             saved = int(caget(f"{p}{plugin}:AutoIncrement") or 1)
-            current_file_number = int(caget(f"{p}{plugin}:FileNumber") or 0)
             caput(f"{p}{plugin}:AutoIncrement", 0, wait=True)
-            caput(f"{p}{plugin}:FileNumber", current_file_number, wait=True)
-        _log.debug("ADPilatusModel set_file_info: %s plugin=%s dir=%r name=%r auto_inc_disabled=%s", p, plugin, directory, filename, disable_auto_increment)
+        _log.debug("ADPilatusModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s", p, plugin, directory, filename, frame_number, file_template, disable_auto_increment)
         return saved
 
     def restore_auto_increment(self, saved_value: int) -> None:
@@ -431,18 +433,19 @@ class ADSpinnakerModel:
         _log.debug("ADSpinnakerModel fetch_file_info: %s plugin=%s dir=%r name=%r num=%d", p, plugin, directory, filename, file_number)
         return directory, filename, file_number
 
-    def set_file_info(self, directory: str, filename: str, disable_auto_increment: bool = False) -> int:
+    def set_file_info(self, directory: str, filename: str, frame_number: int = 1, disable_auto_increment: bool = False, file_template: str = "") -> int:
         p = self._prefix
         plugin = self._plugin
         caput(f"{p}{plugin}:FilePath", directory, wait=True)
         caput(f"{p}{plugin}:FileName", filename, wait=True)
+        caput(f"{p}{plugin}:FileNumber", frame_number, wait=True)
+        if file_template:
+            caput(f"{p}{plugin}:FileTemplate", file_template, wait=True)
         saved = 1
         if disable_auto_increment:
             saved = int(caget(f"{p}{plugin}:AutoIncrement") or 1)
-            current_file_number = int(caget(f"{p}{plugin}:FileNumber") or 0)
             caput(f"{p}{plugin}:AutoIncrement", 0, wait=True)
-            caput(f"{p}{plugin}:FileNumber", current_file_number, wait=True)
-        _log.debug("ADSpinnakerModel set_file_info: %s plugin=%s dir=%r name=%r auto_inc_disabled=%s", p, plugin, directory, filename, disable_auto_increment)
+        _log.debug("ADSpinnakerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s", p, plugin, directory, filename, frame_number, file_template, disable_auto_increment)
         return saved
 
     def restore_auto_increment(self, saved_value: int) -> None:

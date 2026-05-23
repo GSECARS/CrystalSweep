@@ -105,6 +105,10 @@ class CollectController:
                 total += exposure
         return total
 
+    def _on_file_number_updated(self, file_number: int) -> None:
+        self._model.file_settings.frame_number = file_number
+        wx.CallAfter(self._view.file_settings.set_frame_number, file_number)
+
     def _on_abort(self) -> None:
         self._abort_event.set()
         self._engine.abort()
@@ -216,7 +220,7 @@ class CollectController:
             done_event.set()
 
         try:
-            self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings)
+            self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -273,7 +277,7 @@ class CollectController:
         use_slew = self._view.collection_table.slew_scan
 
         try:
-            self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew, file_settings=file_settings)
+            self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -309,7 +313,7 @@ class CollectController:
             done_event.set()
 
         try:
-            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings)
+            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return

@@ -56,31 +56,18 @@ class DetectorConfig:
     pv_prefix: str = ""
     type: str = "eiger"
     file_format: str = "hdf5"
-
-    @property
-    def image_pv(self) -> str:
-        """Derive the PVA NTNDArray image PV from the detector prefix."""
-        prefix = self.pv_prefix.strip()
-        if not prefix:
-            return ""
-        if not prefix.endswith(":"):
-            prefix = f"{prefix}:"
-        return f"{prefix}Pva1:Image"
-
-
-@dataclass(frozen=True, slots=True)
-class BeamlineConfig:
-    """In-memory representation of a beamline TOML configuration."""
-
-    name: str = ""
-    beamline: str = ""
-    rotation_motor: MotorConfig | None = None
-    detectors: tuple[DetectorConfig, ...] = field(default_factory=tuple)
-    active_detector: int = -1
-    motors: tuple[MotorConfig, ...] = field(default_factory=tuple)
-    controllers: tuple[ControllerConfig, ...] = field(default_factory=tuple)
+    file_template: str = ""
     path_prefix_local: str = ""
     path_prefix_remote: str = ""
+
+    @property
+    def file_number_width(self) -> int:
+        """Extract the zero-padding width from the file template (e.g. %4.4d → 4). Defaults to 4."""
+        import re
+        m = re.search(r"%(\d+)\.(\d+)d", self.file_template)
+        if m:
+            return int(m.group(2))
+        return 4
 
     def translate_path(self, local_path: str) -> str:
         """Return *local_path* with the local prefix replaced by the remote prefix.
@@ -116,6 +103,29 @@ class BeamlineConfig:
             remainder = norm[len(rem_norm):]
             return loc_norm + remainder
         return remote_path
+
+    @property
+    def image_pv(self) -> str:
+        """Derive the PVA NTNDArray image PV from the detector prefix."""
+        prefix = self.pv_prefix.strip()
+        if not prefix:
+            return ""
+        if not prefix.endswith(":"):
+            prefix = f"{prefix}:"
+        return f"{prefix}Pva1:Image"
+
+
+@dataclass(frozen=True, slots=True)
+class BeamlineConfig:
+    """In-memory representation of a beamline TOML configuration."""
+
+    name: str = ""
+    beamline: str = ""
+    rotation_motor: MotorConfig | None = None
+    detectors: tuple[DetectorConfig, ...] = field(default_factory=tuple)
+    active_detector: int = -1
+    motors: tuple[MotorConfig, ...] = field(default_factory=tuple)
+    controllers: tuple[ControllerConfig, ...] = field(default_factory=tuple)
 
     @property
     def is_empty(self) -> bool:
@@ -205,6 +215,9 @@ class BeamlineConfigModel:
                 pv_prefix=str(entry.get("pv_prefix", "")),
                 type=str(entry.get("type", "eiger")),
                 file_format=str(entry.get("file_format", "hdf5")),
+                file_template=str(entry.get("file_template", "")),
+                path_prefix_local=str(entry.get("path_prefix_local", "")),
+                path_prefix_remote=str(entry.get("path_prefix_remote", "")),
             )
             if entry.get("active") and active_detector == -1:
                 active_detector = len(detectors)
@@ -271,8 +284,6 @@ class BeamlineConfigModel:
             active_detector=active_detector,
             motors=motors,
             controllers=controllers,
-            path_prefix_local=str(data.get("path_prefix_local", "")),
-            path_prefix_remote=str(data.get("path_prefix_remote", "")),
         )
         self._active = cfg
         return cfg
@@ -284,15 +295,13 @@ class BeamlineConfigModel:
 
         payload: dict = {
             "beamline": config.beamline,
-            "path_prefix_local": config.path_prefix_local,
-            "path_prefix_remote": config.path_prefix_remote,
             "rotation_motor": (
                 {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision, "controller": config.rotation_motor.controller, "xps_group": config.rotation_motor.xps_group, "xps_positioner": config.rotation_motor.xps_positioner}
                 if config.rotation_motor is not None
                 else {}
             ),
             "detectors": [
-                {"name": d.name, "pv_prefix": d.pv_prefix, "type": d.type, "file_format": d.file_format, "active": idx == config.active_detector}
+                {"name": d.name, "pv_prefix": d.pv_prefix, "type": d.type, "file_format": d.file_format, "file_template": d.file_template, "path_prefix_local": d.path_prefix_local, "path_prefix_remote": d.path_prefix_remote, "active": idx == config.active_detector}
                 for idx, d in enumerate(config.detectors)
             ],
             "controllers": [

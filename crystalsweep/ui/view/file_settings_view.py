@@ -48,12 +48,14 @@ class FileSettingsView(wx.Panel):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
 
+        self._file_number_width: int = 4
         self._on_filename_changed_cb: Callable[[str], None] | None = None
         self._on_filename_update_cb: Callable[[], None] | None = None
         self._on_directory_changed_cb: Callable[[Path], None] | None = None
         self._on_path_update_cb: Callable[[], None] | None = None
+        self._on_frame_changed_cb: Callable[[int], None] | None = None
         self._on_frame_reset_cb: Callable[[], None] | None = None
-        self._on_frame_update_cb: Callable[[int], None] | None = None
+        self._on_frame_update_cb: Callable[[], None] | None = None
         self._on_map_ext_changed_cb: Callable[[str], None] | None = None
         self._on_hdf5_changed_cb: Callable[[bool], None] | None = None
         self._on_cbf_changed_cb: Callable[[bool], None] | None = None
@@ -109,6 +111,8 @@ class FileSettingsView(wx.Panel):
         self._filename_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_filename_update_cb))
         frame_lbl = self._field_label("Frame #", label_font)
         self._frame_ctrl = DarkTextCtrl(self, value="0", placeholder="0", parent_bg=BG_CARD)
+        self._frame_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_frame_enter)
+        self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_enter)
         self._frame_reset_btn = IconButton(self, draw_refresh, size=16, tooltip="Reset frame number", bg=BG_CARD)
         self._frame_reset_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_reset())
         self._frame_update_btn = IconButton(self, draw_update, size=16, tooltip="Update frame number", bg=BG_CARD)
@@ -265,10 +269,13 @@ class FileSettingsView(wx.Panel):
     def bind_path_update(self, callback: Callable[[], None]) -> None:
         self._on_path_update_cb = callback
 
+    def bind_frame_changed(self, callback: Callable[[int], None]) -> None:
+        self._on_frame_changed_cb = callback
+
     def bind_frame_reset(self, callback: Callable[[], None]) -> None:
         self._on_frame_reset_cb = callback
 
-    def bind_frame_update(self, callback: Callable[[int], None]) -> None:
+    def bind_frame_update(self, callback: Callable[[], None]) -> None:
         self._on_frame_update_cb = callback
 
     def bind_map_ext_changed(self, callback: Callable[[str], None]) -> None:
@@ -294,6 +301,10 @@ class FileSettingsView(wx.Panel):
 
     def bind_apex_calibration(self, callback: Callable[[Path], None]) -> None:
         self._on_apex_calibration_cb = callback
+
+    def set_file_number_width(self, width: int) -> None:
+        self._file_number_width = max(1, width)
+        self._validate_path()
 
     def set_filename(self, value: str) -> None:
         self._filename_ctrl.SetValue(value)
@@ -363,7 +374,7 @@ class FileSettingsView(wx.Panel):
             frame = int(self._frame_ctrl.GetValue().strip())
         except ValueError:
             frame = 0
-        framed_name = f"{filename}_{frame:04d}"
+        framed_name = f"{filename}_{frame:0{self._file_number_width}d}"
         directory = Path(raw_path)
         display_path = str(directory / framed_name)
         if not directory.exists():
@@ -391,18 +402,25 @@ class FileSettingsView(wx.Panel):
         self._validate_path()
         event.Skip()
 
+    def _on_frame_enter(self, event: wx.Event) -> None:
+        try:
+            value = int(self._frame_ctrl.GetValue().strip())
+        except ValueError:
+            event.Skip()
+            return
+        if self._on_frame_changed_cb is not None:
+            self._on_frame_changed_cb(value)
+        self._validate_path()
+        event.Skip()
+
     def _on_frame_reset(self) -> None:
         self._frame_ctrl.SetValue("0")
         if self._on_frame_reset_cb is not None:
             self._on_frame_reset_cb()
 
     def _on_frame_update(self) -> None:
-        try:
-            value = int(self._frame_ctrl.GetValue())
-        except ValueError:
-            return
         if self._on_frame_update_cb is not None:
-            self._on_frame_update_cb(value)
+            self._on_frame_update_cb()
 
     def _on_map_ext_enter(self, event: wx.Event) -> None:
         value = self._map_ext_ctrl.GetValue().strip()

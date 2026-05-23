@@ -64,6 +64,7 @@ class MainController:
         self._collection_controller.on_config_applied(cfg)
         self._collection_settings_controller.on_config_applied()
         self._file_settings_controller.sync_from_detector()
+        self._file_settings_controller.push_to_detector()
 
     def run(self) -> None:
         """Starts the main application loop."""

@@ -40,13 +40,12 @@ _BORDER = wx.Colour(50, 50, 56)
 _PAD = 6
 
 _PLACEHOLDER_BEAMLINE = "e.g. 13-IDD"
-_PLACEHOLDER_PATH_LOCAL = "e.g. T:\\"
-_PLACEHOLDER_PATH_REMOTE = "e.g. /home/dac_user/cars6/Data"
 _PLACEHOLDER_ROTATION_SHORT = "e.g. omega"
 _PLACEHOLDER_ROTATION_DESCRIPTION = "e.g. rotation"
 _PLACEHOLDER_ROTATION_PV = "e.g. 13IDD:m7.VAL"
 _PLACEHOLDER_DETECTOR_NAME = "e.g. Eiger 9M"
 _PLACEHOLDER_DETECTOR_PREFIX = "e.g. 13EIG2_9M:"
+_PLACEHOLDER_FILE_TEMPLATE = "e.g. %s%s_%4.4d.h5"
 _PLACEHOLDER_CONTROLLER_NAME = "e.g. xps1"
 _PLACEHOLDER_MOTOR_SHORT = "e.g. vert"
 _PLACEHOLDER_MOTOR_DESCRIPTION = "e.g. vertical"
@@ -212,6 +211,11 @@ class _TableRow(wx.Panel):
         ctrl.SetSize(x + _PAD, 4, cw - _PAD * 2, _ROW_H - 8)
 
 
+_DET_ROW_H = _ROW_H * 3 + 2
+_PLACEHOLDER_PATH_LOCAL = "e.g. T:\\ (leave blank to send as-is)"
+_PLACEHOLDER_PATH_REMOTE = "e.g. /home/dac_user/cars6/Data"
+
+
 class _DetectorRow(_TableRow):
     _PROPS = [2, 7, 3, 3, 11, 2]
 
@@ -226,6 +230,7 @@ class _DetectorRow(_TableRow):
     ) -> None:
         bg = BG_CARD if index % 2 == 0 else _ROW_ALT
         super().__init__(parent, bg, self._PROPS)
+        self.SetMinSize((-1, _DET_ROW_H))
         self._on_make_active = on_make_active
         self._on_remove = on_remove
 
@@ -241,6 +246,25 @@ class _DetectorRow(_TableRow):
         self.prefix_ctrl = DarkTextCtrl(self, value=detector.pv_prefix, placeholder=_PLACEHOLDER_DETECTOR_PREFIX)
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
         self._remove_btn.set_action(lambda: on_remove(self))
+
+        self._template_lbl = wx.StaticText(self, label="File template")
+        self._template_lbl.SetForegroundColour(FG_SECONDARY)
+        self._template_lbl.SetBackgroundColour(bg)
+        self._template_lbl.SetFont(scaled_font(11))
+        self.template_ctrl = DarkTextCtrl(self, value=detector.file_template, placeholder=_PLACEHOLDER_FILE_TEMPLATE)
+
+        self._path_local_lbl = wx.StaticText(self, label="Local prefix")
+        self._path_local_lbl.SetForegroundColour(FG_SECONDARY)
+        self._path_local_lbl.SetBackgroundColour(bg)
+        self._path_local_lbl.SetFont(scaled_font(11))
+        self.path_local_ctrl = DarkTextCtrl(self, value=detector.path_prefix_local, placeholder=_PLACEHOLDER_PATH_LOCAL)
+
+        self._path_remote_lbl = wx.StaticText(self, label="Remote prefix")
+        self._path_remote_lbl.SetForegroundColour(FG_SECONDARY)
+        self._path_remote_lbl.SetBackgroundColour(bg)
+        self._path_remote_lbl.SetFont(scaled_font(11))
+        self.path_remote_ctrl = DarkTextCtrl(self, value=detector.path_prefix_remote, placeholder=_PLACEHOLDER_PATH_REMOTE)
+
         self._reposition()
 
     def _reposition(self) -> None:
@@ -252,15 +276,45 @@ class _DetectorRow(_TableRow):
         rw, rh = self.active_dot.GetBestSize()
         self.active_dot.SetSize(x + (widths[0] - rw) // 2, (_ROW_H - rh) // 2, rw, rh)
         x += widths[0]
-        self._place(self.name_ctrl, x, widths[1])
+        self._place_row(self.name_ctrl, x, widths[1], 0)
         x += widths[1]
-        self._place(self.type_combo, x, widths[2])
+        self._place_row(self.type_combo, x, widths[2], 0)
         x += widths[2]
-        self._place(self.format_combo, x, widths[3])
+        self._place_row(self.format_combo, x, widths[3], 0)
         x += widths[3]
-        self._place(self.prefix_ctrl, x, widths[4])
+        self._place_row(self.prefix_ctrl, x, widths[4], 0)
         x += widths[4]
-        self._place(self._remove_btn, x, widths[5])
+        self._place_row(self._remove_btn, x, widths[5], 0)
+
+        content_x = widths[0]
+        content_w = w - content_x - widths[5]
+        lbl_w = 80
+        self._template_lbl.SetSize(content_x + _PAD, _ROW_H + 6, lbl_w, _ROW_H - 8)
+        self.template_ctrl.SetSize(content_x + _PAD + lbl_w, _ROW_H + 4, content_w - lbl_w - _PAD, _ROW_H - 8)
+
+        half = content_w // 2
+        self._path_local_lbl.SetSize(content_x + _PAD, _ROW_H * 2 + 6, lbl_w, _ROW_H - 8)
+        self.path_local_ctrl.SetSize(content_x + _PAD + lbl_w, _ROW_H * 2 + 4, half - lbl_w - _PAD, _ROW_H - 8)
+        self._path_remote_lbl.SetSize(content_x + half + _PAD, _ROW_H * 2 + 6, lbl_w, _ROW_H - 8)
+        self.path_remote_ctrl.SetSize(content_x + half + _PAD + lbl_w, _ROW_H * 2 + 4, content_w - half - lbl_w - _PAD * 2, _ROW_H - 8)
+
+    def _place_row(self, ctrl: wx.Window, x: int, cw: int, row: int) -> None:
+        ctrl.SetSize(x + _PAD, row * _ROW_H + 4, cw - _PAD * 2, _ROW_H - 8)
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
+        w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(self.GetBackgroundColour()))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+        gc.SetPen(wx.Pen(_BORDER, 1))
+        gc.StrokeLine(0, h - 1, w, h - 1)
+        widths = self._col_widths(w)
+        x = 0
+        for i, cw in enumerate(widths[:-1]):
+            x += cw
+            gc.StrokeLine(x, 0, x, _ROW_H)
 
     def to_detector(self) -> DetectorConfig:
         det_type = _DET_LABEL_TO_TYPE.get(self.type_combo.GetStringSelection(), _DETECTOR_TYPES[0])
@@ -270,6 +324,9 @@ class _DetectorRow(_TableRow):
             pv_prefix=self.prefix_ctrl.GetValue().strip(),
             type=det_type,
             file_format=file_format,
+            file_template=self.template_ctrl.GetValue().strip(),
+            path_prefix_local=self.path_local_ctrl.GetValue().strip(),
+            path_prefix_remote=self.path_remote_ctrl.GetValue().strip(),
         )
 
     def set_active_visual(self, active: bool) -> None:
@@ -638,7 +695,7 @@ class _DarkScrolledPanel(wx.Panel):
 
 
 class GeneralConfigView(wx.Panel):
-    """General configuration: beamline name and path prefix mapping."""
+    """General configuration: beamline name."""
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
@@ -657,24 +714,10 @@ class GeneralConfigView(wx.Panel):
         b_sizer.Add(self._beamline_ctrl, 0, wx.EXPAND)
         b_body.SetSizer(b_sizer)
 
-        self._path_section = _Section(self, "Path mapping (Windows → IOC)")
-        p_body = self._path_section.body
-        self._path_local_ctrl = DarkTextCtrl(p_body, placeholder=_PLACEHOLDER_PATH_LOCAL)
-        self._path_local_ctrl.SetMinSize((-1, 28))
-        self._path_remote_ctrl = DarkTextCtrl(p_body, placeholder=_PLACEHOLDER_PATH_REMOTE)
-        self._path_remote_ctrl.SetMinSize((-1, 28))
-        p_sizer = wx.BoxSizer(wx.VERTICAL)
-        p_sizer.Add(_label(p_body, "Local prefix (leave blank to send path as-is)", secondary=True), 0, wx.BOTTOM, 4)
-        p_sizer.Add(self._path_local_ctrl, 0, wx.EXPAND | wx.BOTTOM, 8)
-        p_sizer.Add(_label(p_body, "Remote prefix (IOC path)", secondary=True), 0, wx.BOTTOM, 4)
-        p_sizer.Add(self._path_remote_ctrl, 0, wx.EXPAND)
-        p_body.SetSizer(p_sizer)
-
         self._status_label = _status_label(self)
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(self._beamline_section, 0, wx.EXPAND | wx.ALL, 10)
-        outer.Add(self._path_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
         self.SetMinSize((400, -1))
@@ -684,18 +727,10 @@ class GeneralConfigView(wx.Panel):
 
     def load_config(self, config: BeamlineConfig) -> None:
         self._beamline_ctrl.SetValue(config.beamline)
-        self._path_local_ctrl.SetValue(config.path_prefix_local)
-        self._path_remote_ctrl.SetValue(config.path_prefix_remote)
         self.set_status("")
 
     def beamline_name(self) -> str:
         return self._beamline_ctrl.GetValue().strip()
-
-    def path_prefix_local(self) -> str:
-        return self._path_local_ctrl.GetValue().strip()
-
-    def path_prefix_remote(self) -> str:
-        return self._path_remote_ctrl.GetValue().strip()
 
     def set_status(self, text: str, error: bool = False) -> None:
         self._status_label.SetForegroundColour(DANGER if error else FG_SECONDARY)
@@ -723,7 +758,7 @@ class DetectorsConfigView(wx.Panel):
         d_body = self._detectors_section.body
         self._det_header = _TableHeader(d_body, ["", "Name", "Type", "Format", "PV prefix", ""], [2, 7, 3, 3, 11, 2])
         self._detector_rows_panel = _DarkScrolledPanel(d_body)
-        self._detector_rows_panel.SetMinSize((-1, _ROW_H * 3))
+        self._detector_rows_panel.SetMinSize((-1, _DET_ROW_H * 3))
         self._add_detector_btn = FlatButton(d_body, "+ Add detector")
         self._add_detector_btn.SetMinSize((-1, 26))
         self._add_detector_btn.set_action(self._on_add_detector_clicked)
@@ -1108,7 +1143,7 @@ class _ConfigDialog(wx.Dialog):
 
 class GeneralConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "General configuration", size=(520, 340))
+        super().__init__(parent, "General configuration", size=(520, 200))
 
     def _make_panel(self, viewport: wx.Panel) -> GeneralConfigView:
         return GeneralConfigView(viewport)

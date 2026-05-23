@@ -178,8 +178,6 @@ class BeamlineConfigController:
         base = self._model.beamline.active
 
         beamline = self._general_dlg.config_panel.beamline_name() if self._general_dlg else base.beamline
-        path_prefix_local = self._general_dlg.config_panel.path_prefix_local() if self._general_dlg else base.path_prefix_local
-        path_prefix_remote = self._general_dlg.config_panel.path_prefix_remote() if self._general_dlg else base.path_prefix_remote
 
         if self._detectors_dlg:
             detectors, active_detector = self._detectors_dlg.config_panel.collect_detectors()
@@ -202,8 +200,6 @@ class BeamlineConfigController:
             active_detector=active_detector,
             controllers=controllers,
             motors=motors,
-            path_prefix_local=path_prefix_local,
-            path_prefix_remote=path_prefix_remote,
         )
 
     def _save(self, config: BeamlineConfig) -> None:

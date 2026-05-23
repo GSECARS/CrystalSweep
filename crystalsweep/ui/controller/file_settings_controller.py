@@ -41,6 +41,7 @@ class FileSettingsController:
         fs.bind_filename_update(self._on_filename_update)
         fs.bind_directory_changed(self._on_directory_changed)
         fs.bind_path_update(self._on_path_update)
+        fs.bind_frame_changed(self._on_frame_changed)
         fs.bind_frame_reset(self._on_frame_reset)
         fs.bind_frame_update(self._on_frame_update)
         fs.bind_map_ext_changed(self._on_map_ext_changed)
@@ -56,7 +57,53 @@ class FileSettingsController:
         self.sync_from_detector()
 
     def sync_from_detector(self) -> None:
-        """Fetch FilePath, FileName, FileNumber from the active detector plugin in a background thread."""
+        """Fetch FilePath, FileName and FileNumber from the active detector — updates all three fields."""
+        self._push_file_number_width()
+        self._fetch_from_detector(update_directory=True, update_filename=True, update_frame=True)
+
+    def push_to_detector(self) -> None:
+        """Push current file settings (path, filename, frame number, template) to the active detector plugin."""
+        cfg = self._model.beamline.active
+        det = cfg.active_detector_config if cfg else None
+        if det is None or not det.pv_prefix.strip():
+            return
+
+        m = self._model.file_settings
+        detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
+        directory = det.translate_path(str(m.directory))
+        filename = m.filename
+        frame_number = m.frame_number
+        file_template = det.file_template
+
+        def _push() -> None:
+            try:
+                detector.set_file_info(directory, filename, frame_number, False, file_template)
+            except Exception as exc:
+                _log.warning("push_to_detector: failed: %s", exc)
+
+        threading.Thread(target=_push, daemon=True, name="detector-file-push").start()
+
+    def _push_file_number_width(self) -> None:
+        cfg = self._model.beamline.active
+        det = cfg.active_detector_config if cfg else None
+        width = det.file_number_width if det else 4
+        self._view.file_settings.set_file_number_width(width)
+
+    def _on_filename_update(self) -> None:
+        self._fetch_from_detector(update_filename=True)
+
+    def _on_path_update(self) -> None:
+        self._fetch_from_detector(update_directory=True)
+
+    def _on_frame_update(self) -> None:
+        self._fetch_from_detector(update_frame=True)
+
+    def _fetch_from_detector(
+        self,
+        update_directory: bool = False,
+        update_filename: bool = False,
+        update_frame: bool = False,
+    ) -> None:
         cfg = self._model.beamline.active
         det = cfg.active_detector_config if cfg else None
         if det is None or not det.pv_prefix.strip():
@@ -70,25 +117,38 @@ class FileSettingsController:
             except Exception as exc:
                 _log.warning("sync_from_detector: failed to fetch file info: %s", exc)
                 return
-            wx.CallAfter(self._apply_detector_file_info, directory, filename, file_number)
+            wx.CallAfter(self._apply_detector_file_info, directory, filename, file_number,
+                         update_directory, update_filename, update_frame)
 
         threading.Thread(target=_fetch, daemon=True, name="detector-file-sync").start()
 
-    def _apply_detector_file_info(self, directory: str, filename: str, file_number: int) -> None:
+    def _apply_detector_file_info(
+        self,
+        directory: str,
+        filename: str,
+        file_number: int,
+        update_directory: bool,
+        update_filename: bool,
+        update_frame: bool,
+    ) -> None:
         m = self._model.file_settings
         fs = self._view.file_settings
         cfg = self._model.beamline.active
-        if directory:
-            local_dir = cfg.translate_path_reverse(directory) if cfg else directory
+        det = cfg.active_detector_config if cfg else None
+        if update_directory and directory:
+            local_dir = det.translate_path_reverse(directory) if det else directory
             path = Path(local_dir)
             m.directory = path
             fs.set_directory(path)
-        if filename:
+            _log.debug("sync_from_detector: remote_dir=%r local_dir=%r", directory, local_dir)
+        if update_filename and filename:
             m.filename = filename
             fs.set_filename(filename)
-        m.frame_number = file_number
-        fs.set_frame_number(file_number)
-        _log.debug("sync_from_detector: remote_dir=%r local_dir=%r name=%r num=%d", directory, local_dir if directory else "", filename, file_number)
+            _log.debug("sync_from_detector: filename=%r", filename)
+        if update_frame:
+            m.frame_number = file_number
+            fs.set_frame_number(file_number)
+            _log.debug("sync_from_detector: frame_number=%d", file_number)
 
     def _sync_view_from_model(self) -> None:
         m = self._model.file_settings
@@ -107,24 +167,18 @@ class FileSettingsController:
         self._model.file_settings.filename = value
         _log.debug("file_settings.filename = %r", value)
 
-    def _on_filename_update(self) -> None:
-        _log.debug("file_settings: filename update from PV not yet implemented")
-
     def _on_directory_changed(self, path: Path) -> None:
         self._model.file_settings.directory = path
         _log.debug("file_settings.directory = %s", path)
 
-    def _on_path_update(self) -> None:
-        _log.debug("file_settings: path update from PV not yet implemented")
+    def _on_frame_changed(self, value: int) -> None:
+        self._model.file_settings.frame_number = value
+        _log.debug("file_settings.frame_number = %d", value)
 
     def _on_frame_reset(self) -> None:
         self._model.file_settings.reset_frame_number()
-        self._view.file_settings.set_frame_number(0)
-        _log.debug("file_settings.frame_number reset to 0")
-
-    def _on_frame_update(self, value: int) -> None:
-        self._model.file_settings.frame_number = value
-        _log.debug("file_settings.frame_number = %d", value)
+        self._view.file_settings.set_frame_number(1)
+        _log.debug("file_settings.frame_number reset to 1")
 
     def _on_map_ext_changed(self, value: str) -> None:
         self._model.file_settings.map_ext = value

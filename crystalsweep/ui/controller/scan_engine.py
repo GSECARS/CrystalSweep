@@ -77,6 +77,7 @@ class ScanEngine:
         on_done: Callable[[], None],
         on_error: Callable[[Exception], None],
         file_settings: FileSettingsModel | None = None,
+        on_file_number_updated: Callable[[int], None] | None = None,
     ) -> None:
         """Move rotation motor to rotation_start and trigger one detector frame."""
         if self.is_running:
@@ -105,8 +106,8 @@ class ScanEngine:
             disable_inc = False
             try:
                 if file_settings is not None:
-                    remote_dir, filename, disable_inc = self._resolve_file_info(file_settings, point, config)
-                    saved_auto_inc = detector.set_file_info(remote_dir, filename, disable_inc)
+                    remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
+                    saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                 detector.collect_still(exposure)
                 on_done()
             except Exception as exc:
@@ -115,6 +116,12 @@ class ScanEngine:
             finally:
                 if disable_inc:
                     detector.restore_auto_increment(saved_auto_inc)
+                if on_file_number_updated is not None:
+                    try:
+                        _, _, file_number = detector.fetch_file_info()
+                        on_file_number_updated(file_number)
+                    except Exception:
+                        pass
                 self._driver = None
 
         self._thread = threading.Thread(target=_worker, daemon=True, name="scan-still")
@@ -129,6 +136,7 @@ class ScanEngine:
         on_error: Callable[[Exception], None],
         slew: bool = True,
         file_settings: FileSettingsModel | None = None,
+        on_file_number_updated: Callable[[int], None] | None = None,
     ) -> None:
         """Execute a step scan: slew trajectory (default) or per-angle EPICS stills."""
         if self.is_running:
@@ -197,8 +205,8 @@ class ScanEngine:
                 disable_inc = False
                 try:
                     if file_settings is not None:
-                        remote_dir, filename, disable_inc = self._resolve_file_info(file_settings, point, config)
-                        saved_auto_inc = detector.set_file_info(remote_dir, filename, disable_inc)
+                        remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
+                        saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                     driver.prepare(spec)
                     pv_base = rotation_cfg.pv.removesuffix(".VAL")
                     caput(f"{pv_base}.VAL", omega_start, wait=True)
@@ -217,6 +225,12 @@ class ScanEngine:
                 finally:
                     if disable_inc:
                         detector.restore_auto_increment(saved_auto_inc)
+                    if on_file_number_updated is not None:
+                        try:
+                            _, _, file_number = detector.fetch_file_info()
+                            on_file_number_updated(file_number)
+                        except Exception:
+                            pass
                     self._driver = None
 
             self._thread = threading.Thread(target=_worker_epics, daemon=True, name="scan-step-epics")
@@ -230,8 +244,8 @@ class ScanEngine:
                 disable_inc = False
                 try:
                     if file_settings is not None:
-                        remote_dir, filename, disable_inc = self._resolve_file_info(file_settings, point, config)
-                        saved_auto_inc = detector.set_file_info(remote_dir, filename, disable_inc)
+                        remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
+                        saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                     driver.prepare(spec)
                     caput(f"{pv_base}.VAL", omega_start, wait=True)
                     detector.collect_step(exposure, n_frames)
@@ -265,6 +279,12 @@ class ScanEngine:
                 finally:
                     if disable_inc:
                         detector.restore_auto_increment(saved_auto_inc)
+                    if on_file_number_updated is not None:
+                        try:
+                            _, _, file_number = detector.fetch_file_info()
+                            on_file_number_updated(file_number)
+                        except Exception:
+                            pass
                     self._driver = None
 
             self._thread = threading.Thread(target=_worker_slew, daemon=True, name="scan-step-slew")
@@ -277,6 +297,7 @@ class ScanEngine:
         on_done: Callable[[], None],
         on_error: Callable[[Exception], None],
         file_settings: FileSettingsModel | None = None,
+        on_file_number_updated: Callable[[int], None] | None = None,
     ) -> None:
         """Arm detector for external trigger, run the slew trajectory, wait for readout."""
         if self.is_running:
@@ -339,8 +360,8 @@ class ScanEngine:
             disable_inc = False
             try:
                 if file_settings is not None:
-                    remote_dir, filename, disable_inc = self._resolve_file_info(file_settings, point, config)
-                    saved_auto_inc = detector.set_file_info(remote_dir, filename, disable_inc)
+                    remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
+                    saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                 driver.prepare(spec)
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
                 detector.collect_wide(exposure)
@@ -355,6 +376,12 @@ class ScanEngine:
             finally:
                 if disable_inc:
                     detector.restore_auto_increment(saved_auto_inc)
+                if on_file_number_updated is not None:
+                    try:
+                        _, _, file_number = detector.fetch_file_info()
+                        on_file_number_updated(file_number)
+                    except Exception:
+                        pass
                 self._driver = None
 
         self._thread = threading.Thread(target=_worker, daemon=True, name="scan-wide")
@@ -425,8 +452,8 @@ class ScanEngine:
         file_settings: "FileSettingsModel",
         point: "CollectionPoint",
         config: "BeamlineConfig",
-    ) -> tuple[str, str, bool]:
-        """Return (remote_directory, filename, disable_auto_increment) for the given point.
+    ) -> tuple[str, str, int, bool, str]:
+        """Return (remote_directory, filename, frame_number, disable_auto_increment, file_template) for the given point.
 
         The directory is translated from the local Windows path to the IOC
         path using the prefix map stored in *config* (if configured).
@@ -434,14 +461,16 @@ class ScanEngine:
         AutoIncrement is disabled when the collection point has a non-empty label.
         """
         local_dir = str(file_settings.directory)
-        remote_dir = config.translate_path(local_dir)
+        det = config.active_detector_config
+        remote_dir = det.translate_path(local_dir) if det else local_dir
         label = point.label.strip()
         disable_auto_increment = bool(label)
         if file_settings.filename and label:
             filename = f"{file_settings.filename}_{label}"
         else:
             filename = file_settings.filename or label
-        return remote_dir, filename, disable_auto_increment
+        file_template = det.file_template if det else ""
+        return remote_dir, filename, file_settings.frame_number, disable_auto_increment, file_template
 
     @staticmethod
     def _find_motor(config: BeamlineConfig, shorthand: str) -> MotorConfig | None:
