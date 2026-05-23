@@ -60,6 +60,17 @@ class CollectionSettingsController:
 
         self._sync_rotation_shorthand()
         self._sync_map_motors()
+        self._sync_view_from_model()
+
+    def _sync_view_from_model(self) -> None:
+        cs = self._model.collection_settings
+        v = self._view.collection_settings
+        v.set_scan_type(cs.scan_type)
+        v.set_exposure(cs.exposure)
+        v.set_rotation_start(cs.rotation_start)
+        v.set_rotation_end(cs.rotation_end)
+        v.set_rotation_range(cs.rotation_range)
+        v.set_step_size(cs.step_size)
 
     def add_points_changed_listener(self, callback) -> None:
         self._on_points_changed.append(callback)
@@ -78,6 +89,8 @@ class CollectionSettingsController:
         shorthand = rm.shorthand if rm else ""
         self._model.collection_settings.rotation_shorthand = shorthand
         self._view.collection_settings.set_rotation_shorthand(shorthand)
+        beam_angle = rm.beam_angle if rm else 0.0
+        self._model.collection_settings.beam_angle = beam_angle
 
     def _sync_map_motors(self) -> None:
         cfg = self._model.beamline.active
@@ -100,7 +113,34 @@ class CollectionSettingsController:
 
     def _on_scan_type_changed(self, scan_type: ScanType) -> None:
         self._model.collection_settings.scan_type = scan_type
+        self._apply_type_defaults(scan_type)
         _log.debug("collection_settings.scan_type = %s", scan_type)
+
+    def _apply_type_defaults(self, scan_type: ScanType) -> None:
+        cs = self._model.collection_settings
+        if scan_type == "still":
+            cs.exposure = 1.0
+            self._view.collection_settings.set_exposure(1.0)
+        elif scan_type == "wide":
+            cs.exposure = 20.0
+            cs.rotation_range = 20.0
+            cs.rotation_start = -10.0
+            cs.rotation_end = 10.0
+            self._view.collection_settings.set_exposure(20.0)
+            self._view.collection_settings.set_rotation_range(20.0)
+            self._view.collection_settings.set_rotation_start(-10.0)
+            self._view.collection_settings.set_rotation_end(10.0)
+        elif scan_type == "step":
+            cs.exposure = 1.0
+            cs.rotation_range = 70.0
+            cs.rotation_start = -35.0
+            cs.rotation_end = 35.0
+            cs.step_size = 0.5
+            self._view.collection_settings.set_exposure(1.0)
+            self._view.collection_settings.set_rotation_range(70.0)
+            self._view.collection_settings.set_rotation_start(-35.0)
+            self._view.collection_settings.set_rotation_end(35.0)
+            self._view.collection_settings.set_step_size(0.5)
 
     def _on_exposure_changed(self, value: float) -> None:
         self._model.collection_settings.exposure = value
@@ -155,16 +195,30 @@ class CollectionSettingsController:
         _log.debug("collection_settings.map2_points = %d", value)
 
     def _on_rotation_start_changed(self, value: float) -> None:
-        self._model.collection_settings.rotation_start = value
-        _log.debug("collection_settings.rotation_start = %s", value)
+        cs = self._model.collection_settings
+        cs.rotation_start = value
+        new_range = abs(cs.rotation_end - value)
+        cs.rotation_range = new_range
+        self._view.collection_settings.set_rotation_range(new_range)
+        _log.debug("collection_settings.rotation_start = %s  range = %s", value, new_range)
 
     def _on_rotation_end_changed(self, value: float) -> None:
-        self._model.collection_settings.rotation_end = value
-        _log.debug("collection_settings.rotation_end = %s", value)
+        cs = self._model.collection_settings
+        cs.rotation_end = value
+        new_range = abs(value - cs.rotation_start)
+        cs.rotation_range = new_range
+        self._view.collection_settings.set_rotation_range(new_range)
+        _log.debug("collection_settings.rotation_end = %s  range = %s", value, new_range)
 
     def _on_rotation_range_changed(self, value: float) -> None:
-        self._model.collection_settings.rotation_range = value
-        _log.debug("collection_settings.rotation_range = %s", value)
+        cs = self._model.collection_settings
+        cs.rotation_range = value
+        half = value / 2.0
+        cs.rotation_start = -half
+        cs.rotation_end = half
+        self._view.collection_settings.set_rotation_start(-half)
+        self._view.collection_settings.set_rotation_end(half)
+        _log.debug("collection_settings.rotation_range = %s  start = %s  end = %s", value, -half, half)
 
     def _on_step_size_changed(self, value: float) -> None:
         self._model.collection_settings.step_size = value
@@ -182,8 +236,8 @@ class CollectionSettingsController:
         point.scan_type = cs.scan_type
         point.time = str(cs.exposure)
         if cs.scan_type in ("wide", "step"):
-            point.rotation_start = str(cs.rotation_start)
-            point.rotation_end = str(cs.rotation_end)
+            point.rotation_start = str(cs.rotation_start + cs.beam_angle)
+            point.rotation_end = str(cs.rotation_end + cs.beam_angle)
         if cs.scan_type == "step":
             point.step = str(cs.step_size)
         for motor in motors:
@@ -235,8 +289,8 @@ class CollectionSettingsController:
                 point.scan_type = cs.scan_type
                 point.time = str(cs.exposure)
                 if cs.scan_type in ("wide", "step"):
-                    point.rotation_start = str(cs.rotation_start)
-                    point.rotation_end = str(cs.rotation_end)
+                    point.rotation_start = str(cs.rotation_start + cs.beam_angle)
+                    point.rotation_end = str(cs.rotation_end + cs.beam_angle)
                 if cs.scan_type == "step":
                     point.step = str(cs.step_size)
                 for motor in motors:
@@ -263,8 +317,8 @@ class CollectionSettingsController:
             self._model.collection.update_scan_type(index, cs.scan_type)
             self._model.collection.update_time(index, str(cs.exposure))
             if cs.scan_type in ("wide", "step"):
-                self._model.collection.update_rotation_start(index, str(cs.rotation_start))
-                self._model.collection.update_rotation_end(index, str(cs.rotation_end))
+                self._model.collection.update_rotation_start(index, str(cs.rotation_start + cs.beam_angle))
+                self._model.collection.update_rotation_end(index, str(cs.rotation_end + cs.beam_angle))
             else:
                 self._model.collection.update_rotation_start(index, "")
                 self._model.collection.update_rotation_end(index, "")

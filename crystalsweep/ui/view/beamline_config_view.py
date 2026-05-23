@@ -424,7 +424,7 @@ class _ControllerRow(_TableRow):
 
 
 class _RotationRow(_TableRow):
-    _PROPS = [3, 6, 10, 2, 7]
+    _PROPS = [3, 6, 10, 2, 3, 7]
 
     def __init__(self, parent: wx.Window, motor: MotorConfig | None) -> None:
         super().__init__(parent, BG_CARD, self._PROPS)
@@ -435,6 +435,7 @@ class _RotationRow(_TableRow):
         self.description_ctrl = DarkTextCtrl(self, value=rm.description if rm else "", placeholder=_PLACEHOLDER_ROTATION_DESCRIPTION)
         self.pv_ctrl = DarkTextCtrl(self, value=rm.pv if rm else "", placeholder=_PLACEHOLDER_ROTATION_PV)
         self.precision_ctrl = DarkTextCtrl(self, value=str(rm.precision) if rm else "4", placeholder=_PLACEHOLDER_MOTOR_PRECISION)
+        self.beam_angle_ctrl = DarkTextCtrl(self, value=str(rm.beam_angle) if rm else "0.0", placeholder="0.0")
         self.controller_combo = DarkCombo(self, choices=["epics"], selection=0)
         self.controller_combo.Bind(wx.EVT_CHOICE, lambda _e: self._on_controller_changed())
 
@@ -457,13 +458,13 @@ class _RotationRow(_TableRow):
         widths = self._col_widths(w)
         x = 0
         for ctrl, cw in zip(
-            (self.short_ctrl, self.description_ctrl, self.pv_ctrl, self.precision_ctrl),
-            widths[:4],
+            (self.short_ctrl, self.description_ctrl, self.pv_ctrl, self.precision_ctrl, self.beam_angle_ctrl),
+            widths[:5],
         ):
             self._place(ctrl, x, cw)
             x += cw
         xps = self._is_xps()
-        ctrl_w = widths[4]
+        ctrl_w = widths[5]
         if xps:
             third = ctrl_w // 3
             self._place(self.controller_combo, x, third)
@@ -953,7 +954,7 @@ class PositionersConfigView(wx.Panel):
     def _build_layout(self) -> None:
         self._rotation_section = _Section(self, "Rotation Stage")
         r_body = self._rotation_section.body
-        self._rot_header = _TableHeader(r_body, ["Short", "Description", "PV", "Prec", "Controller"], [3, 6, 10, 2, 7])
+        self._rot_header = _TableHeader(r_body, ["Short", "Description", "PV", "Prec", "Beam °", "Controller"], [3, 6, 10, 2, 3, 7])
         self._rotation_row = _RotationRow(r_body, None)
         r_sizer = wx.BoxSizer(wx.VERTICAL)
         r_sizer.Add(self._rot_header, 0, wx.EXPAND)
@@ -1000,6 +1001,7 @@ class PositionersConfigView(wx.Panel):
         self._rotation_row.description_ctrl.SetValue(rm.description if rm else "")
         self._rotation_row.pv_ctrl.SetValue(rm.pv if rm else "")
         self._rotation_row.precision_ctrl.SetValue(str(rm.precision) if rm else "4")
+        self._rotation_row.beam_angle_ctrl.SetValue(str(rm.beam_angle) if rm else "0.0")
         self._refresh_rotation_controller_choices(selected=rm.controller if rm else "epics")
 
         self._clear_motor_rows()
@@ -1015,6 +1017,10 @@ class PositionersConfigView(wx.Panel):
             rot_precision = max(0, int(self._rotation_row.precision_ctrl.GetValue().strip()))
         except ValueError:
             rot_precision = 4
+        try:
+            beam_angle = float(self._rotation_row.beam_angle_ctrl.GetValue().strip())
+        except ValueError:
+            beam_angle = 0.0
         if not rot_pv:
             return None
         is_xps = self._rotation_row._is_xps()
@@ -1026,6 +1032,7 @@ class PositionersConfigView(wx.Panel):
             controller=self._rotation_row.controller_combo.GetStringSelection() or "epics",
             xps_group=self._rotation_row.xps_group_ctrl.GetValue().strip() if is_xps else "",
             xps_positioner=self._rotation_row.xps_positioner_ctrl.GetValue().strip() if is_xps else "",
+            beam_angle=beam_angle,
         )
 
     def collect_motors(self) -> tuple[MotorConfig, ...]:

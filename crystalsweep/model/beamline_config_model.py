@@ -46,6 +46,7 @@ class MotorConfig:
     controller: str = "epics"
     xps_group: str = ""
     xps_positioner: str = ""
+    beam_angle: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -274,6 +275,7 @@ class BeamlineConfigModel:
                 controller=str(rm_data.get("controller", "epics")),
                 xps_group=str(rm_data.get("xps_group", "")),
                 xps_positioner=str(rm_data.get("xps_positioner", "")),
+                beam_angle=float(rm_data.get("beam_angle", 0.0)),
             )
 
         cfg = BeamlineConfig(
@@ -296,7 +298,7 @@ class BeamlineConfigModel:
         payload: dict = {
             "beamline": config.beamline,
             "rotation_motor": (
-                {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision, "controller": config.rotation_motor.controller, "xps_group": config.rotation_motor.xps_group, "xps_positioner": config.rotation_motor.xps_positioner}
+                {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision, "controller": config.rotation_motor.controller, "xps_group": config.rotation_motor.xps_group, "xps_positioner": config.rotation_motor.xps_positioner, "beam_angle": config.rotation_motor.beam_angle}
                 if config.rotation_motor is not None
                 else {}
             ),
