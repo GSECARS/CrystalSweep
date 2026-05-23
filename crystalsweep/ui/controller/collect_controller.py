@@ -227,6 +227,8 @@ class CollectController:
 
         wx.CallAfter(self._start_point_timer, idx, total, exposure)
         done_event.wait()
+        if self._engine._thread is not None:
+            self._engine._thread.join()
         wx.CallAfter(self._stop_point_timer, idx, total)
 
         if error_holder:
@@ -284,6 +286,8 @@ class CollectController:
 
         wx.CallAfter(self._view.collect.set_progress, idx, total, 0, n_frames)
         done_event.wait()
+        if self._engine._thread is not None:
+            self._engine._thread.join()
         wx.CallAfter(self._view.collect.set_progress, idx, total, n_frames, n_frames)
 
         if error_holder:
@@ -320,6 +324,8 @@ class CollectController:
 
         wx.CallAfter(self._start_point_timer, idx, total, exposure)
         done_event.wait()
+        if self._engine._thread is not None:
+            self._engine._thread.join()
         wx.CallAfter(self._stop_point_timer, idx, total)
 
         if error_holder:
