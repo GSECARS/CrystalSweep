@@ -297,27 +297,15 @@ class CollectionSettingsView(wx.Panel):
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.AddSpacer(2)
 
-        outer.Add(self._make_row_type(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.Add(self._make_row_all(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
         outer.AddSpacer(4)
 
-        outer.Add(self._make_row_rotation(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
-        outer.AddSpacer(4)
-
-        outer.Add(self._make_row_step(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
-        outer.AddSpacer(4)
-
-        outer.Add(self._make_map_table(), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.Add(self._make_map_table(), 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
         self._map_table.Hide()
-        outer.AddSpacer(4)
 
-        outer.Add(self._make_map_presets(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        outer.Add(self._make_map_presets(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP | wx.BOTTOM, 10)
         self._map_presets_panel.Hide()
         outer.AddSpacer(8)
-
-        sep_bot = wx.Panel(self, size=(-1, 1))
-        sep_bot.SetBackgroundColour(SEP_COLOUR)
-        outer.Add(sep_bot, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 6)
-        outer.AddSpacer(6)
 
         btn_row = wx.BoxSizer(wx.HORIZONTAL)
         self._add_btn = FlatButton(self, "+ Add point")
@@ -340,10 +328,10 @@ class CollectionSettingsView(wx.Panel):
         lbl.SetBackgroundColour(BG_CARD)
         return lbl
 
-    def _make_row_type(self, label_font: wx.Font) -> wx.Sizer:
+    def _make_row_all(self, label_font: wx.Font) -> wx.Sizer:
         row = wx.BoxSizer(wx.HORIZONTAL)
-        lbl = self._field_label("Type", label_font)
-        lbl.SetMinSize((70, -1))
+
+        type_lbl = self._field_label("Type", label_font)
         self._type_combo = DarkCombo(
             self,
             choices=list(SCAN_TYPES),
@@ -351,67 +339,68 @@ class CollectionSettingsView(wx.Panel):
             choice_colours=_TYPE_COLOURS,
         )
         self._type_combo.Bind(wx.EVT_CHOICE, self._on_type_choice)
+        row.Add(type_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(6)
+        row.Add(self._type_combo, 2, wx.EXPAND)
+        row.AddSpacer(8)
+
         exp_lbl = self._field_label("Exp. (s)", label_font)
         self._exposure_ctrl = DarkTextCtrl(self, value="1.0", parent_bg=BG_CARD)
         self._exposure_ctrl.set_restrict_to_float(True)
         self._exposure_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_exposure_enter)
         self._exposure_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_exposure_enter)
-        row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
-        row.AddSpacer(6)
-        row.Add(self._type_combo, 1, wx.EXPAND)
-        row.AddSpacer(10)
-        self._map_toggle = DarkToggle(self, "Map")
-        self._map_toggle.SetBackgroundColour(BG_CARD)
-        self._map_toggle.Bind(wx.EVT_CHECKBOX, self._on_map_toggle_changed)
         row.Add(exp_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
-        row.AddSpacer(6)
-        row.Add(self._exposure_ctrl, 1, wx.EXPAND)
+        row.AddSpacer(4)
+        row.Add(self._exposure_ctrl, 2, wx.EXPAND)
         row.AddSpacer(8)
-        row.Add(self._map_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
-        return row
 
-    def _make_row_rotation(self, label_font: wx.Font) -> wx.Sizer:
-        self._rotation_row = wx.BoxSizer(wx.HORIZONTAL)
         self._rot_start_lbl = self._field_label("Start", label_font)
         self._rot_start_ctrl = DarkTextCtrl(self, value="0.0", parent_bg=BG_CARD)
         self._rot_start_ctrl.set_restrict_to_float(True)
         self._rot_start_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_start_enter)
         self._rot_start_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_start_enter)
+        row.Add(self._rot_start_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(4)
+        row.Add(self._rot_start_ctrl, 2, wx.EXPAND)
+        row.AddSpacer(8)
+
         self._rot_end_lbl = self._field_label("End", label_font)
         self._rot_end_ctrl = DarkTextCtrl(self, value="180.0", parent_bg=BG_CARD)
         self._rot_end_ctrl.set_restrict_to_float(True)
         self._rot_end_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_end_enter)
         self._rot_end_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_end_enter)
+        row.Add(self._rot_end_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(4)
+        row.Add(self._rot_end_ctrl, 2, wx.EXPAND)
+        row.AddSpacer(8)
+
         self._rot_range_lbl = self._field_label("Range", label_font)
         self._rot_range_ctrl = DarkTextCtrl(self, value="180.0", parent_bg=BG_CARD)
         self._rot_range_ctrl.set_restrict_to_float(True)
         self._rot_range_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_range_enter)
         self._rot_range_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_range_enter)
-        self._rotation_row.Add(self._rot_start_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
-        self._rotation_row.AddSpacer(4)
-        self._rotation_row.Add(self._rot_start_ctrl, 1, wx.EXPAND)
-        self._rotation_row.AddSpacer(6)
-        self._rotation_row.Add(self._rot_end_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
-        self._rotation_row.AddSpacer(4)
-        self._rotation_row.Add(self._rot_end_ctrl, 1, wx.EXPAND)
-        self._rotation_row.AddSpacer(6)
-        self._rotation_row.Add(self._rot_range_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
-        self._rotation_row.AddSpacer(4)
-        self._rotation_row.Add(self._rot_range_ctrl, 1, wx.EXPAND)
-        return self._rotation_row
+        row.Add(self._rot_range_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(4)
+        row.Add(self._rot_range_ctrl, 2, wx.EXPAND)
+        row.AddSpacer(8)
 
-    def _make_row_step(self, label_font: wx.Font) -> wx.Sizer:
-        self._step_row = wx.BoxSizer(wx.HORIZONTAL)
-        lbl = self._field_label("Step (°)", label_font)
-        lbl.SetMinSize((70, -1))
+        self._step_lbl = self._field_label("Step (°)", label_font)
         self._step_ctrl = DarkTextCtrl(self, value="1.0", parent_bg=BG_CARD)
         self._step_ctrl.set_restrict_to_float(True)
         self._step_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_step_enter)
         self._step_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_step_enter)
-        self._step_row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
-        self._step_row.AddSpacer(6)
-        self._step_row.Add(self._step_ctrl, 1, wx.EXPAND)
-        return self._step_row
+        row.Add(self._step_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(4)
+        row.Add(self._step_ctrl, 2, wx.EXPAND)
+        row.AddSpacer(8)
+
+        self._map_toggle = DarkToggle(self, "Map")
+        self._map_toggle.SetBackgroundColour(BG_CARD)
+        self._map_toggle.Bind(wx.EVT_CHECKBOX, self._on_map_toggle_changed)
+        row.Add(self._map_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        self._scan_row = row
+        return row
 
     def _make_map_presets(self, label_font: wx.Font) -> wx.Window:
         self._map_presets_panel = wx.Panel(self)
@@ -484,15 +473,13 @@ class CollectionSettingsView(wx.Panel):
         show_rotation = scan_type in ("wide", "step")
         show_step = scan_type == "step"
 
-        for item in self._rotation_row.GetChildren():
-            w = item.GetWindow()
-            if w:
-                w.Show(show_rotation)
+        for w in (self._rot_start_lbl, self._rot_start_ctrl,
+                  self._rot_end_lbl, self._rot_end_ctrl,
+                  self._rot_range_lbl, self._rot_range_ctrl):
+            w.Show(show_rotation)
 
-        for item in self._step_row.GetChildren():
-            w = item.GetWindow()
-            if w:
-                w.Show(show_step)
+        self._step_lbl.Show(show_step)
+        self._step_ctrl.Show(show_step)
 
         self._update_rotation_labels(scan_type)
         self._refresh_map_row()
