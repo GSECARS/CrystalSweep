@@ -326,9 +326,23 @@ class CollectController:
         sorted_rows = [rows[r] for r in sorted(rows.keys())]
         n_rows = len(sorted_rows)
 
-        motor2_cfg = None
-        if motor2:
-            motor2_cfg = next((m for m in config.motors if m.shorthand == motor2), None)
+        motor1_cfg = next((m for m in config.motors if m.shorthand == motor1), None) if motor1 else None
+        motor2_cfg = next((m for m in config.motors if m.shorthand == motor2), None) if motor2 else None
+
+        original_motor1: float | None = None
+        original_motor2: float | None = None
+        if motor1_cfg is not None:
+            try:
+                raw = caget(motor1_cfg.pv)
+                original_motor1 = float(raw) if raw is not None else None
+            except Exception:
+                pass
+        if motor2_cfg is not None:
+            try:
+                raw = caget(motor2_cfg.pv)
+                original_motor2 = float(raw) if raw is not None else None
+            except Exception:
+                pass
 
         for row_num, row in enumerate(sorted_rows):
             if self._abort_event.is_set():
@@ -367,14 +381,12 @@ class CollectController:
                     col_model_index = all_points.index(col_pt) if col_pt in all_points else -1
                     wx.CallAfter(self._view.collection_table.set_active_row, col_model_index)
 
-                    if motor1:
-                        motor1_cfg = next((m for m in config.motors if m.shorthand == motor1), None)
-                        if motor1_cfg is not None:
-                            try:
-                                pos1 = float(col_pt.motor_positions.get(motor1, "0") or "0")
-                                caput(motor1_cfg.pv, pos1, wait=True)
-                            except Exception as exc:
-                                _log.warning("Failed to move map motor1 %s: %s", motor1, exc)
+                    if motor1_cfg is not None:
+                        try:
+                            pos1 = float(col_pt.motor_positions.get(motor1, "0") or "0")
+                            caput(motor1_cfg.pv, pos1, wait=True)
+                        except Exception as exc:
+                            _log.warning("Failed to move map motor1 %s: %s", motor1, exc)
 
                     wx.CallAfter(
                         self._view.collect.set_status,
@@ -392,6 +404,19 @@ class CollectController:
                     elif scan_type == "step":
                         self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     map_completed_weight += pt_weight
+
+        if original_motor1 is not None and motor1_cfg is not None:
+            try:
+                caput(motor1_cfg.pv, original_motor1, wait=True)
+                _log.debug("Restored map motor1 %s to %.4f", motor1, original_motor1)
+            except Exception as exc:
+                _log.warning("Failed to restore map motor1 %s: %s", motor1, exc)
+        if original_motor2 is not None and motor2_cfg is not None:
+            try:
+                caput(motor2_cfg.pv, original_motor2, wait=True)
+                _log.debug("Restored map motor2 %s to %.4f", motor2, original_motor2)
+            except Exception as exc:
+                _log.warning("Failed to restore map motor2 %s: %s", motor2, exc)
 
     def _run_map_row_trajectory(
         self,
