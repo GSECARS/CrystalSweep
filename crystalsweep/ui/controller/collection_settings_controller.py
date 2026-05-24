@@ -56,6 +56,7 @@ class CollectionSettingsController:
         cs.bind_rotation_end_changed(self._on_rotation_end_changed)
         cs.bind_rotation_range_changed(self._on_rotation_range_changed)
         cs.bind_step_size_changed(self._on_step_size_changed)
+        cs.bind_wide_flip_changed(self._on_wide_flip_changed)
         cs.bind_add_point(self._on_add_point)
         cs.bind_update_selected(self._on_update_selected)
 
@@ -72,6 +73,7 @@ class CollectionSettingsController:
         v.set_rotation_end(cs.rotation_end)
         v.set_rotation_range(cs.rotation_range)
         v.set_step_size(cs.step_size)
+        v.set_wide_flip(cs.wide_flip)
 
     def add_points_changed_listener(self, callback) -> None:
         self._on_points_changed.append(callback)
@@ -201,6 +203,10 @@ class CollectionSettingsController:
         self._model.collection_settings.map2_points = value
         _log.debug("collection_settings.map2_points = %d", value)
 
+    def _on_wide_flip_changed(self, value: bool) -> None:
+        self._model.collection_settings.wide_flip = value
+        _log.debug("collection_settings.wide_flip = %s", value)
+
     def _on_rotation_start_changed(self, value: float) -> None:
         cs = self._model.collection_settings
         cs.rotation_start = value
@@ -290,6 +296,7 @@ class CollectionSettingsController:
         axis2 = [origin2 + p for p in axis_positions(cs.map2_start, cs.map2_end, cs.map2_points)] if cs.map2_enabled else [None]
 
         group_id = str(uuid.uuid4())
+        point_index = 0
         for row_idx, pos2 in enumerate(axis2):
             for col_idx, pos1 in enumerate(axis1):
                 point = self._model.collection.add_point(shorthands)
@@ -297,8 +304,12 @@ class CollectionSettingsController:
                 point.scan_type = cs.scan_type
                 point.time = str(cs.exposure)
                 if cs.scan_type in ("wide", "step"):
-                    point.rotation_start = str(cs.rotation_start + cs.beam_angle)
-                    point.rotation_end = str(cs.rotation_end + cs.beam_angle)
+                    rot_start = cs.rotation_start + cs.beam_angle
+                    rot_end = cs.rotation_end + cs.beam_angle
+                    if cs.scan_type == "wide" and cs.wide_flip and point_index % 2 == 1:
+                        rot_start, rot_end = rot_end, rot_start
+                    point.rotation_start = str(rot_start)
+                    point.rotation_end = str(rot_end)
                 if cs.scan_type == "step":
                     point.step = str(cs.step_size)
                 for motor in motors:
@@ -318,6 +329,7 @@ class CollectionSettingsController:
                 point.map_motor1 = cs.map_motor
                 point.map_motor2 = cs.map2_motor if cs.map2_enabled else ""
                 self._view.collection_table.add_row(point)
+                point_index += 1
 
         n_total = cs.map_points * (cs.map2_points if cs.map2_enabled else 1)
         wx.CallAfter(self._notify_points_changed)

@@ -44,3 +44,4 @@ class CollectionSettingsModel:
     step_size: float = field(default=1.0)
     rotation_shorthand: str = field(default="")
     beam_angle: float = field(default=0.0)
+    wide_flip: bool = field(default=True)

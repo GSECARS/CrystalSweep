@@ -272,6 +272,7 @@ class CollectionSettingsView(wx.Panel):
         self._on_rotation_range_changed_cb: Callable[[float], None] | None = None
         self._on_step_size_changed_cb: Callable[[float], None] | None = None
         self._on_map_changed_cb: Callable[[bool], None] | None = None
+        self._on_wide_flip_changed_cb: Callable[[bool], None] | None = None
         self._on_map_motor_changed_cb: Callable[[str], None] | None = None
         self._on_map_start_changed_cb: Callable[[float], None] | None = None
         self._on_map_end_changed_cb: Callable[[float], None] | None = None
@@ -302,6 +303,7 @@ class CollectionSettingsView(wx.Panel):
 
         outer.Add(self._make_map_table(), 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
         self._map_table.Hide()
+        self._flip_toggle.Hide()
 
         outer.Add(self._make_map_presets(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP | wx.BOTTOM, 10)
         self._map_presets_panel.Hide()
@@ -398,6 +400,12 @@ class CollectionSettingsView(wx.Panel):
         self._map_toggle.SetBackgroundColour(BG_CARD)
         self._map_toggle.Bind(wx.EVT_CHECKBOX, self._on_map_toggle_changed)
         row.Add(self._map_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(8)
+
+        self._flip_toggle = DarkToggle(self, "Flip", value=True)
+        self._flip_toggle.SetBackgroundColour(BG_CARD)
+        self._flip_toggle.Bind(wx.EVT_CHECKBOX, self._on_flip_toggle_changed)
+        row.Add(self._flip_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
 
         self._scan_row = row
         return row
@@ -483,6 +491,15 @@ class CollectionSettingsView(wx.Panel):
 
         self._update_rotation_labels(scan_type)
         self._refresh_map_row()
+        self._refresh_flip_visibility(scan_type)
+        self.Layout()
+        self.GetParent().Layout()
+
+    def _refresh_flip_visibility(self, scan_type: ScanType | None = None) -> None:
+        if scan_type is None:
+            scan_type = SCAN_TYPES[self._type_combo._selection]
+        show = self._map_toggle.GetValue() and scan_type == "wide"
+        self._flip_toggle.Show(show)
         self.Layout()
         self.GetParent().Layout()
 
@@ -491,6 +508,7 @@ class CollectionSettingsView(wx.Panel):
         self._map_table.Show(show)
         self._map_presets_panel.Show(show)
         self._add_btn.SetLabel("+ Add map points" if show else "+ Add point")
+        self._refresh_flip_visibility()
         self.Layout()
         self.GetParent().Layout()
 
@@ -513,6 +531,7 @@ class CollectionSettingsView(wx.Panel):
         ):
             ctrl.Enable(enabled)
         self._map_toggle.SetLocked(not enabled)
+        self._flip_toggle.SetLocked(not enabled)
 
     def set_scan_type(self, scan_type: ScanType) -> None:
         if scan_type in SCAN_TYPES:
@@ -524,6 +543,9 @@ class CollectionSettingsView(wx.Panel):
 
     def set_map(self, value: bool) -> None:
         self._map_toggle.SetValue(value)
+
+    def set_wide_flip(self, value: bool) -> None:
+        self._flip_toggle.SetValue(value)
 
     def set_rotation_start(self, value: float) -> None:
         self._rot_start_ctrl.SetValue(f"{value}")
@@ -599,6 +621,9 @@ class CollectionSettingsView(wx.Panel):
     def bind_map_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_map_changed_cb = callback
 
+    def bind_wide_flip_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_wide_flip_changed_cb = callback
+
     def bind_map_motor_changed(self, callback: Callable[[str], None]) -> None:
         self._on_map_motor_changed_cb = callback
 
@@ -668,6 +693,9 @@ class CollectionSettingsView(wx.Panel):
         value = self._map_toggle.GetValue()
         self._fire(self._on_map_changed_cb, value)
         self._refresh_map_row()
+
+    def _on_flip_toggle_changed(self, event: wx.Event) -> None:
+        self._fire(self._on_wide_flip_changed_cb, self._flip_toggle.GetValue())
 
     def _on_map1_motor_choice(self, value: str) -> None:
         self._fire(self._on_map_motor_changed_cb, value)
