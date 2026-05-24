@@ -26,6 +26,7 @@ from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.model.file_settings_model import FileSettingsModel
 from crystalsweep.model.scan_model import ScanSpec, get_driver
+from crystalsweep.model.script_model import ScriptModel
 
 __all__ = ["ScanEngine"]
 
@@ -40,20 +41,19 @@ class ScanEngine:
     still  — move rotation motor to rotation_start, trigger one detector frame.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, script_model: ScriptModel | None = None) -> None:
         self._driver = None
         self._thread: threading.Thread | None = None
+        self._scripts = script_model
 
     @property
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
     def pre_scan(self, point: CollectionPoint, config: BeamlineConfig) -> str | None:
-        """Validate a point before scanning and configure hardware routing gates.
+        """Validate a point before scanning. Delegates to the user script if available.
 
         Returns an error string if the scan cannot proceed, or None if OK.
-        Sets any trigger_pv_* entries from the rotation motor's controller params to 0
-        so PSO pulses are routed correctly to the detector.
         """
         rotation_cfg = config.rotation_motor
         if rotation_cfg is not None:
@@ -68,11 +68,17 @@ class ScanEngine:
                             _log.debug("pre_scan: set %s (%s) = 0", key, pv)
                         except Exception as exc:
                             _log.warning("pre_scan: failed to set %s (%s): %s", key, pv, exc)
+
+        if self._scripts is not None:
+            result = self._scripts.call("pre_scan", point, config)
+            if isinstance(result, str):
+                return result
         return None
 
     def post_scan(self, point: CollectionPoint, config: BeamlineConfig) -> None:
-        """Run post-scan cleanup after each point completes or is aborted."""
-        print(f"[post_scan] {point.label}")
+        """Run post-scan cleanup after each point. Delegates to the user script if available."""
+        if self._scripts is not None:
+            self._scripts.call("post_scan", point, config)
 
     def run_still(
         self,

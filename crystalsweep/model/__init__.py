@@ -27,6 +27,7 @@ from crystalsweep.model.file_settings_model import FileSettingsModel
 from crystalsweep.model.image_loader_model import ImageLoaderModel
 from crystalsweep.model.integration_model import IntegrationModel
 from crystalsweep.model.main_model import MainModel
+from crystalsweep.model.script_model import ScriptModel
 from crystalsweep.model.validation import MotorPositionValidator
 
 __all__ = [
@@ -49,6 +50,7 @@ __all__ = [
     "MainModel",
     "MotorConfig",
     "MotorPositionValidator",
+    "ScriptModel",
     "AerotechA1Model",
     "EpicsScanModel",
     "NewportXPSModel",

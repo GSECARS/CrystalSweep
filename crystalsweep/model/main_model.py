@@ -23,6 +23,7 @@ from crystalsweep.model.epics_model import EpicsModel
 from crystalsweep.model.file_settings_model import FileSettingsModel
 from crystalsweep.model.image_loader_model import ImageLoaderModel
 from crystalsweep.model.integration_model import IntegrationModel
+from crystalsweep.model.script_model import ScriptModel
 
 __all__ = ["MainModel"]
 
@@ -40,6 +41,7 @@ class MainModel:
     image_loader: ImageLoaderModel = field(init=False, compare=False, repr=False, default_factory=ImageLoaderModel)
     integration: IntegrationModel = field(init=False, compare=False, repr=False, default_factory=IntegrationModel)
     collection: CollectionTableModel = field(init=False, compare=False, repr=False, default_factory=CollectionTableModel)
+    scripts: ScriptModel = field(init=False, compare=False, repr=False, default_factory=ScriptModel)
 
     def __post_init__(self) -> None:
         """Load the previously remembered active beamline configuration, if available."""

@@ -42,6 +42,7 @@ class MainView(wx.Frame):
         self._open_detectors_cb: Callable[[], None] | None = None
         self._open_controllers_cb: Callable[[], None] | None = None
         self._open_positioners_cb: Callable[[], None] | None = None
+        self._open_scripts_cb: Callable[[], None] | None = None
         self._load_config_cb: Callable[[], None] | None = None
         self._save_config_cb: Callable[[], None] | None = None
         self._save_config_as_cb: Callable[[], None] | None = None
@@ -133,6 +134,9 @@ class MainView(wx.Frame):
     def bind_save_config_as(self, callback: Callable[[], None]) -> None:
         self._save_config_as_cb = callback
 
+    def bind_open_scripts(self, callback: Callable[[], None]) -> None:
+        self._open_scripts_cb = callback
+
     def bind_abort(self, callback: Callable[[], None]) -> None:
         self._abort_cb = callback
 
@@ -192,6 +196,7 @@ class MainView(wx.Frame):
         bar.append_action("Detectors", lambda: self._fire(self._open_detectors_cb))
         bar.append_action("Controllers", lambda: self._fire(self._open_controllers_cb))
         bar.append_action("Positioners", lambda: self._fire(self._open_positioners_cb))
+        bar.append_action("Scripts", lambda: self._fire(self._open_scripts_cb))
 
         accel = wx.AcceleratorTable(
             [

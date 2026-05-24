@@ -26,6 +26,7 @@ from crystalsweep.ui.controller.collect_controller import CollectController
 from crystalsweep.ui.controller.collection_settings_controller import CollectionSettingsController
 from crystalsweep.ui.controller.collection_table_controller import CollectionTableController
 from crystalsweep.ui.controller.file_settings_controller import FileSettingsController
+from crystalsweep.ui.controller.script_editor_controller import ScriptEditorController
 from crystalsweep.ui.view import MainView
 
 __all__ = ["MainController"]
@@ -60,6 +61,10 @@ class MainController:
             model=self._model,
             view=self._view,
             on_config_applied=self._on_config_applied,
+        )
+        self._script_editor_controller = ScriptEditorController(
+            model=self._model.scripts,
+            view=self._view,
         )
 
     def _on_collecting_changed(self, collecting: bool) -> None:

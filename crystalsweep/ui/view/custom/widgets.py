@@ -55,6 +55,7 @@ __all__ = [
     "DarkConfirmDialog",
     "DarkMenuBar",
     "DarkScrollBar",
+    "DarkHScrollBar",
     "DarkTextCtrl",
     "DarkToggle",
     "FlatButton",
@@ -1340,6 +1341,105 @@ class DarkScrollBar(wx.Panel):
         else:
             x, y, tw, th = self._thumb_rect()
             hovered = y <= event.GetY() <= y + th
+            if hovered != self._hovered:
+                self._hovered = hovered
+                self.Refresh()
+        event.Skip()
+
+    def _on_leave(self, event: wx.MouseEvent) -> None:
+        if self._hovered:
+            self._hovered = False
+            self.Refresh()
+        event.Skip()
+
+
+class DarkHScrollBar(wx.Panel):
+    """Thin custom-painted horizontal scrollbar matching the dark theme."""
+
+    def __init__(self, parent: wx.Window, on_scroll: Callable[[float], None]) -> None:
+        super().__init__(parent, size=(-1, _SB_W), style=wx.BORDER_NONE)
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self.SetBackgroundColour(_SB_TRACK)
+        self._on_scroll = on_scroll
+        self._thumb_pos: float = 0.0
+        self._thumb_size: float = 1.0
+        self._dragging = False
+        self._drag_start_x: int = 0
+        self._drag_start_pos: float = 0.0
+        self._hovered = False
+        self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_LEFT_DOWN, self._on_mouse_down)
+        self.Bind(wx.EVT_LEFT_UP, self._on_mouse_up)
+        self.Bind(wx.EVT_MOTION, self._on_motion)
+        self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
+
+    def update(self, thumb_pos: float, thumb_size: float) -> None:
+        self._thumb_pos = max(0.0, min(thumb_pos, 1.0 - thumb_size))
+        self._thumb_size = max(0.0, min(thumb_size, 1.0))
+        self.Refresh()
+
+    @property
+    def visible(self) -> bool:
+        return self._thumb_size < 1.0
+
+    def _thumb_rect(self) -> tuple[int, int, int, int]:
+        w, _ = self.GetClientSize()
+        track_w = w - 2
+        tx = 1 + int(self._thumb_pos * track_w)
+        tw = max(20, int(self._thumb_size * track_w))
+        tw = min(tw, track_w - (tx - 1))
+        return tx, 1, tw, _SB_W - 2
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
+        w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(_SB_TRACK))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+        if not self.visible:
+            return
+        x, y, tw, th = self._thumb_rect()
+        colour = _SB_THUMB_HOVER if (self._hovered or self._dragging) else _SB_THUMB
+        gc.SetBrush(wx.Brush(colour))
+        gc.DrawRoundedRectangle(x, y, tw, th, _SB_RADIUS)
+
+    def _on_mouse_down(self, event: wx.MouseEvent) -> None:
+        x, y, tw, th = self._thumb_rect()
+        ex = event.GetX()
+        if x <= ex <= x + tw:
+            self._dragging = True
+            self._drag_start_x = ex
+            self._drag_start_pos = self._thumb_pos
+            self.CaptureMouse()
+        else:
+            w, _ = self.GetClientSize()
+            track_w = w - 2
+            pos = max(0.0, min((ex - 1) / track_w - self._thumb_size / 2, 1.0 - self._thumb_size))
+            self._thumb_pos = pos
+            self.Refresh()
+            self._on_scroll(self._thumb_pos)
+        event.Skip()
+
+    def _on_mouse_up(self, event: wx.MouseEvent) -> None:
+        if self._dragging and self.HasCapture():
+            self.ReleaseMouse()
+        self._dragging = False
+        self.Refresh()
+        event.Skip()
+
+    def _on_motion(self, event: wx.MouseEvent) -> None:
+        if self._dragging:
+            w, _ = self.GetClientSize()
+            track_w = w - 2
+            dx = event.GetX() - self._drag_start_x
+            pos = max(0.0, min(self._drag_start_pos + dx / track_w, 1.0 - self._thumb_size))
+            self._thumb_pos = pos
+            self.Refresh()
+            self._on_scroll(self._thumb_pos)
+        else:
+            x, y, tw, th = self._thumb_rect()
+            hovered = x <= event.GetX() <= x + tw
             if hovered != self._hovered:
                 self._hovered = hovered
                 self.Refresh()
