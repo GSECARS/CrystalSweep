@@ -78,6 +78,7 @@ class ScanEngine:
         on_error: Callable[[Exception], None],
         file_settings: FileSettingsModel | None = None,
         on_file_number_updated: Callable[[int], None] | None = None,
+        on_status: Callable[[str], None] | None = None,
     ) -> None:
         """Move rotation motor to rotation_start and trigger one detector frame."""
         if self.is_running:
@@ -111,10 +112,12 @@ class ScanEngine:
             saved_auto_inc = 1
             disable_inc = False
             try:
+                if on_status: on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                if on_status: on_status("collecting")
                 detector.collect_still(exposure)
                 on_done()
             except Exception as exc:
@@ -144,6 +147,7 @@ class ScanEngine:
         slew: bool = True,
         file_settings: FileSettingsModel | None = None,
         on_file_number_updated: Callable[[int], None] | None = None,
+        on_status: Callable[[str], None] | None = None,
     ) -> None:
         """Execute a step scan: slew trajectory (default) or per-angle EPICS stills."""
         if self.is_running:
@@ -214,10 +218,13 @@ class ScanEngine:
                     if file_settings is not None:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                    if on_status: on_status("preparing")
                     driver.prepare(spec)
                     pv_base = rotation_cfg.pv.removesuffix(".VAL")
+                    if on_status: on_status("moving")
                     caput(f"{pv_base}.VAL", omega_start, wait=True)
                     detector.arm_plugin(n_frames)
+                    if on_status: on_status("collecting")
                     for frame_idx in range(n_frames):
                         if self._driver is None:
                             break
@@ -253,8 +260,11 @@ class ScanEngine:
                     if file_settings is not None:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                    if on_status: on_status("preparing")
                     driver.prepare(spec)
+                    if on_status: on_status("moving")
                     caput(f"{pv_base}.VAL", omega_start, wait=True)
+                    if on_status: on_status("collecting")
                     detector.collect_step(exposure, n_frames)
 
                     import threading as _threading
@@ -278,6 +288,7 @@ class ScanEngine:
                     if captured != last_reported:
                         on_frame(captured, n_frames)
 
+                    if on_status: on_status("readout")
                     _log.debug("ScanEngine step-slew: detector readout complete")
                     on_done()
                 except Exception as exc:
@@ -305,6 +316,7 @@ class ScanEngine:
         on_error: Callable[[Exception], None],
         file_settings: FileSettingsModel | None = None,
         on_file_number_updated: Callable[[int], None] | None = None,
+        on_status: Callable[[str], None] | None = None,
     ) -> None:
         """Arm detector for external trigger, run the slew trajectory, wait for readout."""
         if self.is_running:
@@ -369,10 +381,14 @@ class ScanEngine:
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                if on_status: on_status("preparing")
                 driver.prepare(spec)
+                if on_status: on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
+                if on_status: on_status("collecting")
                 detector.collect_wide(exposure)
                 driver.run(spec, lambda i, pos: None)
+                if on_status: on_status("readout")
                 while caget(acquire_pv):
                     time.sleep(0.05)
                 _log.debug("ScanEngine wide: detector readout complete")

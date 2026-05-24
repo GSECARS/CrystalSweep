@@ -508,8 +508,11 @@ class CollectController:
             print(f"[collect] [{idx}/{total}] {point.label}: ERROR — {exc}")
             done_event.set()
 
+        def on_status(phase: str) -> None:
+            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
+
         try:
-            self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated)
+            self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -552,6 +555,9 @@ class CollectController:
 
         frame_holder: list[tuple[int, int]] = [(0, n_frames)]
 
+        def on_status(phase: str) -> None:
+            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
+
         def on_frame(frame: int, total_frames: int) -> None:
             frame_holder[0] = (frame, total_frames)
             inner = frame / total_frames if total_frames > 0 else 0.0
@@ -575,7 +581,7 @@ class CollectController:
         use_slew = self._view.collection_table.slew_scan
 
         try:
-            self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated)
+            self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -612,8 +618,11 @@ class CollectController:
             print(f"[collect] [{idx}/{total}] {point.label}: ERROR — {exc}")
             done_event.set()
 
+        def on_status(phase: str) -> None:
+            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
+
         try:
-            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated)
+            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
