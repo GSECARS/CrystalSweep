@@ -138,6 +138,7 @@ class CollectController:
     def _on_abort(self) -> None:
         self._abort_event.set()
         self._engine.abort()
+        wx.CallAfter(self._view.collect.set_status, "Aborting...", wx.Colour(220, 160, 40))
         _log.info("Collection aborted by user")
 
     def _on_elapsed_tick(self, _event: wx.TimerEvent) -> None:
