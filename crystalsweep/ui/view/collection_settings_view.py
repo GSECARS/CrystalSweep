@@ -359,6 +359,16 @@ class CollectionSettingsView(wx.Panel):
         row.Add(self._exposure_ctrl, 2, wx.EXPAND)
         row.AddSpacer(8)
 
+        self._rot_range_lbl = self._field_label("Range", label_font)
+        self._rot_range_ctrl = DarkTextCtrl(self, value="180.0", parent_bg=BG_CARD)
+        self._rot_range_ctrl.set_restrict_to_float(True)
+        self._rot_range_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_range_enter)
+        self._rot_range_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_range_enter)
+        row.Add(self._rot_range_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(4)
+        row.Add(self._rot_range_ctrl, 2, wx.EXPAND)
+        row.AddSpacer(8)
+
         self._rot_start_lbl = self._field_label("Start", label_font)
         self._rot_start_ctrl = DarkTextCtrl(self, value="0.0", parent_bg=BG_CARD)
         self._rot_start_ctrl.set_restrict_to_float(True)
@@ -379,16 +389,6 @@ class CollectionSettingsView(wx.Panel):
         row.Add(self._rot_end_ctrl, 2, wx.EXPAND)
         row.AddSpacer(8)
 
-        self._rot_range_lbl = self._field_label("Range", label_font)
-        self._rot_range_ctrl = DarkTextCtrl(self, value="180.0", parent_bg=BG_CARD)
-        self._rot_range_ctrl.set_restrict_to_float(True)
-        self._rot_range_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_range_enter)
-        self._rot_range_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_range_enter)
-        row.Add(self._rot_range_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
-        row.AddSpacer(4)
-        row.Add(self._rot_range_ctrl, 2, wx.EXPAND)
-        row.AddSpacer(8)
-
         self._step_lbl = self._field_label("Step (°)", label_font)
         self._step_ctrl = DarkTextCtrl(self, value="1.0", parent_bg=BG_CARD)
         self._step_ctrl.set_restrict_to_float(True)
@@ -399,16 +399,16 @@ class CollectionSettingsView(wx.Panel):
         row.Add(self._step_ctrl, 2, wx.EXPAND)
         row.AddSpacer(8)
 
-        self._map_toggle = DarkToggle(self, "Map")
-        self._map_toggle.SetBackgroundColour(BG_CARD)
-        self._map_toggle.Bind(wx.EVT_CHECKBOX, self._on_map_toggle_changed)
-        row.Add(self._map_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
-        row.AddSpacer(8)
-
         self._flip_toggle = DarkToggle(self, "Flip", value=True)
         self._flip_toggle.SetBackgroundColour(BG_CARD)
         self._flip_toggle.Bind(wx.EVT_CHECKBOX, self._on_flip_toggle_changed)
         row.Add(self._flip_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(8)
+
+        self._map_toggle = DarkToggle(self, "Map")
+        self._map_toggle.SetBackgroundColour(BG_CARD)
+        self._map_toggle.Bind(wx.EVT_CHECKBOX, self._on_map_toggle_changed)
+        row.Add(self._map_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
 
         self._scan_row = row
         return row
