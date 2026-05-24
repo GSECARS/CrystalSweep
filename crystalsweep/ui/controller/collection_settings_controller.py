@@ -14,6 +14,7 @@
 # ----------------------------------------------------------------------------------
 
 import logging
+import uuid
 
 import wx
 
@@ -114,7 +115,12 @@ class CollectionSettingsController:
     def _on_scan_type_changed(self, scan_type: ScanType) -> None:
         self._model.collection_settings.scan_type = scan_type
         self._apply_type_defaults(scan_type)
+        self._sync_trajectory_toggle()
         _log.debug("collection_settings.scan_type = %s", scan_type)
+
+    def _sync_trajectory_toggle(self) -> None:
+        cs = self._model.collection_settings
+        self._view.collection_table.set_trajectory_visible(cs.scan_type == "still" and cs.map)
 
     def _apply_type_defaults(self, scan_type: ScanType) -> None:
         cs = self._model.collection_settings
@@ -148,6 +154,7 @@ class CollectionSettingsController:
 
     def _on_map_changed(self, value: bool) -> None:
         self._model.collection_settings.map = value
+        self._sync_trajectory_toggle()
         _log.debug("collection_settings.map = %s", value)
 
     def _on_map_motor_changed(self, value: str) -> None:
@@ -282,8 +289,9 @@ class CollectionSettingsController:
         axis1 = [origin1 + p for p in axis_positions(cs.map_start, cs.map_end, cs.map_points)]
         axis2 = [origin2 + p for p in axis_positions(cs.map2_start, cs.map2_end, cs.map2_points)] if cs.map2_enabled else [None]
 
-        for pos2 in axis2:
-            for pos1 in axis1:
+        group_id = str(uuid.uuid4())
+        for row_idx, pos2 in enumerate(axis2):
+            for col_idx, pos1 in enumerate(axis1):
                 point = self._model.collection.add_point(shorthands)
                 point.selected = True
                 point.scan_type = cs.scan_type
@@ -304,6 +312,11 @@ class CollectionSettingsController:
                     point.motor_positions[cs.map_motor] = f"{pos1:.{prec1}f}"
                 if pos2 is not None and motor2_cfg and cs.map2_motor in point.motor_positions:
                     point.motor_positions[cs.map2_motor] = f"{pos2:.{prec2}f}"
+                point.map_group = group_id
+                point.map_row = row_idx
+                point.map_col = col_idx
+                point.map_motor1 = cs.map_motor
+                point.map_motor2 = cs.map2_motor if cs.map2_enabled else ""
                 self._view.collection_table.add_row(point)
 
         n_total = cs.map_points * (cs.map2_points if cs.map2_enabled else 1)

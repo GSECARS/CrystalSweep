@@ -443,6 +443,106 @@ class ScanEngine:
         self._thread = threading.Thread(target=_worker, daemon=True, name="scan-map")
         self._thread.start()
 
+    def run_map_row_trajectory(
+        self,
+        config: BeamlineConfig,
+        map_motor_shorthand: str,
+        epics_positions: list[float],
+        exposure: float,
+        file_settings,
+        row_points: list[CollectionPoint],
+        on_frame: Callable[[int, int], None],
+        on_done: Callable[[], None],
+        on_error: Callable[[Exception], None],
+        on_file_number_updated: Callable[[int], None] | None = None,
+    ) -> None:
+        """Run a trajectory across one map row, collecting one still frame per point.
+
+        The detector is armed for *n_points* frames before the trajectory fires.
+        File info is set from the first point in *row_points*.
+        """
+        if self.is_running:
+            raise RuntimeError("A scan is already in progress.")
+
+        n_points = len(epics_positions)
+        if n_points < 1:
+            on_error(ValueError("No positions in map row."))
+            return
+
+        motor_cfg = self._find_motor(config, map_motor_shorthand)
+        if motor_cfg is None:
+            on_error(ValueError(f"Map motor '{map_motor_shorthand}' not found in active config."))
+            return
+
+        det = config.active_detector_config
+        if det is None or not det.pv_prefix.strip():
+            on_error(ValueError("No active detector configured."))
+            return
+
+        controller_cfg = next((c for c in config.controllers if c.name == motor_cfg.controller), None)
+        params = dict(controller_cfg.params) if controller_cfg else {}
+        controller_type = controller_cfg.type if controller_cfg else motor_cfg.controller
+
+        detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
+        driver = get_driver(controller_type)
+        self._driver = driver
+
+        prefix = det.pv_prefix.strip()
+        if not prefix.endswith(":"):
+            prefix += ":"
+        acquire_pv = f"{prefix}cam1:Acquire"
+
+        ref_point = row_points[0] if row_points else None
+
+        xps_group = params.get("xps_group") or motor_cfg.xps_group or ""
+        xps_positioner = params.get("xps_positioner") or motor_cfg.xps_positioner or ""
+        is_xps = controller_type == "newport_xps" and xps_group and xps_positioner
+
+        spec = ScanSpec(
+            pv=motor_cfg.pv,
+            start=epics_positions[0],
+            end=epics_positions[-1],
+            points=n_points,
+            exposure=exposure,
+            controller_params=params,
+        )
+
+        def _worker() -> None:
+            saved_auto_inc = 1
+            disable_inc = False
+            try:
+                if file_settings is not None and ref_point is not None:
+                    remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, ref_point, config)
+                    saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                detector.arm_plugin(n_points)
+                detector.collect_step(exposure, n_points)
+                if is_xps:
+                    driver.prepare(spec)
+                    driver.prepare_array(motor_cfg.pv, epics_positions, exposure, xps_positioner, xps_group)
+                    driver.run_array(lambda i, pos: on_frame(i + 1, n_points), n_points)
+                else:
+                    driver.prepare(spec)
+                    driver.run(spec, lambda i, pos: on_frame(i + 1, n_points))
+                while caget(acquire_pv):
+                    time.sleep(0.05)
+                on_done()
+            except Exception as exc:
+                _log.exception("ScanEngine map-row-trajectory error")
+                on_error(exc)
+            finally:
+                if disable_inc:
+                    detector.restore_auto_increment(saved_auto_inc)
+                if on_file_number_updated is not None:
+                    try:
+                        _, _, file_number = detector.fetch_file_info()
+                        on_file_number_updated(file_number)
+                    except Exception:
+                        pass
+                self._driver = None
+
+        self._thread = threading.Thread(target=_worker, daemon=True, name="scan-map-traj")
+        self._thread.start()
+
     def abort(self) -> None:
         if self._driver is not None:
             self._driver.abort()

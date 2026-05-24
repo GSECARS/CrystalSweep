@@ -20,6 +20,9 @@
 import logging
 from typing import Callable
 
+import numpy as np
+from epics import caget
+
 from crystalsweep.model.scan_model import ScanSpec
 
 __all__ = ["NewportXPSModel"]
@@ -117,6 +120,54 @@ class NewportXPSModel:
                 break
             on_point(i, pos)
             _log.debug("NewportXPSModel point %d/%d pos=%.4f", i + 1, spec.points, pos)
+
+    def prepare_array(self, motor_pv: str, epics_positions: list[float], exposure: float, positioner_name: str, group_name: str) -> None:
+        """Prepare an array trajectory for a linear map motor using define_array_trajectory."""
+        if self._xps is None:
+            raise RuntimeError("XPS not connected. Call prepare() first.")
+
+        pv_base = motor_pv.removesuffix(".VAL")
+        try:
+            offset = float(caget(f"{pv_base}.OFF") or 0.0)
+        except Exception:
+            offset = 0.0
+        try:
+            direction = int(caget(f"{pv_base}.DIR") or 0)
+        except Exception:
+            direction = 0
+
+        if direction:
+            xps_positions = [(p - offset) * -1 for p in epics_positions]
+        else:
+            xps_positions = [p - offset for p in epics_positions]
+
+        axis_name = positioner_name
+        if axis_name.startswith(group_name):
+            axis_name = axis_name[len(group_name):].lstrip("-.")
+
+        self._xps.set_trajectory_group(group_name)
+        result = self._xps.define_array_trajectory(
+            positions={axis_name: np.array(xps_positions)},
+            dtime=exposure,
+            name="forward",
+            verbose=False,
+        )
+        if result is None:
+            raise RuntimeError(
+                f"define_array_trajectory failed — check positioner name '{axis_name}' "
+                f"against XPS group '{group_name}' axes."
+            )
+        _log.debug("NewportXPSModel array trajectory defined: %d positions, dtime=%.4f", len(xps_positions), exposure)
+
+    def run_array(self, on_point: Callable[[int, float], None], n_points: int) -> None:
+        """Run the previously defined array trajectory."""
+        if self._aborted:
+            return
+        self._xps.arm_trajectory(name="forward", move_to_start=True)
+        self._xps.run_trajectory(name="forward", save=False, clean=True, move_to_start=False)
+        _log.debug("NewportXPSModel array trajectory complete")
+        if not self._aborted:
+            on_point(n_points - 1, 0.0)
 
     def abort(self) -> None:
         self._aborted = True

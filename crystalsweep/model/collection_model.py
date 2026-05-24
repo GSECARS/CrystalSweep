@@ -34,6 +34,11 @@ class CollectionPoint:
     step: str = ""
     time: str = "1.0000"
     selected: bool = False
+    map_group: str = ""
+    map_row: int = -1
+    map_col: int = -1
+    map_motor1: str = ""
+    map_motor2: str = ""
 
 
 class CollectionTableModel:

@@ -573,6 +573,14 @@ class CollectionTableView(wx.Panel):
                 elif row_bot > offset + vh:
                     self._viewport.scroll_to((row_bot - vh) / max(1, total - vh))
 
+    def set_trajectory_visible(self, visible: bool) -> None:
+        self._slew_scan_toggle.Show(visible)
+        self.Layout()
+
+    @property
+    def trajectory_scan(self) -> bool:
+        return self._slew_scan_toggle.GetValue()
+
     @property
     def slew_scan(self) -> bool:
         return self._slew_scan_toggle.GetValue()
@@ -606,9 +614,10 @@ class CollectionTableView(wx.Panel):
         self._clear_btn.SetMinSize((70, 22))
         self._clear_btn.set_action(self._on_clear_clicked)
 
-        self._slew_scan_toggle = DarkToggle(self, "Slew scanning")
+        self._slew_scan_toggle = DarkToggle(self, "Trajectory scanning")
         self._slew_scan_toggle.SetBackgroundColour(BG_CARD)
         self._slew_scan_toggle.SetValue(True)
+        self._slew_scan_toggle.Hide()
 
         title_row = wx.BoxSizer(wx.HORIZONTAL)
         title_row.AddStretchSpacer()
