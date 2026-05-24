@@ -59,6 +59,8 @@ class CollectController:
         self._point_weight: int = 1
         self._total_weight: int = 1
 
+        self._restore_pv_snapshot: dict[str, object] = {}
+
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
         self._view.bind_abort(self._on_abort)
@@ -159,6 +161,15 @@ class CollectController:
                 caput_many(pvs, values)
             except Exception as exc:
                 _log.warning("Failed to write abort PVs: %s", exc)
+
+        if self._restore_pv_snapshot:
+            snapshot = self._restore_pv_snapshot
+            try:
+                caput_many(list(snapshot.keys()), list(snapshot.values()))
+                _log.info("Restored %d PV(s) on abort", len(snapshot))
+            except Exception as exc:
+                _log.warning("Failed to restore PVs on abort: %s", exc)
+
         _log.info("Collection aborted by user")
 
     def _on_elapsed_tick(self, _event: wx.TimerEvent) -> None:
@@ -201,6 +212,19 @@ class CollectController:
         file_settings = self._model.file_settings
         all_points = self._model.collection.points
         pre_scan_error: str | None = None
+
+        self._restore_pv_snapshot = {}
+        for pv in config.restore_pvs:
+            if not pv:
+                continue
+            try:
+                val = caget(pv)
+                if val is not None:
+                    self._restore_pv_snapshot[pv] = val
+            except Exception as exc:
+                _log.warning("Failed to read restore PV %s: %s", pv, exc)
+        if self._restore_pv_snapshot:
+            _log.info("Snapshotted %d restore PV(s) at collection start", len(self._restore_pv_snapshot))
 
         rotation_cfg = config.rotation_motor
         original_rotation: float | None = None
@@ -334,6 +358,15 @@ class CollectController:
                     _log.debug("Restored motor %s to %.4f", motor_cfg.shorthand, original)
                 except Exception as exc:
                     _log.warning("Failed to restore motor %s: %s", motor_cfg.shorthand, exc)
+
+        if self._restore_pv_snapshot and not self._abort_event.is_set():
+            snapshot = self._restore_pv_snapshot
+            try:
+                caput_many(list(snapshot.keys()), list(snapshot.values()))
+                _log.info("Restored %d PV(s) at collection end", len(snapshot))
+            except Exception as exc:
+                _log.warning("Failed to restore PVs at collection end: %s", exc)
+        self._restore_pv_snapshot = {}
 
         wx.CallAfter(self._stop_elapsed_timer)
         if self._on_collecting_changed is not None:

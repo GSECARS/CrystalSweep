@@ -731,8 +731,40 @@ class _AbortPvRow(_TableRow):
         return self.pv_ctrl.GetValue().strip(), self.value_ctrl.GetValue().strip()
 
 
+class _RestorePvRow(_TableRow):
+    _PROPS = [9, 1]
+
+    def __init__(
+        self,
+        parent: wx.Window,
+        pv: str,
+        index: int,
+        on_remove: Callable[["_RestorePvRow"], None],
+    ) -> None:
+        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
+        super().__init__(parent, bg, self._PROPS)
+        self._on_remove = on_remove
+        self.pv_ctrl = DarkTextCtrl(self, value=pv, placeholder="e.g. 13IDD:SomePV.VAL")
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
+        self._remove_btn.set_action(lambda: on_remove(self))
+        self._reposition()
+
+    def _reposition(self) -> None:
+        w, _ = self.GetClientSize()
+        if w <= 0:
+            return
+        widths = self._col_widths(w)
+        x = 0
+        self._place(self.pv_ctrl, x, widths[0])
+        x += widths[0]
+        self._place(self._remove_btn, x, widths[1])
+
+    def to_restore_pv(self) -> str:
+        return self.pv_ctrl.GetValue().strip()
+
+
 class GeneralConfigView(wx.Panel):
-    """General configuration: beamline name and abort PVs."""
+    """General configuration: beamline name, abort PVs, and restore PVs."""
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
@@ -740,6 +772,7 @@ class GeneralConfigView(wx.Panel):
         self.SetForegroundColour(POPUP_FG)
         self._on_save_cb: Callable[[], None] | None = None
         self._abort_pv_rows: list[_AbortPvRow] = []
+        self._restore_pv_rows: list[_RestorePvRow] = []
         self._build_layout()
 
     def _build_layout(self) -> None:
@@ -766,11 +799,26 @@ class GeneralConfigView(wx.Panel):
         a_sizer.Add(self._add_abort_btn, 0, wx.EXPAND)
         a_body.SetSizer(a_sizer)
 
+        self._restore_section = _Section(self, "Restore PVs")
+        r_body = self._restore_section.body
+        self._restore_header = _TableHeader(r_body, ["PV", ""], [9, 1])
+        self._restore_rows_panel = _DarkScrolledPanel(r_body)
+        self._restore_rows_panel.SetMinSize((-1, _ROW_H * 3))
+        self._add_restore_btn = FlatButton(r_body, "+ Add restore PV")
+        self._add_restore_btn.SetMinSize((-1, 26))
+        self._add_restore_btn.set_action(self._on_add_restore_pv_clicked)
+        r_sizer = wx.BoxSizer(wx.VERTICAL)
+        r_sizer.Add(self._restore_header, 0, wx.EXPAND)
+        r_sizer.Add(self._restore_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
+        r_sizer.Add(self._add_restore_btn, 0, wx.EXPAND)
+        r_body.SetSizer(r_sizer)
+
         self._status_label = _status_label(self)
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(self._beamline_section, 0, wx.EXPAND | wx.ALL, 10)
         outer.Add(self._abort_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        outer.Add(self._restore_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
         self.SetMinSize((400, -1))
@@ -783,6 +831,9 @@ class GeneralConfigView(wx.Panel):
         self._clear_abort_pv_rows()
         for pv, value in config.abort_pvs:
             self._append_abort_pv_row(pv, value)
+        self._clear_restore_pv_rows()
+        for pv in config.restore_pvs:
+            self._append_restore_pv_row(pv)
         self.set_status("")
 
     def beamline_name(self) -> str:
@@ -793,6 +844,13 @@ class GeneralConfigView(wx.Panel):
             row.to_abort_pv()
             for row in self._abort_pv_rows
             if row.to_abort_pv()[0]
+        )
+
+    def collect_restore_pvs(self) -> tuple[str, ...]:
+        return tuple(
+            row.to_restore_pv()
+            for row in self._restore_pv_rows
+            if row.to_restore_pv()
         )
 
     def set_status(self, text: str, error: bool = False) -> None:
@@ -831,6 +889,35 @@ class GeneralConfigView(wx.Panel):
             return
         self._abort_pv_rows.remove(row)
         self._abort_rows_panel.remove_row(row)
+        row.Destroy()
+        self.Layout()
+
+    def _clear_restore_pv_rows(self) -> None:
+        for row in self._restore_pv_rows:
+            self._restore_rows_panel.remove_row(row)
+            row.Destroy()
+        self._restore_pv_rows.clear()
+
+    def _append_restore_pv_row(self, pv: str = "") -> None:
+        index = len(self._restore_pv_rows)
+        row = _RestorePvRow(
+            self._restore_rows_panel._content,
+            pv,
+            index,
+            on_remove=self._on_remove_restore_pv,
+        )
+        self._restore_rows_panel.bind_mousewheel(row)
+        self._restore_pv_rows.append(row)
+        self._restore_rows_panel.add_row(row)
+
+    def _on_add_restore_pv_clicked(self) -> None:
+        self._append_restore_pv_row()
+
+    def _on_remove_restore_pv(self, row: _RestorePvRow) -> None:
+        if row not in self._restore_pv_rows:
+            return
+        self._restore_pv_rows.remove(row)
+        self._restore_rows_panel.remove_row(row)
         row.Destroy()
         self.Layout()
 

@@ -187,6 +187,7 @@ class BeamlineConfigController:
 
         beamline = self._general_dlg.config_panel.beamline_name() if self._general_dlg else base.beamline
         abort_pvs = self._general_dlg.config_panel.collect_abort_pvs() if self._general_dlg else base.abort_pvs
+        restore_pvs = self._general_dlg.config_panel.collect_restore_pvs() if self._general_dlg else base.restore_pvs
 
         if self._detectors_dlg:
             detectors, active_detector = self._detectors_dlg.config_panel.collect_detectors()
@@ -210,6 +211,7 @@ class BeamlineConfigController:
             controllers=controllers,
             motors=motors,
             abort_pvs=abort_pvs,
+            restore_pvs=restore_pvs,
         )
 
     def _save(self, config: BeamlineConfig) -> None:

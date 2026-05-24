@@ -128,6 +128,7 @@ class BeamlineConfig:
     motors: tuple[MotorConfig, ...] = field(default_factory=tuple)
     controllers: tuple[ControllerConfig, ...] = field(default_factory=tuple)
     abort_pvs: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    restore_pvs: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def is_empty(self) -> bool:
@@ -284,6 +285,12 @@ class BeamlineConfigModel:
             for entry in (data.get("abort_pvs", []) or [])
         )
 
+        restore_pvs = tuple(
+            str(entry.get("pv", "")) if isinstance(entry, dict) else str(entry)
+            for entry in (data.get("restore_pvs", []) or [])
+            if (entry.get("pv", "") if isinstance(entry, dict) else entry)
+        )
+
         cfg = BeamlineConfig(
             name=name,
             beamline=str(data.get("beamline", "")),
@@ -293,6 +300,7 @@ class BeamlineConfigModel:
             motors=motors,
             controllers=controllers,
             abort_pvs=abort_pvs,
+            restore_pvs=restore_pvs,
         )
         self._active = cfg
         return cfg
@@ -324,6 +332,11 @@ class BeamlineConfigModel:
             "abort_pvs": [
                 {"pv": pv, "value": value}
                 for pv, value in config.abort_pvs
+            ],
+            "restore_pvs": [
+                {"pv": pv}
+                for pv in config.restore_pvs
+                if pv
             ],
         }
 
