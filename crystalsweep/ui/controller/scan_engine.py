@@ -55,20 +55,6 @@ class ScanEngine:
 
         Returns an error string if the scan cannot proceed, or None if OK.
         """
-        rotation_cfg = config.rotation_motor
-        if rotation_cfg is not None:
-            controller_cfg = next(
-                (c for c in config.controllers if c.name == rotation_cfg.controller), None
-            )
-            if controller_cfg is not None:
-                for key, pv in controller_cfg.params.items():
-                    if key.startswith("trigger_pv_"):
-                        try:
-                            caput(pv, 0, wait=True)
-                            _log.debug("pre_scan: set %s (%s) = 0", key, pv)
-                        except Exception as exc:
-                            _log.warning("pre_scan: failed to set %s (%s): %s", key, pv, exc)
-
         if self._scripts is not None:
             result = self._scripts.call("pre_scan", point, config)
             if isinstance(result, str):

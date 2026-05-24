@@ -200,6 +200,7 @@ class CollectController:
         config = self._model.beamline.active
         file_settings = self._model.file_settings
         all_points = self._model.collection.points
+        pre_scan_error: str | None = None
 
         rotation_cfg = config.rotation_motor
         original_rotation: float | None = None
@@ -248,6 +249,12 @@ class CollectController:
                 for gi in group_indices:
                     consumed.add(gi)
                 group_weights = [frame_weights[gi] for gi in group_indices]
+                error = self._engine.pre_scan(point, config)
+                if error is not None:
+                    _log.warning("Pre-scan failed for map group %s: %s", group_id, error)
+                    pre_scan_error = error
+                    self._abort_event.set()
+                    break
                 self._run_map_group(group_points, idx + 1, total, config, file_settings, all_points, completed_weight, group_weights, total_weight)
                 completed_weight += sum(group_weights)
                 idx = max(group_indices) + 1
@@ -265,14 +272,10 @@ class CollectController:
 
             error = self._engine.pre_scan(point, config)
             if error is not None:
-                _log.warning("Pre-scan check failed for %s: %s", point.label, error)
-                wx.CallAfter(
-                    self._view.collect.set_status,
-                    f"[{idx}/{total}] {point.label} skipped: {error}",
-                    wx.Colour(220, 160, 40),
-                )
-                completed_weight += frame_weights[idx - 1]
-                continue
+                _log.warning("Pre-scan failed for %s: %s", point.label, error)
+                pre_scan_error = error
+                self._abort_event.set()
+                break
 
             if self._abort_event.is_set():
                 break
@@ -335,7 +338,9 @@ class CollectController:
         wx.CallAfter(self._stop_elapsed_timer)
         if self._on_collecting_changed is not None:
             wx.CallAfter(self._on_collecting_changed, False)
-        if self._abort_event.is_set():
+        if pre_scan_error is not None:
+            wx.CallAfter(self._view.collect.set_status, f"Pre-scan error: {pre_scan_error}", wx.Colour(220, 80, 40))
+        elif self._abort_event.is_set():
             wx.CallAfter(self._view.collect.set_status, "Aborted", wx.Colour(220, 160, 40))
         else:
             wx.CallAfter(self._view.collect.set_progress, total, total, point_fraction=1.0)

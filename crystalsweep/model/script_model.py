@@ -27,7 +27,7 @@ _log = logging.getLogger(__name__)
 _HOOKS_FILE = "hooks.py"
 
 _DEFAULT_HOOKS = '''\
-from epics import caget, caput, caput_many
+from epics import caget, caput
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.beamline_config_model import BeamlineConfig
 
@@ -42,6 +42,7 @@ def pre_scan(point: CollectionPoint, config: BeamlineConfig) -> str | None:
     """Called before each scan point.
 
     Return an error string to skip the point, or None to proceed.
+    Example: return "Sample not aligned" to skip this point with that message.
 
     Useful point attributes:
       point.scan_type     -- "still", "wide", or "step"
