@@ -19,7 +19,7 @@ import time as _time
 from typing import Callable
 
 import wx
-from epics import caget, caput
+from epics import caget, caput, caput_many
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import CollectionPoint
@@ -362,12 +362,25 @@ class CollectController:
                 wx.Colour(99, 179, 237),
             )
 
+            pvs: list[str] = []
+            vals: list[float] = []
             if motor2_cfg is not None:
                 try:
-                    pos2 = float(first_pt.motor_positions.get(motor2, "0") or "0")
-                    caput(motor2_cfg.pv, pos2, wait=True)
+                    pvs.append(motor2_cfg.pv)
+                    vals.append(float(first_pt.motor_positions.get(motor2, "0") or "0"))
                 except Exception as exc:
-                    _log.warning("Failed to move map motor2 %s: %s", motor2, exc)
+                    _log.warning("Failed to prepare motor2 move %s: %s", motor2, exc)
+            if motor1_cfg is not None:
+                try:
+                    pvs.append(motor1_cfg.pv)
+                    vals.append(float(first_pt.motor_positions.get(motor1, "0") or "0"))
+                except Exception as exc:
+                    _log.warning("Failed to prepare motor1 start move %s: %s", motor1, exc)
+            if pvs:
+                try:
+                    caput_many(pvs, vals, wait=True)
+                except Exception as exc:
+                    _log.warning("Failed to move map motors to row start: %s", exc)
 
             if self._abort_event.is_set():
                 break

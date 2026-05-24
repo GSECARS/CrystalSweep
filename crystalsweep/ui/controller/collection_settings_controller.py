@@ -74,6 +74,14 @@ class CollectionSettingsController:
         v.set_rotation_range(cs.rotation_range)
         v.set_step_size(cs.step_size)
         v.set_wide_flip(cs.wide_flip)
+        v.set_map_start(cs.map_start)
+        v.set_map_end(cs.map_end)
+        v.set_map_step(cs.map_step)
+        v.set_map_points(cs.map_points)
+        v.set_map2_start(cs.map2_start)
+        v.set_map2_end(cs.map2_end)
+        v.set_map2_step(cs.map2_step)
+        v.set_map2_points(cs.map2_points)
 
     def add_points_changed_listener(self, callback) -> None:
         self._on_points_changed.append(callback)

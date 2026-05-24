@@ -135,13 +135,13 @@ class _MapDataRow(wx.Panel):
         self._enabled = not self._optional
 
         self.motor_combo = DarkCombo(self, choices=[], selection=0)
-        self.start_ctrl = DarkTextCtrl(self, value="0.0", parent_bg=bg)
+        self.start_ctrl = DarkTextCtrl(self, value="-0.0025", parent_bg=bg)
         self.start_ctrl.set_restrict_to_float(True)
-        self.end_ctrl = DarkTextCtrl(self, value="1.0", parent_bg=bg)
+        self.end_ctrl = DarkTextCtrl(self, value="0.0025", parent_bg=bg)
         self.end_ctrl.set_restrict_to_float(True)
-        self.step_ctrl = DarkTextCtrl(self, value="0.1", parent_bg=bg)
+        self.step_ctrl = DarkTextCtrl(self, value="0.001", parent_bg=bg)
         self.step_ctrl.set_restrict_to_float(True)
-        self.points_ctrl = DarkTextCtrl(self, value="11", parent_bg=bg)
+        self.points_ctrl = DarkTextCtrl(self, value="6", parent_bg=bg)
 
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_SIZE, self._on_size)
@@ -430,18 +430,19 @@ class CollectionSettingsView(wx.Panel):
         return self._map_presets_panel
 
     def _apply_map_preset(self, size_um: int, step_um: int, points: int) -> None:
-        half = size_um / 2.0
+        half = size_um / 2000.0
+        step = step_um / 1000.0
         for row in (self._map_table.row1, self._map_table.row2):
-            row.start_ctrl.SetValue(f"{-half:.1f}")
-            row.end_ctrl.SetValue(f"{half:.1f}")
-            row.step_ctrl.SetValue(f"{step_um:.1f}")
+            row.start_ctrl.SetValue(f"{-half:.4f}")
+            row.end_ctrl.SetValue(f"{half:.4f}")
+            row.step_ctrl.SetValue(f"{step:.4f}")
             row.points_ctrl.SetValue(str(points))
         if self._on_map_start_changed_cb:
             self._on_map_start_changed_cb(-half)
         if self._on_map_end_changed_cb:
             self._on_map_end_changed_cb(half)
         if self._on_map_step_changed_cb:
-            self._on_map_step_changed_cb(float(step_um))
+            self._on_map_step_changed_cb(step)
         if self._on_map_points_changed_cb:
             self._on_map_points_changed_cb(points)
         if self._on_map2_start_changed_cb:
@@ -449,7 +450,7 @@ class CollectionSettingsView(wx.Panel):
         if self._on_map2_end_changed_cb:
             self._on_map2_end_changed_cb(half)
         if self._on_map2_step_changed_cb:
-            self._on_map2_step_changed_cb(float(step_um))
+            self._on_map2_step_changed_cb(step)
         if self._on_map2_points_changed_cb:
             self._on_map2_points_changed_cb(points)
 
