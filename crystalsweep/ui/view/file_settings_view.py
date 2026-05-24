@@ -465,7 +465,7 @@ class FileSettingsView(wx.Panel):
 
     def _on_map_ext_enter(self, event: wx.Event) -> None:
         value = self._map_ext_ctrl.GetValue().strip()
-        if value and self._on_map_ext_changed_cb is not None:
+        if self._on_map_ext_changed_cb is not None:
             self._on_map_ext_changed_cb(value)
         event.Skip()
 

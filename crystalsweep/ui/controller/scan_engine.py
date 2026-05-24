@@ -584,10 +584,16 @@ class ScanEngine:
         remote_dir = det.translate_path(local_dir) if det else local_dir
         label = point.label.strip()
         disable_auto_increment = bool(label)
-        if file_settings.filename and label:
-            filename = f"{file_settings.filename}_{label}"
+        base = file_settings.filename or ""
+        map_ext = file_settings.map_ext.strip()
+        if point.map_group:
+            folder_suffix = map_ext if map_ext else "map"
+            folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
+            remote_dir = f"{remote_dir.rstrip('/')}/{folder_name}"
+            parts = [p for p in [base, map_ext, label] if p]
         else:
-            filename = file_settings.filename or label
+            parts = [p for p in [base, label] if p]
+        filename = "_".join(parts) if parts else ""
         file_template = det.file_template if det else ""
         return remote_dir, filename, file_settings.frame_number, disable_auto_increment, file_template
 
