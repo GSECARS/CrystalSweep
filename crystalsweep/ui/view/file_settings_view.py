@@ -27,6 +27,7 @@ from crystalsweep.ui.view.custom.theme import (
     BG_CARD,
     BG_ELEVATED,
     BG_SURFACE,
+    DISABLED_FG,
     FG_PRIMARY,
     FG_SECONDARY,
     PONI_LOADED,
@@ -102,14 +103,16 @@ class FileSettingsView(wx.Panel):
 
     def _make_row_filename_and_frame(self, label_font: wx.Font) -> wx.Sizer:
         row = wx.BoxSizer(wx.HORIZONTAL)
-        lbl = self._field_label("Filename", label_font)
+        self._filename_lbl = self._field_label("Filename", label_font)
+        lbl = self._filename_lbl
         lbl.SetMinSize((70, -1))
         self._filename_ctrl = DarkTextCtrl(self, parent_bg=BG_CARD)
         self._filename_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_filename_enter)
         self._filename_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_filename_enter)
         self._filename_update_btn = IconButton(self, draw_update, size=16, tooltip="Update filename", bg=BG_CARD)
         self._filename_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_filename_update_cb))
-        frame_lbl = self._field_label("Frame #", label_font)
+        self._frame_lbl = self._field_label("Frame #", label_font)
+        frame_lbl = self._frame_lbl
         self._frame_ctrl = DarkTextCtrl(self, value="0", placeholder="0", parent_bg=BG_CARD)
         self._frame_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_frame_enter)
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_enter)
@@ -140,7 +143,8 @@ class FileSettingsView(wx.Panel):
 
     def _make_row_path(self, label_font: wx.Font) -> wx.Sizer:
         row = wx.BoxSizer(wx.HORIZONTAL)
-        lbl = self._field_label("Path", label_font)
+        self._path_lbl = self._field_label("Path", label_font)
+        lbl = self._path_lbl
         lbl.SetMinSize((70, -1))
         self._path_ctrl = DarkTextCtrl(self, parent_bg=BG_CARD)
         self._path_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_path_enter)
@@ -187,7 +191,8 @@ class FileSettingsView(wx.Panel):
         row = wx.BoxSizer(wx.HORIZONTAL)
         cal_font = scaled_font(12)
 
-        map_lbl = self._field_label("Map ext.", label_font)
+        self._map_ext_lbl = self._field_label("Map ext.", label_font)
+        map_lbl = self._map_ext_lbl
         map_lbl.SetMinSize((70, -1))
         self._map_ext_ctrl = DarkTextCtrl(self, parent_bg=BG_CARD)
         self._map_ext_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_map_ext_enter)
@@ -316,6 +321,10 @@ class FileSettingsView(wx.Panel):
         ):
             toggle.SetLocked(not enabled)
         self._path_status_label.Enable(True)
+        lbl_colour = FG_SECONDARY if enabled else DISABLED_FG
+        for lbl in (self._filename_lbl, self._frame_lbl, self._path_lbl, self._map_ext_lbl):
+            lbl.SetForegroundColour(lbl_colour)
+            lbl.Refresh()
 
     def set_file_number_width(self, width: int) -> None:
         self._file_number_width = max(1, width)

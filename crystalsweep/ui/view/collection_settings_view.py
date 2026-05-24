@@ -26,6 +26,7 @@ from crystalsweep.ui.view.custom.theme import (
     BG_CARD,
     BG_ELEVATED,
     BG_SURFACE,
+    DISABLED_FG,
     FG_PRIMARY,
     FG_SECONDARY,
     SEP_COLOUR,
@@ -333,7 +334,8 @@ class CollectionSettingsView(wx.Panel):
     def _make_row_all(self, label_font: wx.Font) -> wx.Sizer:
         row = wx.BoxSizer(wx.HORIZONTAL)
 
-        type_lbl = self._field_label("Type", label_font)
+        self._type_lbl = self._field_label("Type", label_font)
+        type_lbl = self._type_lbl
         self._type_combo = DarkCombo(
             self,
             choices=list(SCAN_TYPES),
@@ -346,7 +348,8 @@ class CollectionSettingsView(wx.Panel):
         row.Add(self._type_combo, 2, wx.EXPAND)
         row.AddSpacer(8)
 
-        exp_lbl = self._field_label("Exp. (s)", label_font)
+        self._exp_lbl = self._field_label("Exp. (s)", label_font)
+        exp_lbl = self._exp_lbl
         self._exposure_ctrl = DarkTextCtrl(self, value="1.0", parent_bg=BG_CARD)
         self._exposure_ctrl.set_restrict_to_float(True)
         self._exposure_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_exposure_enter)
@@ -413,10 +416,11 @@ class CollectionSettingsView(wx.Panel):
     def _make_map_presets(self, label_font: wx.Font) -> wx.Window:
         self._map_presets_panel = wx.Panel(self)
         self._map_presets_panel.SetBackgroundColour(BG_CARD)
-        lbl = wx.StaticText(self._map_presets_panel, label="Presets")
-        lbl.SetFont(label_font)
-        lbl.SetForegroundColour(FG_SECONDARY)
-        lbl.SetBackgroundColour(BG_CARD)
+        self._map_presets_lbl = wx.StaticText(self._map_presets_panel, label="Presets")
+        self._map_presets_lbl.SetFont(label_font)
+        self._map_presets_lbl.SetForegroundColour(FG_SECONDARY)
+        self._map_presets_lbl.SetBackgroundColour(BG_CARD)
+        lbl = self._map_presets_lbl
         row = wx.BoxSizer(wx.HORIZONTAL)
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
         for size_um, step_um in _MAP_PRESETS:
@@ -533,6 +537,23 @@ class CollectionSettingsView(wx.Panel):
             ctrl.Enable(enabled)
         self._map_toggle.SetLocked(not enabled)
         self._flip_toggle.SetLocked(not enabled)
+        lbl_colour = FG_SECONDARY if enabled else DISABLED_FG
+        for lbl in (self._type_lbl, self._exp_lbl,
+                    self._rot_start_lbl, self._rot_end_lbl, self._rot_range_lbl, self._step_lbl):
+            lbl.SetForegroundColour(lbl_colour)
+            lbl.Refresh()
+        if not self._map_table.IsShown():
+            return
+        for row in (self._map_table.row1, self._map_table.row2):
+            state = enabled and row.enabled
+            for ctrl in (row.motor_combo, row.start_ctrl, row.end_ctrl, row.step_ctrl, row.points_ctrl):
+                ctrl.Enable(state)
+        if self._map_presets_panel.IsShown():
+            self._map_presets_lbl.SetForegroundColour(FG_SECONDARY if enabled else DISABLED_FG)
+            self._map_presets_lbl.Refresh()
+            for btn in self._map_presets_panel.GetChildren():
+                if btn is not self._map_presets_lbl:
+                    btn.Enable(enabled)
 
     def set_scan_type(self, scan_type: ScanType) -> None:
         if scan_type in SCAN_TYPES:
