@@ -99,12 +99,19 @@ class ScanEngine:
             on_error(exc)
             return
 
+        try:
+            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
+        except ValueError:
+            omega_start = 0.0
+
+        pv_base = rotation_cfg.pv.removesuffix(".VAL")
         detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
 
         def _worker() -> None:
             saved_auto_inc = 1
             disable_inc = False
             try:
+                caput(f"{pv_base}.VAL", omega_start, wait=True)
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)

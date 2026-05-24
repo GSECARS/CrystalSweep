@@ -161,12 +161,19 @@ class CollectController:
 
         rotation_cfg = config.rotation_motor
         original_rotation: float | None = None
+        original_velocity: float | None = None
         if rotation_cfg is not None:
             try:
                 raw = caget(rotation_cfg.pv)
                 original_rotation = float(raw) if raw is not None else None
             except Exception:
                 original_rotation = None
+            try:
+                pv_base = rotation_cfg.pv.removesuffix(".VAL")
+                raw_vel = caget(f"{pv_base}.VELO")
+                original_velocity = float(raw_vel) if raw_vel is not None else None
+            except Exception:
+                original_velocity = None
 
         consumed: set[int] = set()
         idx = 0
@@ -218,6 +225,13 @@ class CollectController:
                 wx.Colour(99, 179, 237),
             )
 
+            if rotation_cfg is not None and original_velocity is not None:
+                try:
+                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
+                    caput(f"{pv_base}.VELO", original_velocity, wait=True)
+                except Exception as exc:
+                    _log.warning("Failed to set rotation velocity before point %s: %s", point.label, exc)
+
             if point.scan_type == "still":
                 self._run_still(point, idx, total, config, file_settings)
             elif point.scan_type == "wide":
@@ -232,12 +246,20 @@ class CollectController:
                     wx.Colour(220, 160, 40),
                 )
 
-        if original_rotation is not None and rotation_cfg is not None:
-            try:
-                caput(rotation_cfg.pv, original_rotation, wait=True)
-                _log.debug("Restored rotation motor to %.4f", original_rotation)
-            except Exception as exc:
-                _log.warning("Failed to restore rotation motor position: %s", exc)
+        if rotation_cfg is not None:
+            pv_base = rotation_cfg.pv.removesuffix(".VAL")
+            if original_velocity is not None:
+                try:
+                    caput(f"{pv_base}.VELO", original_velocity, wait=True)
+                    _log.debug("Restored rotation motor velocity to %.4f", original_velocity)
+                except Exception as exc:
+                    _log.warning("Failed to restore rotation motor velocity: %s", exc)
+            if original_rotation is not None:
+                try:
+                    caput(rotation_cfg.pv, original_rotation, wait=True)
+                    _log.debug("Restored rotation motor to %.4f", original_rotation)
+                except Exception as exc:
+                    _log.warning("Failed to restore rotation motor position: %s", exc)
 
         wx.CallAfter(self._stop_elapsed_timer)
         if self._on_collecting_changed is not None:
