@@ -217,7 +217,9 @@ class CollectController:
                 group_indices = [i for i, p in enumerate(points) if p.map_group == group_id]
                 for gi in group_indices:
                     consumed.add(gi)
-                self._run_map_group(group_points, idx + 1, total, config, file_settings, all_points)
+                group_weights = [frame_weights[gi] for gi in group_indices]
+                self._run_map_group(group_points, idx + 1, total, config, file_settings, all_points, completed_weight, group_weights, total_weight)
+                completed_weight += sum(group_weights)
                 idx = max(group_indices) + 1
                 continue
 
@@ -307,11 +309,16 @@ class CollectController:
         config,
         file_settings,
         all_points: list[CollectionPoint],
+        completed_weight: int = 0,
+        group_weights: list[int] | None = None,
+        total_weight: int = 1,
     ) -> None:
         scan_type = group_points[0].scan_type
         motor1 = group_points[0].map_motor1
         motor2 = group_points[0].map_motor2
         use_trajectory = self._view.collection_table.trajectory_scan
+        weights = group_weights if group_weights is not None else [1] * len(group_points)
+        map_completed_weight = completed_weight
 
         rows: dict[int, list[CollectionPoint]] = {}
         for pt in group_points:
@@ -375,13 +382,16 @@ class CollectController:
                         wx.Colour(99, 179, 237),
                     )
 
-                    pt_idx = start_idx + group_points.index(col_pt)
+                    gidx = group_points.index(col_pt)
+                    pt_idx = start_idx + gidx
+                    pt_weight = weights[gidx]
                     if scan_type == "still":
-                        self._run_still(col_pt, pt_idx, total, config, file_settings)
+                        self._run_still(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     elif scan_type == "wide":
-                        self._run_wide(col_pt, pt_idx, total, config, file_settings)
+                        self._run_wide(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     elif scan_type == "step":
-                        self._run_step(col_pt, pt_idx, total, config, file_settings)
+                        self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
+                    map_completed_weight += pt_weight
 
     def _run_map_row_trajectory(
         self,
