@@ -202,8 +202,6 @@ class ScanEngine:
         prefix = det.pv_prefix.strip()
         if not prefix.endswith(":"):
             prefix += ":"
-        acquire_pv = f"{prefix}cam1:Acquire"
-
         _EPICS_TYPES = {"epics", "step"}
 
         if not slew or controller_type in _EPICS_TYPES:
@@ -247,7 +245,9 @@ class ScanEngine:
             self._thread.start()
 
         else:
-            pv_base = rotation_cfg.pv.removesuffix(".VAL")
+            _PLUGIN_MAP = {"hdf5": "HDF1", "cbf": "CBF1", "tif": "TIFF1"}
+            plugin = _PLUGIN_MAP.get(det.file_format, "HDF1")
+            capture_pv = f"{prefix}{plugin}:Capture_RBV"
 
             def _worker_slew() -> None:
                 saved_auto_inc = 1
@@ -264,14 +264,26 @@ class ScanEngine:
                     import threading as _threading
                     traj_done = _threading.Event()
 
+                    traj_error: list[Exception] = []
+
                     def _run_traj() -> None:
-                        driver.run(spec, lambda i, pos: None)
-                        traj_done.set()
+                        try:
+                            driver.run(spec, lambda i, pos: None)
+                        except Exception as exc:
+                            _log.exception("ScanEngine step-slew trajectory error")
+                            traj_error.append(exc)
+                        finally:
+                            traj_done.set()
 
                     _threading.Thread(target=_run_traj, daemon=True, name="scan-step-traj").start()
 
                     last_reported = -1
-                    while not traj_done.is_set() or caget(acquire_pv):
+                    timeout = exposure * n_frames + 60.0
+                    deadline = time.monotonic() + timeout
+                    while not traj_done.is_set() or int(caget(capture_pv) or 0):
+                        if time.monotonic() > deadline:
+                            _log.warning("ScanEngine step-slew: timed out (traj_done=%s capture=%s)", traj_done.is_set(), caget(capture_pv))
+                            break
                         captured = detector.frames_captured()
                         if captured != last_reported:
                             on_frame(captured, n_frames)
@@ -282,8 +294,10 @@ class ScanEngine:
                     if captured != last_reported:
                         on_frame(captured, n_frames)
 
-                    if on_status: on_status("readout")
-                    _log.debug("ScanEngine step-slew: detector readout complete")
+                    if traj_error:
+                        raise traj_error[0]
+
+                    _log.debug("ScanEngine step-slew: loop exited (traj_done=%s)", traj_done.is_set())
                     on_done()
                 except Exception as exc:
                     _log.exception("ScanEngine step-slew error")
@@ -382,7 +396,6 @@ class ScanEngine:
                 if on_status: on_status("collecting")
                 detector.collect_wide(exposure)
                 driver.run(spec, lambda i, pos: None)
-                if on_status: on_status("readout")
                 while caget(acquire_pv):
                     time.sleep(0.05)
                 _log.debug("ScanEngine wide: detector readout complete")

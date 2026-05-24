@@ -168,6 +168,7 @@ class FileSettingsController:
         fs.set_cbf(m.use_cbf)
         fs.set_tif(m.use_tif)
         fs.set_crysalis(m.use_crysalis)
+        fs.set_crysalis_calibration_label(m.crysalis_calibration)
         fs.set_apex(m.use_apex)
         self._sync_format_from_detector()
 
@@ -205,6 +206,9 @@ class FileSettingsController:
         _log.debug("file_settings.use_tif = %s", value)
 
     def _on_crysalis_changed(self, value: bool) -> None:
+        if value and self._model.file_settings.crysalis_calibration is None:
+            self._view.file_settings.set_crysalis(False)
+            return
         self._model.file_settings.use_crysalis = value
         _log.debug("file_settings.use_crysalis = %s", value)
 

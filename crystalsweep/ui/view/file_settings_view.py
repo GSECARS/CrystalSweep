@@ -317,9 +317,13 @@ class FileSettingsView(wx.Panel):
             ctrl.Enable(enabled)
         for toggle in (
             self._hdf5_toggle, self._cbf_toggle, self._tif_toggle,
-            self._crysalis_toggle, self._apex_toggle,
+            self._apex_toggle,
         ):
             toggle.SetLocked(not enabled)
+        if enabled:
+            self._refresh_crysalis_toggle_lock()
+        else:
+            self._crysalis_toggle.SetLocked(True)
         self._path_status_label.Enable(True)
         lbl_colour = FG_SECONDARY if enabled else DISABLED_FG
         for lbl in (self._filename_lbl, self._frame_lbl, self._path_lbl, self._map_ext_lbl):
@@ -382,6 +386,13 @@ class FileSettingsView(wx.Panel):
             self._crysalis_cal_label.SetLabel("Not loaded")
             self._crysalis_cal_label.SetForegroundColour(FG_SECONDARY)
         self._crysalis_cal_label.Refresh()
+        self._refresh_crysalis_toggle_lock()
+
+    def _refresh_crysalis_toggle_lock(self) -> None:
+        par_loaded = self._crysalis_cal_label.GetLabel() != "Not loaded"
+        self._crysalis_toggle.SetLocked(not par_loaded)
+        if not par_loaded:
+            self._crysalis_toggle.SetValue(False)
 
     def set_apex(self, value: bool) -> None:
         self._apex_toggle.SetValue(value)

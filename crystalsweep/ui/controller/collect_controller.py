@@ -14,6 +14,7 @@
 # ----------------------------------------------------------------------------------
 
 import logging
+import multiprocessing
 import threading
 import time as _time
 from typing import Callable
@@ -339,13 +340,13 @@ class CollectController:
             pv_base = rotation_cfg.pv.removesuffix(".VAL")
             if original_velocity is not None:
                 try:
-                    caput(f"{pv_base}.VELO", original_velocity, wait=True)
+                    caput(f"{pv_base}.VELO", original_velocity)
                     _log.debug("Restored rotation motor velocity to %.4f", original_velocity)
                 except Exception as exc:
                     _log.warning("Failed to restore rotation motor velocity: %s", exc)
             if original_rotation is not None:
                 try:
-                    caput(rotation_cfg.pv, original_rotation, wait=True)
+                    caput(rotation_cfg.pv, original_rotation)
                     _log.debug("Restored rotation motor to %.4f", original_rotation)
                 except Exception as exc:
                     _log.warning("Failed to restore rotation motor position: %s", exc)
@@ -354,7 +355,7 @@ class CollectController:
             original = original_motor_positions.get(motor_cfg.shorthand)
             if original is not None:
                 try:
-                    caput(motor_cfg.pv, original, wait=True)
+                    caput(motor_cfg.pv, original)
                     _log.debug("Restored motor %s to %.4f", motor_cfg.shorthand, original)
                 except Exception as exc:
                     _log.warning("Failed to restore motor %s: %s", motor_cfg.shorthand, exc)
@@ -616,6 +617,90 @@ class CollectController:
                 pass
             _time.sleep(_TRIGGERING_POLL_S)
 
+    def _spawn_crysalis_conversion(self, point: CollectionPoint) -> None:
+        if point.scan_type != "step":
+            return
+        fs = self._model.file_settings
+        if not fs.use_crysalis:
+            return
+        if fs.crysalis_calibration is None:
+            return
+
+        config = self._model.beamline.active
+        det = config.active_detector_config
+        file_format = det.file_format if det else "hdf5"
+
+        label = point.label.strip()
+        base = fs.filename or ""
+        parts = [p for p in [base, label] if p]
+        basename = "_".join(parts) if parts else base
+
+        filenumber = fs.frame_number
+
+        try:
+            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
+        except ValueError:
+            omega_start = 0.0
+        try:
+            omega_end = float(point.rotation_end) if point.rotation_end else omega_start
+        except ValueError:
+            omega_end = omega_start
+        try:
+            step = float(point.step) if point.step else abs(omega_end - omega_start)
+        except ValueError:
+            step = abs(omega_end - omega_start) or 1.0
+        try:
+            count = max(1, round(abs(omega_end - omega_start) / step)) if step > 0 else 1
+        except ZeroDivisionError:
+            count = 1
+
+        try:
+            exposure_time = float(point.time) if point.time else 1.0
+        except ValueError:
+            exposure_time = 1.0
+
+        scan_info = {
+            "omega_start": omega_start,
+            "omega_end": omega_end,
+            "domega": step,
+            "count": count,
+            "kappa": 0.0,
+            "theta": 0.0,
+            "phi": 0.0,
+            "alpha": 50.0,
+            "dist": 200.0,
+            "center_x": 0.0,
+            "center_y": 0.0,
+            "mono": 0.99,
+            "wavelength": 0.2952,
+            "dtheta": 0.0,
+            "dkappa": 0.0,
+            "dphi": 0.0,
+            "Exposure_time": exposure_time,
+            "pixel_size": 0.075,
+            "l1": 0.2952,
+            "l2": 0.2952,
+            "l12": 0.2952,
+            "b": 0.2952,
+            "monotype": "SYNCHROTRON",
+        }
+
+        args = {
+            "filepath": str(fs.directory),
+            "basename": basename,
+            "filenumber": filenumber,
+            "par_file": str(fs.crysalis_calibration),
+            "scan_info": scan_info,
+            "file_format": file_format,
+        }
+
+        try:
+            from crystalsweep.model.crysalis_converter import run_conversion
+            p = multiprocessing.Process(target=run_conversion, args=(args,), daemon=True)
+            p.start()
+        except Exception as exc:
+            _log.warning("Failed to spawn crysalis conversion: %s", exc)
+
     def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
@@ -660,6 +745,8 @@ class CollectController:
                 wx.Colour(220, 80, 40),
             )
             self._abort_event.set()
+        else:
+            self._spawn_crysalis_conversion(point)
 
     def _run_step(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
         done_event = threading.Event()
@@ -725,6 +812,8 @@ class CollectController:
                 wx.Colour(220, 80, 40),
             )
             self._abort_event.set()
+        else:
+            self._spawn_crysalis_conversion(point)
 
     def _run_wide(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
         done_event = threading.Event()
@@ -770,3 +859,6 @@ class CollectController:
                 wx.Colour(220, 80, 40),
             )
             self._abort_event.set()
+
+        else:
+            self._spawn_crysalis_conversion(point)
