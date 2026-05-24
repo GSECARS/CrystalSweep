@@ -54,6 +54,9 @@ class CollectController:
         self._point_timer_duration: float = 1.0
         self._point_timer_idx: int = 1
         self._point_timer_total: int = 1
+        self._completed_weight: int = 0
+        self._point_weight: int = 1
+        self._total_weight: int = 1
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
@@ -95,6 +98,19 @@ class CollectController:
         self._view.collect.set_eta(self._estimate_total_seconds(selected))
 
     @staticmethod
+    def _point_frame_weight(point: CollectionPoint) -> int:
+        """Return the number of frames for a point (1 for still/wide, n_frames for step)."""
+        if point.scan_type == "step":
+            try:
+                step = float(point.step) if point.step else 1.0
+                start = float(point.rotation_start) if point.rotation_start else 0.0
+                end = float(point.rotation_end) if point.rotation_end else 0.0
+                return max(1, round(abs(end - start) / step)) if step > 0 else 1
+            except (ValueError, ZeroDivisionError):
+                return 1
+        return 1
+
+    @staticmethod
     def _estimate_total_seconds(points: list[CollectionPoint]) -> float:
         total = 0.0
         for point in points:
@@ -130,23 +146,28 @@ class CollectController:
 
     def _on_point_tick(self, _event: wx.TimerEvent) -> None:
         elapsed = _time.monotonic() - self._point_timer_start
-        fraction = min(1.0, elapsed / self._point_timer_duration) if self._point_timer_duration > 0 else 1.0
+        inner = min(1.0, elapsed / self._point_timer_duration) if self._point_timer_duration > 0 else 1.0
+        weighted = (self._completed_weight + inner * self._point_weight) / self._total_weight
         self._view.collect.set_progress(
             self._point_timer_idx,
             self._point_timer_total,
-            point_fraction=fraction,
+            point_fraction=weighted,
         )
 
-    def _start_point_timer(self, idx: int, total: int, duration: float) -> None:
+    def _start_point_timer(self, idx: int, total: int, duration: float, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
         self._point_timer_start = _time.monotonic()
         self._point_timer_duration = max(duration, 0.1)
         self._point_timer_idx = idx
         self._point_timer_total = total
+        self._completed_weight = completed_weight
+        self._point_weight = point_weight
+        self._total_weight = max(1, total_weight)
         self._point_timer.Start(_PROGRESS_INTERVAL_MS)
 
     def _stop_point_timer(self, idx: int, total: int) -> None:
         self._point_timer.Stop()
-        self._view.collect.set_progress(idx, total, point_fraction=1.0)
+        weighted = (self._completed_weight + self._point_weight) / self._total_weight
+        self._view.collect.set_progress(idx, total, point_fraction=weighted)
 
     def _stop_elapsed_timer(self) -> None:
         self._elapsed_timer.Stop()
@@ -174,6 +195,10 @@ class CollectController:
                 original_velocity = float(raw_vel) if raw_vel is not None else None
             except Exception:
                 original_velocity = None
+
+        frame_weights = [self._point_frame_weight(p) for p in points]
+        total_weight = max(1, sum(frame_weights))
+        completed_weight = 0
 
         consumed: set[int] = set()
         idx = 0
@@ -214,6 +239,7 @@ class CollectController:
                     f"[{idx}/{total}] {point.label} skipped: {error}",
                     wx.Colour(220, 160, 40),
                 )
+                completed_weight += frame_weights[idx - 1]
                 continue
 
             if self._abort_event.is_set():
@@ -232,12 +258,13 @@ class CollectController:
                 except Exception as exc:
                     _log.warning("Failed to set rotation velocity before point %s: %s", point.label, exc)
 
+            point_weight = frame_weights[idx - 1]
             if point.scan_type == "still":
-                self._run_still(point, idx, total, config, file_settings)
+                self._run_still(point, idx, total, config, file_settings, completed_weight, point_weight, total_weight)
             elif point.scan_type == "wide":
-                self._run_wide(point, idx, total, config, file_settings)
+                self._run_wide(point, idx, total, config, file_settings, completed_weight, point_weight, total_weight)
             elif point.scan_type == "step":
-                self._run_step(point, idx, total, config, file_settings)
+                self._run_step(point, idx, total, config, file_settings, completed_weight, point_weight, total_weight)
             else:
                 _log.info("Scan type %r not yet implemented, skipping point %s", point.scan_type, point.label)
                 wx.CallAfter(
@@ -245,6 +272,8 @@ class CollectController:
                     f"[{idx}/{total}] {point.label}: scan type '{point.scan_type}' not yet supported",
                     wx.Colour(220, 160, 40),
                 )
+
+            completed_weight += point_weight
 
         if rotation_cfg is not None:
             pv_base = rotation_cfg.pv.removesuffix(".VAL")
@@ -461,7 +490,7 @@ class CollectController:
                 pass
             _time.sleep(_TRIGGERING_POLL_S)
 
-    def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None) -> None:
+    def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -489,7 +518,7 @@ class CollectController:
         if det is not None and det.type == "eiger":
             self._wait_for_eiger_triggering(det.pv_prefix)
 
-        wx.CallAfter(self._start_point_timer, idx, total, exposure)
+        wx.CallAfter(self._start_point_timer, idx, total, exposure, completed_weight, point_weight, total_weight)
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
@@ -503,7 +532,7 @@ class CollectController:
             )
             self._abort_event.set()
 
-    def _run_step(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None) -> None:
+    def _run_step(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -525,10 +554,13 @@ class CollectController:
 
         def on_frame(frame: int, total_frames: int) -> None:
             frame_holder[0] = (frame, total_frames)
+            inner = frame / total_frames if total_frames > 0 else 0.0
+            weighted = (completed_weight + inner * point_weight) / total_weight
             wx.CallAfter(
                 self._view.collect.set_progress,
                 idx, total,
                 frame, total_frames,
+                weighted,
             )
 
         def on_done() -> None:
@@ -548,11 +580,11 @@ class CollectController:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
 
-        wx.CallAfter(self._view.collect.set_progress, idx, total, 0, n_frames)
+        wx.CallAfter(self._view.collect.set_progress, idx, total, 0, n_frames, completed_weight / total_weight)
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
-        wx.CallAfter(self._view.collect.set_progress, idx, total, n_frames, n_frames)
+        wx.CallAfter(self._view.collect.set_progress, idx, total, n_frames, n_frames, (completed_weight + point_weight) / total_weight)
 
         if error_holder:
             wx.CallAfter(
@@ -562,7 +594,7 @@ class CollectController:
             )
             self._abort_event.set()
 
-    def _run_wide(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None) -> None:
+    def _run_wide(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -590,7 +622,7 @@ class CollectController:
         if det is not None and det.type == "eiger":
             self._wait_for_eiger_triggering(det.pv_prefix)
 
-        wx.CallAfter(self._start_point_timer, idx, total, exposure)
+        wx.CallAfter(self._start_point_timer, idx, total, exposure, completed_weight, point_weight, total_weight)
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()

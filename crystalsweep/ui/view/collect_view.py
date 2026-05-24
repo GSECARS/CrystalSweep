@@ -74,14 +74,12 @@ class _ProgressBar(wx.Panel):
         total_frames: int = 0,
         point_fraction: float | None = None,
     ) -> None:
-        completed_points = point - 1
         if point_fraction is not None:
-            inner = max(0.0, min(1.0, point_fraction))
-        elif total_frames > 1:
-            inner = frame / total_frames
+            self._fraction = max(0.0, min(1.0, point_fraction))
         else:
-            inner = 0.0
-        self._fraction = max(0.0, min(1.0, (completed_points + inner) / total_points if total_points > 0 else 0.0))
+            completed_points = point - 1
+            inner = frame / total_frames if total_frames > 1 else 0.0
+            self._fraction = max(0.0, min(1.0, (completed_points + inner) / total_points if total_points > 0 else 0.0))
         self._point_text = f"Point {point}/{total_points}"
         self._frame_text = f"  Frame {frame}/{total_frames}" if total_frames > 1 else ""
         self.Refresh()
