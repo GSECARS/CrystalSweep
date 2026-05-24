@@ -258,8 +258,6 @@ class ScanEngine:
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                     if on_status: on_status("preparing")
                     driver.prepare(spec)
-                    if on_status: on_status("moving")
-                    caput(f"{pv_base}.VAL", omega_start, wait=True)
                     if on_status: on_status("collecting")
                     detector.collect_step(exposure, n_frames)
 
