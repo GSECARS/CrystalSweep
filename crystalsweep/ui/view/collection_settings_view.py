@@ -214,6 +214,24 @@ class _MapDataRow(wx.Panel):
         self._apply_enabled()
         self.Refresh()
 
+    def sync_step_from_points(self) -> None:
+        try:
+            span = abs(float(self.end_ctrl.GetValue()) - float(self.start_ctrl.GetValue()))
+            pts = int(self.points_ctrl.GetValue())
+        except ValueError:
+            return
+        if pts > 1:
+            self.step_ctrl.SetValue(f"{span / (pts - 1):.4f}")
+
+    def sync_points_from_step(self) -> None:
+        try:
+            span = abs(float(self.end_ctrl.GetValue()) - float(self.start_ctrl.GetValue()))
+            step = float(self.step_ctrl.GetValue())
+        except ValueError:
+            return
+        if step > 0:
+            self.points_ctrl.SetValue(str(max(2, round(span / step) + 1)))
+
     def set_choices(self, choices: list[str]) -> None:
         self.motor_combo.SetChoices(choices)
 
@@ -737,10 +755,12 @@ class CollectionSettingsView(wx.Panel):
         event.Skip()
 
     def _on_map_step_enter(self, event: wx.Event) -> None:
+        self._map_table.row1.sync_points_from_step()
         self._fire_float(self._map_table.row1.step_ctrl, self._on_map_step_changed_cb)
         event.Skip()
 
     def _on_map_points_enter(self, event: wx.Event) -> None:
+        self._map_table.row1.sync_step_from_points()
         if self._on_map_points_changed_cb is None:
             event.Skip()
             return
@@ -765,10 +785,12 @@ class CollectionSettingsView(wx.Panel):
         event.Skip()
 
     def _on_map2_step_enter(self, event: wx.Event) -> None:
+        self._map_table.row2.sync_points_from_step()
         self._fire_float(self._map_table.row2.step_ctrl, self._on_map2_step_changed_cb)
         event.Skip()
 
     def _on_map2_points_enter(self, event: wx.Event) -> None:
+        self._map_table.row2.sync_step_from_points()
         if self._on_map2_points_changed_cb is None:
             event.Skip()
             return
