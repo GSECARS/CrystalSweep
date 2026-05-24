@@ -110,6 +110,11 @@ class MainView(wx.Frame):
         if self._menu_bar is not None:
             self._menu_bar.set_config_name(name)
 
+    def set_epics_online(self, online: bool) -> None:
+        if self._menu_bar is not None:
+            self._menu_bar.set_epics_status(online)
+        self.collect.set_collect_enabled(online)
+
     def set_ui_collecting(self, collecting: bool) -> None:
         self._collecting = collecting
         if self._menu_bar is not None:

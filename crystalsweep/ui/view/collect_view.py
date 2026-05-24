@@ -202,6 +202,10 @@ class CollectView(wx.Panel):
     def test_mode(self) -> bool:
         return self._test_mode_toggle.GetValue()
 
+    def set_collect_enabled(self, enabled: bool) -> None:
+        if not self._collecting:
+            self._collect_btn.Enable(enabled)
+
     def set_status(self, text: str, colour: wx.Colour | None = None) -> None:
         self._status_label.SetLabel(text)
         self._status_label.SetForegroundColour(colour if colour is not None else FG_SECONDARY)

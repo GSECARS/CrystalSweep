@@ -14,10 +14,12 @@
 # ----------------------------------------------------------------------------------
 
 import sys
+import threading
 
 import wx
 
 from crystalsweep.model import MainModel
+from crystalsweep.model.beamline_config_model import BeamlineConfig
 from crystalsweep.ui.controller.ad_viewer_controller import ADViewerController
 from crystalsweep.ui.controller.beamline_config_controller import BeamlineConfigController
 from crystalsweep.ui.controller.collect_controller import CollectController
@@ -64,18 +66,42 @@ class MainController:
         self._view.set_ui_collecting(collecting)
         self._beamline_config_controller.set_collecting(collecting)
 
-    def _on_config_applied(self, cfg) -> None:
+    def _on_config_applied(self, cfg: BeamlineConfig) -> None:
         self._ad_viewer_controller.resubscribe_detector()
         self._collection_controller.on_config_applied(cfg)
         self._collection_settings_controller.on_config_applied()
         self._file_settings_controller.sync_from_detector()
         self._file_settings_controller.push_to_detector()
+        self._check_epics_status(cfg)
+
+    def _check_epics_status(self, cfg: BeamlineConfig | None = None) -> None:
+        if cfg is None:
+            cfg = self._model.beamline.active
+
+        def _worker() -> None:
+            pvs: list[str] = []
+            if cfg.rotation_motor and cfg.rotation_motor.pv.strip():
+                pvs.append(cfg.rotation_motor.pv.strip())
+            det = cfg.active_detector_config
+            if det and det.pv_prefix.strip():
+                prefix = det.pv_prefix.strip()
+                if not prefix.endswith(":"):
+                    prefix += ":"
+                pvs.append(f"{prefix}cam1:Acquire")
+            for motor in cfg.motors:
+                if motor.pv.strip():
+                    pvs.append(motor.pv.strip())
+            online = all(self._model.epics.is_online(pv) for pv in pvs) if pvs else True
+            wx.CallAfter(self._view.set_epics_online, online)
+
+        threading.Thread(target=_worker, daemon=True, name="epics-check").start()
 
     def run(self) -> None:
         """Starts the main application loop."""
         self._view.display_window()
         if self._beamline_config_controller.has_active_config():
             self._view.set_active_config_name(self._model.beamline.active.name)
+            self._check_epics_status()
         else:
             wx.CallAfter(self._beamline_config_controller.open_general)
         self._app.MainLoop()

@@ -1095,7 +1095,16 @@ class DarkMenuBar(wx.Panel):
         self._config_name.SetBackgroundColour(_MENU_BAR_BG)
         self._config_name.SetForegroundColour(ACCENT)
         self._config_name.SetFont(scaled_font(11))
+        self._epics_prefix_label = wx.StaticText(self, label="")
+        self._epics_prefix_label.SetBackgroundColour(_MENU_BAR_BG)
+        self._epics_prefix_label.SetForegroundColour(FG_SECONDARY)
+        self._epics_prefix_label.SetFont(scaled_font(11))
+        self._epics_value_label = wx.StaticText(self, label="")
+        self._epics_value_label.SetBackgroundColour(_MENU_BAR_BG)
+        self._epics_value_label.SetFont(scaled_font(11))
         self._sizer.AddStretchSpacer(1)
+        self._sizer.Add(self._epics_prefix_label, 0, wx.ALIGN_CENTER_VERTICAL)
+        self._sizer.Add(self._epics_value_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 16)
         self._sizer.Add(self._config_prefix, 0, wx.ALIGN_CENTER_VERTICAL)
         self._sizer.Add(self._config_name, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 12)
         self.SetSizer(self._sizer)
@@ -1109,6 +1118,14 @@ class DarkMenuBar(wx.Panel):
         """Update the active configuration name shown on the right of the menu bar."""
         self._config_prefix.SetLabel("Active config: ")
         self._config_name.SetLabel(name)
+        self.Layout()
+
+    def set_epics_status(self, online: bool) -> None:
+        """Update the EPICS connectivity indicator in the menu bar."""
+        self._epics_prefix_label.SetLabel("EPICS: ")
+        self._epics_value_label.SetLabel("Online" if online else "Offline")
+        self._epics_value_label.SetForegroundColour(PONI_LOADED if online else DANGER)
+        self._epics_value_label.Refresh()
         self.Layout()
 
     def append_menu(
