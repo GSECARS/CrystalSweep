@@ -127,6 +127,7 @@ class BeamlineConfig:
     active_detector: int = -1
     motors: tuple[MotorConfig, ...] = field(default_factory=tuple)
     controllers: tuple[ControllerConfig, ...] = field(default_factory=tuple)
+    abort_pvs: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
     @property
     def is_empty(self) -> bool:
@@ -278,6 +279,11 @@ class BeamlineConfigModel:
                 beam_angle=float(rm_data.get("beam_angle", 0.0)),
             )
 
+        abort_pvs = tuple(
+            (str(entry.get("pv", "")), str(entry.get("value", "")))
+            for entry in (data.get("abort_pvs", []) or [])
+        )
+
         cfg = BeamlineConfig(
             name=name,
             beamline=str(data.get("beamline", "")),
@@ -286,6 +292,7 @@ class BeamlineConfigModel:
             active_detector=active_detector,
             motors=motors,
             controllers=controllers,
+            abort_pvs=abort_pvs,
         )
         self._active = cfg
         return cfg
@@ -313,6 +320,10 @@ class BeamlineConfigModel:
             "motors": [
                 {"shorthand": m.shorthand, "description": m.description, "pv": m.pv, "precision": m.precision, "mapping_enabled": m.mapping_enabled, "controller": m.controller, "xps_group": m.xps_group, "xps_positioner": m.xps_positioner}
                 for m in config.motors
+            ],
+            "abort_pvs": [
+                {"pv": pv, "value": value}
+                for pv, value in config.abort_pvs
             ],
         }
 

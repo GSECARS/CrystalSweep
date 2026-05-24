@@ -23,6 +23,7 @@ from epics import caget, caput, caput_many
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import CollectionPoint
+from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
 
@@ -139,6 +140,25 @@ class CollectController:
         self._abort_event.set()
         self._engine.abort()
         wx.CallAfter(self._view.collect.set_status, "Aborting...", wx.Colour(220, 160, 40))
+
+        config = self._model.beamline.active
+        det = config.active_detector_config
+        if det is not None and det.pv_prefix.strip():
+            def _abort_detector() -> None:
+                try:
+                    get_detector_model(det.type, det.pv_prefix, det.file_format).abort()
+                except Exception as exc:
+                    _log.warning("Failed to abort detector: %s", exc)
+            threading.Thread(target=_abort_detector, daemon=True, name="abort-detector").start()
+
+        abort_pvs = config.abort_pvs
+        if abort_pvs:
+            pvs = [pv for pv, _ in abort_pvs]
+            values = [value for _, value in abort_pvs]
+            try:
+                caput_many(pvs, values)
+            except Exception as exc:
+                _log.warning("Failed to write abort PVs: %s", exc)
         _log.info("Collection aborted by user")
 
     def _on_elapsed_tick(self, _event: wx.TimerEvent) -> None:
@@ -196,6 +216,15 @@ class CollectController:
                 original_velocity = float(raw_vel) if raw_vel is not None else None
             except Exception:
                 original_velocity = None
+
+        original_motor_positions: dict[str, float] = {}
+        for motor_cfg in config.motors:
+            try:
+                raw = caget(motor_cfg.pv)
+                if raw is not None:
+                    original_motor_positions[motor_cfg.shorthand] = float(raw)
+            except Exception:
+                pass
 
         frame_weights = [self._point_frame_weight(p) for p in points]
         total_weight = max(1, sum(frame_weights))
@@ -276,6 +305,7 @@ class CollectController:
                     wx.Colour(220, 160, 40),
                 )
 
+            self._engine.post_scan(point, config)
             completed_weight += point_weight
 
         if rotation_cfg is not None:
@@ -292,6 +322,15 @@ class CollectController:
                     _log.debug("Restored rotation motor to %.4f", original_rotation)
                 except Exception as exc:
                     _log.warning("Failed to restore rotation motor position: %s", exc)
+
+        for motor_cfg in config.motors:
+            original = original_motor_positions.get(motor_cfg.shorthand)
+            if original is not None:
+                try:
+                    caput(motor_cfg.pv, original, wait=True)
+                    _log.debug("Restored motor %s to %.4f", motor_cfg.shorthand, original)
+                except Exception as exc:
+                    _log.warning("Failed to restore motor %s: %s", motor_cfg.shorthand, exc)
 
         wx.CallAfter(self._stop_elapsed_timer)
         if self._on_collecting_changed is not None:

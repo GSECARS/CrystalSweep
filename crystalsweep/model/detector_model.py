@@ -106,6 +106,10 @@ class DetectorModel(Protocol):
         """Restore the plugin's AutoIncrement PV to *saved_value*."""
         ...
 
+    def abort(self) -> None:
+        """Stop acquisition immediately and reset the detector to a safe idle state."""
+        ...
+
 
 class ADEigerModel:
     """Detector model for Dectris Eiger detectors via EPICS areaDetector.
@@ -249,6 +253,26 @@ class ADEigerModel:
         print(f"[detector] Eiger {p} ({plugin}): still done (exposure={exposure:.4f}s)")
         _log.debug("ADEigerModel still: %s plugin=%s exposure=%.4f done", p, plugin, exposure)
 
+    def abort(self) -> None:
+        p = self._prefix
+        try:
+            caput(f"{p}cam1:Acquire", 0)
+        except Exception as exc:
+            _log.warning("ADEigerModel abort: failed to stop acquire: %s", exc)
+        try:
+            caput(f"{p}cam1:NumImages", 1)
+        except Exception as exc:
+            _log.warning("ADEigerModel abort: failed to reset NumImages: %s", exc)
+        try:
+            caput(f"{p}Proc1:NumFilter", 1)
+        except Exception as exc:
+            _log.warning("ADEigerModel abort: failed to reset Proc1:NumFilter: %s", exc)
+        try:
+            caput(f"{p}HDF1:Capture", 0)
+        except Exception as exc:
+            _log.warning("ADEigerModel abort: failed to stop HDF1:Capture: %s", exc)
+        _log.info("ADEigerModel abort: %s", p)
+
 
 class ADPilatusModel:
     """Detector model for Dectris Pilatus detectors via EPICS areaDetector.
@@ -387,6 +411,26 @@ class ADPilatusModel:
 
         print(f"[detector] Pilatus {p} ({plugin}): still done (exposure={exposure:.4f}s)")
         _log.debug("ADPilatusModel still: %s plugin=%s exposure=%.4f done", p, plugin, exposure)
+
+    def abort(self) -> None:
+        p = self._prefix
+        try:
+            caput(f"{p}cam1:Acquire", 0)
+        except Exception as exc:
+            _log.warning("ADPilatusModel abort: failed to stop acquire: %s", exc)
+        try:
+            caput(f"{p}cam1:ThresholdApply", 1)
+        except Exception as exc:
+            _log.warning("ADPilatusModel abort: failed to apply threshold: %s", exc)
+        try:
+            caput(f"{p}cam1:NumImages", 1)
+        except Exception as exc:
+            _log.warning("ADPilatusModel abort: failed to reset NumImages: %s", exc)
+        try:
+            caput(f"{p}Proc1:NumFilter", 1)
+        except Exception as exc:
+            _log.warning("ADPilatusModel abort: failed to reset Proc1:NumFilter: %s", exc)
+        _log.info("ADPilatusModel abort: %s", p)
 
 
 class ADSpinnakerModel:
@@ -530,6 +574,18 @@ class ADSpinnakerModel:
 
         print(f"[detector] Spinnaker {p} ({plugin}): still done (exposure={exposure:.4f}s)")
         _log.debug("ADSpinnakerModel still: %s plugin=%s exposure=%.4f done", p, plugin, exposure)
+
+    def abort(self) -> None:
+        p = self._prefix
+        try:
+            caput(f"{p}cam1:Acquire", 0)
+        except Exception as exc:
+            _log.warning("ADSpinnakerModel abort: failed to stop acquire: %s", exc)
+        try:
+            caput(f"{p}cam1:NumImages", 1)
+        except Exception as exc:
+            _log.warning("ADSpinnakerModel abort: failed to reset NumImages: %s", exc)
+        _log.info("ADSpinnakerModel abort: %s", p)
 
 
 _REGISTRY: dict[str, type] = {

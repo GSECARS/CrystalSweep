@@ -70,6 +70,10 @@ class ScanEngine:
                             _log.warning("pre_scan: failed to set %s (%s): %s", key, pv, exc)
         return None
 
+    def post_scan(self, point: CollectionPoint, config: BeamlineConfig) -> None:
+        """Run post-scan cleanup after each point completes or is aborted."""
+        print(f"[post_scan] {point.label}")
+
     def run_still(
         self,
         point: CollectionPoint,
