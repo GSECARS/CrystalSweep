@@ -55,7 +55,9 @@ class MainController:
         self._collect_controller = CollectController(model=self._model, view=self._view)
         self._collect_controller.bind_collecting_changed(self._on_collecting_changed)
         self._collection_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
+        self._collection_controller.add_points_changed_listener(self._collect_controller.validate_limits)
         self._collection_settings_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
+        self._collection_settings_controller.add_points_changed_listener(self._collect_controller.validate_limits)
         self._ad_viewer_controller = ADViewerController(model=self._model, view=self._view)
         self._beamline_config_controller = BeamlineConfigController(
             model=self._model,
@@ -78,6 +80,7 @@ class MainController:
         self._file_settings_controller.sync_from_detector()
         self._file_settings_controller.push_to_detector()
         self._file_settings_controller.apply_crysalis_from_config()
+        self._collect_controller.on_config_applied()
         self._check_epics_status(cfg)
 
     def _check_epics_status(self, cfg: BeamlineConfig | None = None) -> None:

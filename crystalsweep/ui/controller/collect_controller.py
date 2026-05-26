@@ -25,6 +25,7 @@ from epics import caget, caput, caput_many
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
+from crystalsweep.model.motor_limits import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
 from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
 
@@ -61,6 +62,7 @@ class CollectController:
         self._total_weight: int = 1
 
         self._restore_pv_snapshot: dict[str, object] = {}
+        self._monitored_limit_pvs: list[str] = []
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
@@ -69,6 +71,15 @@ class CollectController:
 
     def bind_collecting_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_collecting_changed = callback
+
+    def on_config_applied(self) -> None:
+        """Re-subscribe soft-limit monitors for the newly active beamline config."""
+        clear_limit_monitors(self._monitored_limit_pvs)
+        config = self._model.beamline.active
+        pvs = [m.pv for m in config.motors if m.pv.strip()]
+        if config.rotation_motor and config.rotation_motor.pv.strip():
+            pvs.append(config.rotation_motor.pv)
+        self._monitored_limit_pvs = subscribe_limit_monitors(pvs, lambda **_: wx.CallAfter(self.validate_limits))
 
     def _on_collect(self) -> None:
         if self._view.collect.test_mode:
@@ -100,6 +111,70 @@ class CollectController:
             self._view.collect.clear_eta()
             return
         self._view.collect.set_eta(self._estimate_total_seconds(selected))
+
+    def validate_limits(self) -> None:
+        """Check all collection points against motor soft limits in a background thread.
+
+        Marks rows with red outlines and disables the Collect button when violations
+        are found.  Clears all markers and re-enables the button when everything is OK.
+        """
+        if not self._model.beamline.has_active:
+            return
+
+        all_points = self._model.collection.points
+        config = self._model.beamline.active
+
+        def _worker() -> None:
+            rotation_cfg = config.rotation_motor
+            violations: set[int] = set()
+            field_errors: dict[int, tuple[dict[str, bool], bool, bool]] = {}
+
+            for idx, point in enumerate(all_points):
+                if not point.selected:
+                    continue
+
+                motor_errors: dict[str, bool] = {}
+                for motor_cfg in config.motors:
+                    raw = point.motor_positions.get(motor_cfg.shorthand)
+                    if raw is None:
+                        continue
+                    try:
+                        pos = float(raw)
+                    except (ValueError, TypeError):
+                        continue
+                    motor_errors[motor_cfg.shorthand] = bool(check_soft_limits(motor_cfg.pv, pos))
+
+                rot_start_error = False
+                rot_end_error = False
+                if rotation_cfg is not None:
+                    if point.rotation_start:
+                        try:
+                            pos = float(point.rotation_start)
+                            rot_start_error = bool(check_soft_limits(rotation_cfg.pv, pos))
+                        except (ValueError, TypeError):
+                            pass
+                    if point.rotation_end:
+                        try:
+                            pos = float(point.rotation_end)
+                            rot_end_error = bool(check_soft_limits(rotation_cfg.pv, pos))
+                        except (ValueError, TypeError):
+                            pass
+
+                if any(motor_errors.values()) or rot_start_error or rot_end_error:
+                    violations.add(idx)
+                field_errors[idx] = (motor_errors, rot_start_error, rot_end_error)
+
+            wx.CallAfter(self._apply_limit_errors, violations, field_errors, len(all_points))
+
+        threading.Thread(target=_worker, daemon=True, name="limit-check").start()
+
+    def _apply_limit_errors(self, violations: set[int], field_errors: dict, total: int) -> None:
+        for idx in range(total):
+            in_violation = idx in violations
+            self._view.collection_table.set_row_limit_error(idx, in_violation)
+            motor_errors, rot_start_error, rot_end_error = field_errors.get(idx, ({}, False, False))
+            self._view.collection_table.set_row_field_limit_errors(idx, motor_errors, rot_start_error, rot_end_error)
+        self._view.collect.set_collect_enabled(not violations)
 
     @staticmethod
     def _point_frame_weight(point: CollectionPoint) -> int:
@@ -445,16 +520,32 @@ class CollectController:
             vals: list[float] = []
             if motor2_cfg is not None:
                 try:
+                    pos2 = float(first_pt.motor_positions.get(motor2, "0") or "0")
+                    limit_err = check_soft_limits(motor2_cfg.pv, pos2)
+                    if limit_err:
+                        wx.CallAfter(wx.MessageBox, f"Soft limit violation — {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+                        self._abort_event.set()
+                        break
                     pvs.append(motor2_cfg.pv)
-                    vals.append(float(first_pt.motor_positions.get(motor2, "0") or "0"))
+                    vals.append(pos2)
                 except Exception as exc:
                     _log.warning("Failed to prepare motor2 move %s: %s", motor2, exc)
+            if self._abort_event.is_set():
+                break
             if motor1_cfg is not None:
                 try:
+                    pos1_row = float(first_pt.motor_positions.get(motor1, "0") or "0")
+                    limit_err = check_soft_limits(motor1_cfg.pv, pos1_row)
+                    if limit_err:
+                        wx.CallAfter(wx.MessageBox, f"Soft limit violation — {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+                        self._abort_event.set()
+                        break
                     pvs.append(motor1_cfg.pv)
-                    vals.append(float(first_pt.motor_positions.get(motor1, "0") or "0"))
+                    vals.append(pos1_row)
                 except Exception as exc:
                     _log.warning("Failed to prepare motor1 start move %s: %s", motor1, exc)
+            if self._abort_event.is_set():
+                break
             if pvs:
                 try:
                     caput_many(pvs, vals, wait=True)
@@ -476,6 +567,11 @@ class CollectController:
                     if motor1_cfg is not None:
                         try:
                             pos1 = float(col_pt.motor_positions.get(motor1, "0") or "0")
+                            limit_err = check_soft_limits(motor1_cfg.pv, pos1)
+                            if limit_err:
+                                wx.CallAfter(wx.MessageBox, f"Soft limit violation — {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+                                self._abort_event.set()
+                                break
                             caput(motor1_cfg.pv, pos1, wait=True)
                         except Exception as exc:
                             _log.warning("Failed to move map motor1 %s: %s", motor1, exc)
@@ -617,6 +713,11 @@ class CollectController:
                 pass
             _time.sleep(_TRIGGERING_POLL_S)
 
+    def _handle_scan_error(self, exc: Exception, label: str) -> None:
+        msg = str(exc)
+        if "Soft limit violation" in msg:
+            wx.MessageBox(msg, "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+
     def _spawn_crysalis_conversion(self, point: CollectionPoint) -> None:
         if point.scan_type != "step":
             return
@@ -739,6 +840,7 @@ class CollectController:
         wx.CallAfter(self._stop_point_timer, idx, total)
 
         if error_holder:
+            wx.CallAfter(self._handle_scan_error, error_holder[0], point.label)
             wx.CallAfter(
                 self._view.collect.set_status,
                 f"[{idx}/{total}] {point.label}: {error_holder[0]}",
@@ -806,6 +908,7 @@ class CollectController:
         wx.CallAfter(self._view.collect.set_progress, idx, total, n_frames, n_frames, (completed_weight + point_weight) / total_weight)
 
         if error_holder:
+            wx.CallAfter(self._handle_scan_error, error_holder[0], point.label)
             wx.CallAfter(
                 self._view.collect.set_status,
                 f"[{idx}/{total}] {point.label}: {error_holder[0]}",
@@ -853,6 +956,7 @@ class CollectController:
         wx.CallAfter(self._stop_point_timer, idx, total)
 
         if error_holder:
+            wx.CallAfter(self._handle_scan_error, error_holder[0], point.label)
             wx.CallAfter(
                 self._view.collect.set_status,
                 f"[{idx}/{total}] {point.label}: {error_holder[0]}",

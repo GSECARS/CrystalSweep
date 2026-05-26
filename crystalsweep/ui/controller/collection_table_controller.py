@@ -92,6 +92,7 @@ class CollectionTableController:
     def _on_add(self) -> None:
         point = self._model.collection.add_point(self._current_shorthands())
         self._view.add_row(point)
+        self._notify_points_changed()
         _log.debug("Added collection point: %s", point.label)
 
     def _on_label_changed(self, index: int, label: str) -> None:
@@ -99,6 +100,7 @@ class CollectionTableController:
 
     def _on_motor_changed(self, index: int, shorthand: str, value: str) -> None:
         self._model.collection.update_motor_position(index, shorthand, value)
+        self._notify_points_changed()
 
     def _on_type_changed(self, index: int, scan_type: ScanType) -> None:
         self._model.collection.update_scan_type(index, scan_type)

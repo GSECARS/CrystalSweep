@@ -458,6 +458,11 @@ class DarkTextCtrl(wx.Panel):
             self._ctrl.SetBackgroundColour(bg)
             self.Refresh()
 
+    def set_limit_error(self, error: bool) -> None:
+        if error != getattr(self, "_limit_error", False):
+            self._limit_error = error
+            self.Refresh()
+
     def Enable(self, enable: bool = True) -> bool:
         self.set_disabled(not enable)
         return True
@@ -570,7 +575,12 @@ class DarkTextCtrl(wx.Panel):
         gc.DrawRoundedRectangle(0, 0, w, h, 3)
         if self._editing:
             return
-        fg = DISABLED_FG if self._disabled else FG_PRIMARY
+        if self._disabled:
+            fg = DISABLED_FG
+        elif getattr(self, "_limit_error", False):
+            fg = DANGER
+        else:
+            fg = FG_PRIMARY
         x_pad = 6
         if self._value:
             gc.SetFont(self._font, fg)

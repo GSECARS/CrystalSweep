@@ -19,7 +19,7 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BG_SURFACE, FG_PRIMARY, FG_SECONDARY, SEP_COLOUR, scaled_font
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BG_SURFACE, DANGER, FG_PRIMARY, FG_SECONDARY, SEP_COLOUR, scaled_font
 from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, MUTED_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton
 
 __all__ = ["CollectionTableView"]
@@ -177,6 +177,7 @@ class _CollectionRow(wx.Panel):
         self._motor_precisions = motor_precisions
         self._collecting = False
         self._active = False
+        self._limit_error = False
 
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_SIZE, self._on_size)
@@ -289,6 +290,17 @@ class _CollectionRow(wx.Panel):
         self.Refresh()
         self._remove_btn_panel.Refresh()
 
+    def set_limit_error(self, error: bool) -> None:
+        self._limit_error = error
+        self.Refresh()
+        self._remove_btn_panel.Refresh()
+
+    def set_field_limit_errors(self, motor_errors: dict[str, bool], rot_start_error: bool, rot_end_error: bool) -> None:
+        for shorthand, ctrl in self._motor_ctrls.items():
+            ctrl.set_limit_error(motor_errors.get(shorthand, False))
+        self._rot_start_ctrl.set_limit_error(rot_start_error)
+        self._rot_end_ctrl.set_limit_error(rot_end_error)
+
     def refresh_from_point(self, point: "CollectionPoint") -> None:
         if point.scan_type in SCAN_TYPES:
             self._type_combo.SetSelection(list(SCAN_TYPES).index(point.scan_type))
@@ -364,7 +376,13 @@ class _CollectionRow(wx.Panel):
             x += cw
             gc.StrokeLine(x, 0, x, h)
 
-        if self._active:
+        if self._limit_error:
+            gc.SetPen(wx.Pen(DANGER, 2))
+            gc.SetBrush(wx.TRANSPARENT_BRUSH)
+            gc.StrokeLine(1, 1, w, 1)
+            gc.StrokeLine(1, h - 2, w, h - 2)
+            gc.StrokeLine(1, 1, 1, h - 2)
+        elif self._active:
             gc.SetPen(wx.Pen(ACCENT, 2))
             gc.SetBrush(wx.TRANSPARENT_BRUSH)
             gc.StrokeLine(1, 1, w, 1)
@@ -378,7 +396,13 @@ class _CollectionRow(wx.Panel):
         gc.SetBrush(wx.Brush(self._remove_btn_panel.GetBackgroundColour()))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
-        if self._active:
+        if self._limit_error:
+            gc.SetPen(wx.Pen(DANGER, 2))
+            gc.SetBrush(wx.TRANSPARENT_BRUSH)
+            gc.StrokeLine(w - 1, 1, w - 1, h - 1)
+            gc.StrokeLine(0, 1, w - 1, 1)
+            gc.StrokeLine(0, h - 2, w - 1, h - 2)
+        elif self._active:
             gc.SetPen(wx.Pen(ACCENT, 2))
             gc.SetBrush(wx.TRANSPARENT_BRUSH)
             gc.StrokeLine(w - 1, 1, w - 1, h - 1)
@@ -717,6 +741,14 @@ class CollectionTableView(wx.Panel):
     def set_row_selected(self, index: int, selected: bool) -> None:
         if 0 <= index < len(self._rows):
             self._rows[index].set_selected(selected)
+
+    def set_row_limit_error(self, index: int, error: bool) -> None:
+        if 0 <= index < len(self._rows):
+            self._rows[index].set_limit_error(error)
+
+    def set_row_field_limit_errors(self, index: int, motor_errors: dict[str, bool], rot_start_error: bool, rot_end_error: bool) -> None:
+        if 0 <= index < len(self._rows):
+            self._rows[index].set_field_limit_errors(motor_errors, rot_start_error, rot_end_error)
 
     def bind_add(self, callback: Callable[[], None]) -> None:
         self._on_add_cb = callback

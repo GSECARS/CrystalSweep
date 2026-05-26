@@ -25,6 +25,7 @@ from crystalsweep.model.beamline_config_model import BeamlineConfig, MotorConfig
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.model.file_settings_model import FileSettingsModel
+from crystalsweep.model.motor_limits import check_soft_limits
 from crystalsweep.model.scan_model import ScanSpec, get_driver
 from crystalsweep.model.script_model import ScriptModel
 
@@ -108,6 +109,10 @@ class ScanEngine:
             saved_auto_inc = 1
             disable_inc = False
             try:
+                limit_err = check_soft_limits(rotation_cfg.pv, omega_start)
+                if limit_err:
+                    on_error(ValueError(f"Soft limit violation — {limit_err}"))
+                    return
                 if on_status: on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
                 if file_settings is not None:
@@ -209,6 +214,11 @@ class ScanEngine:
                 saved_auto_inc = 1
                 disable_inc = False
                 try:
+                    for chk_pos in (omega_start, omega_end):
+                        limit_err = check_soft_limits(rotation_cfg.pv, chk_pos)
+                        if limit_err:
+                            on_error(ValueError(f"Soft limit violation — {limit_err}"))
+                            return
                     if file_settings is not None:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
@@ -223,6 +233,10 @@ class ScanEngine:
                         if self._driver is None:
                             break
                         angle = omega_start + frame_idx * step_size
+                        limit_err = check_soft_limits(rotation_cfg.pv, angle)
+                        if limit_err:
+                            on_error(ValueError(f"Soft limit violation — {limit_err}"))
+                            return
                         caput(f"{pv_base}.VAL", angle, wait=True)
                         detector.collect_frame(exposure)
                         on_frame(frame_idx + 1, n_frames)
@@ -386,6 +400,11 @@ class ScanEngine:
             saved_auto_inc = 1
             disable_inc = False
             try:
+                for chk_pos in (omega_start, omega_end):
+                    limit_err = check_soft_limits(rotation_cfg.pv, chk_pos)
+                    if limit_err:
+                        on_error(ValueError(f"Soft limit violation — {limit_err}"))
+                        return
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
