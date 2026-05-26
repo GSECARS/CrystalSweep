@@ -498,6 +498,8 @@ class CollectController:
 
         motor1_cfg = next((m for m in config.motors if m.shorthand == motor1), None) if motor1 else None
         motor2_cfg = next((m for m in config.motors if m.shorthand == motor2), None) if motor2 else None
+        map_motor_shorthands = {s for s in (motor1, motor2) if s}
+        other_motors = [m for m in config.motors if m.shorthand not in map_motor_shorthands]
 
         original_motor1: float | None = None
         original_motor2: float | None = None
@@ -570,6 +572,18 @@ class CollectController:
 
             if self._abort_event.is_set():
                 break
+
+            if row_num == 0:
+                for motor_cfg in other_motors:
+                    raw = first_pt.motor_positions.get(motor_cfg.shorthand)
+                    if raw is None:
+                        continue
+                    try:
+                        caput(motor_cfg.pv, float(raw), wait=True)
+                    except Exception as exc:
+                        _log.warning("Failed to move non-map motor %s before map group: %s", motor_cfg.shorthand, exc)
+                if self._abort_event.is_set():
+                    break
 
             if scan_type == "still" and use_trajectory:
                 self._run_map_row_trajectory(row_points, row_num, n_rows, start_idx, total, motor1, config, file_settings, all_points)
