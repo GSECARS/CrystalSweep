@@ -397,6 +397,18 @@ class CollectController:
                 except Exception as exc:
                     _log.warning("Failed to set rotation velocity before point %s: %s", point.label, exc)
 
+            for motor_cfg in config.motors:
+                raw = point.motor_positions.get(motor_cfg.shorthand)
+                if raw is None:
+                    continue
+                try:
+                    caput(motor_cfg.pv, float(raw), wait=True)
+                except Exception as exc:
+                    _log.warning("Failed to move motor %s before point %s: %s", motor_cfg.shorthand, point.label, exc)
+
+            if self._abort_event.is_set():
+                break
+
             point_weight = frame_weights[idx - 1]
             if point.scan_type == "still":
                 self._run_still(point, idx, total, config, file_settings, completed_weight, point_weight, total_weight)
