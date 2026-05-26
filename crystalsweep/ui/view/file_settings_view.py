@@ -211,9 +211,6 @@ class FileSettingsView(wx.Panel):
         self._crysalis_cal_btn = IconButton(self, draw_folder, size=16, tooltip="Load CrysAlis calibration", bg=BG_CARD)
         self._crysalis_cal_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_calibration())
 
-        vsep2 = wx.Panel(self, size=(1, -1))
-        vsep2.SetBackgroundColour(SEP_COLOUR)
-
         self._apex_toggle = DarkToggle(self, "Use APEX")
         self._apex_toggle.SetBackgroundColour(BG_CARD)
         self._apex_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_apex_changed_cb, v))
@@ -223,6 +220,9 @@ class FileSettingsView(wx.Panel):
         self._apex_cal_label.SetBackgroundColour(BG_CARD)
         self._apex_cal_btn = IconButton(self, draw_folder, size=16, tooltip="Load APEX calibration", bg=BG_CARD)
         self._apex_cal_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_apex_calibration())
+        self._apex_toggle.Hide()
+        self._apex_cal_label.Hide()
+        self._apex_cal_btn.Hide()
 
         crysalis_inner = wx.BoxSizer(wx.HORIZONTAL)
         crysalis_inner.Add(self._crysalis_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -235,17 +235,6 @@ class FileSettingsView(wx.Panel):
         crysalis_col.Add(crysalis_inner, 0, wx.EXPAND)
         crysalis_col.AddStretchSpacer()
 
-        apex_inner = wx.BoxSizer(wx.HORIZONTAL)
-        apex_inner.Add(self._apex_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
-        apex_inner.AddSpacer(4)
-        apex_inner.Add(self._apex_cal_label, 1, wx.ALIGN_CENTER_VERTICAL)
-        apex_inner.AddSpacer(4)
-        apex_inner.Add(self._apex_cal_btn, 0, wx.ALIGN_CENTER_VERTICAL)
-        apex_col = wx.BoxSizer(wx.VERTICAL)
-        apex_col.AddStretchSpacer()
-        apex_col.Add(apex_inner, 0, wx.EXPAND)
-        apex_col.AddStretchSpacer()
-
         map_col = wx.BoxSizer(wx.HORIZONTAL)
         map_col.Add(map_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         map_col.AddSpacer(6)
@@ -256,10 +245,6 @@ class FileSettingsView(wx.Panel):
         row.Add(vsep1, 0, wx.EXPAND)
         row.AddSpacer(8)
         row.Add(crysalis_col, 1, wx.EXPAND)
-        row.AddSpacer(8)
-        row.Add(vsep2, 0, wx.EXPAND)
-        row.AddSpacer(8)
-        row.Add(apex_col, 1, wx.EXPAND)
         return row
 
     def bind_filename_changed(self, callback: Callable[[str], None]) -> None:
@@ -312,12 +297,11 @@ class FileSettingsView(wx.Panel):
             self._filename_ctrl, self._filename_update_btn,
             self._frame_ctrl, self._frame_reset_btn, self._frame_update_btn,
             self._path_ctrl, self._path_browse_btn, self._path_update_btn,
-            self._map_ext_ctrl, self._crysalis_cal_btn, self._apex_cal_btn,
+            self._map_ext_ctrl, self._crysalis_cal_btn,
         ):
             ctrl.Enable(enabled)
         for toggle in (
             self._hdf5_toggle, self._cbf_toggle, self._tif_toggle,
-            self._apex_toggle,
         ):
             toggle.SetLocked(not enabled)
         if enabled:
