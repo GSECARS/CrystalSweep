@@ -28,6 +28,7 @@ from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.model.motor_limits import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
 from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
+from crystalsweep.ui.view.custom.widgets import DarkAbortingDialog
 
 __all__ = ["CollectController"]
 
@@ -63,6 +64,7 @@ class CollectController:
 
         self._restore_pv_snapshot: dict[str, object] = {}
         self._monitored_limit_pvs: list[str] = []
+        self._aborting_dlg: DarkAbortingDialog | None = None
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
@@ -214,14 +216,34 @@ class CollectController:
                 total += exposure
         return total
 
+    def _show_aborting_dialog(self, elapsed_str: str) -> None:
+        if self._aborting_dlg is not None:
+            return
+        self._aborting_dlg = DarkAbortingDialog(self._view, elapsed=elapsed_str)
+        self._aborting_dlg.Show()
+        self._aborting_dlg.Raise()
+        self._aborting_dlg.SetFocus()
+
+    def _dismiss_aborting_dialog(self) -> None:
+        dlg = self._aborting_dlg
+        self._aborting_dlg = None
+        if dlg is not None:
+            dlg.dismiss()
+
     def _on_file_number_updated(self, file_number: int) -> None:
         self._model.file_settings.frame_number = file_number
         wx.CallAfter(self._view.file_settings.set_frame_number, file_number)
 
     def _on_abort(self) -> None:
-        self._abort_event.set()
-        self._engine.abort()
-        wx.CallAfter(self._view.collect.set_status, "Aborting...", wx.Colour(220, 160, 40))
+        if not self._abort_event.is_set():
+            self._abort_event.set()
+            self._engine.abort()
+            wx.CallAfter(self._view.collect.set_status, "Aborting...", wx.Colour(220, 160, 40))
+            elapsed = _time.monotonic() - self._start_time
+            h, rem = divmod(int(elapsed), 3600)
+            m, s = divmod(rem, 60)
+            elapsed_str = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+            wx.CallAfter(self._show_aborting_dialog, elapsed_str)
 
         config = self._model.beamline.active
         det = config.active_detector_config
@@ -463,6 +485,7 @@ class CollectController:
         wx.CallAfter(self._stop_elapsed_timer)
         if self._on_collecting_changed is not None:
             wx.CallAfter(self._on_collecting_changed, False)
+        wx.CallAfter(self._dismiss_aborting_dialog)
         if pre_scan_error is not None:
             wx.CallAfter(self._view.collect.set_status, f"Pre-scan error: {pre_scan_error}", wx.Colour(220, 80, 40))
         elif self._abort_event.is_set():

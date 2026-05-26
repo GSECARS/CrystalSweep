@@ -51,6 +51,7 @@ __all__ = [
     "DANGER_SCHEME",
     "DEFAULT_SCHEME",
     "MUTED_SCHEME",
+    "DarkAbortingDialog",
     "DarkCombo",
     "DarkConfirmDialog",
     "DarkMenuBar",
@@ -1543,6 +1544,59 @@ class ThemedSplitter(wx.SplitterWindow):
         new_event.SetPosition(pt)
         wx.PostEvent(self, new_event)
         event.Skip()
+
+
+class DarkAbortingDialog(wx.Dialog):
+    """Non-modal dark-themed dialog shown while a collection is aborting.
+
+    Steals focus immediately so the user cannot click Collect again until
+    the background thread has fully stopped.  Call *dismiss()* from the
+    main thread to close it once aborting is complete.
+    """
+
+    def __init__(self, parent: wx.Window, elapsed: str = "") -> None:
+        super().__init__(
+            parent,
+            title="Aborting…",
+            style=wx.DEFAULT_DIALOG_STYLE & ~wx.CLOSE_BOX,
+        )
+        self.SetBackgroundColour(BG_SURFACE)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        title_label = wx.StaticText(self, label="Collection aborted")
+        title_label.SetForegroundColour(DANGER)
+        title_label.SetBackgroundColour(BG_SURFACE)
+        title_label.SetFont(scaled_font(13, weight=wx.FONTWEIGHT_BOLD))
+        outer.Add(title_label, 0, wx.LEFT | wx.TOP | wx.RIGHT, 20)
+
+        lines = ["The collection was aborted. Motors are being restored,"]
+        lines.append("the detector is being stopped, and abort PVs are being written.")
+        if elapsed:
+            lines.append(f"\nElapsed time: {elapsed}")
+        lines.append("\nThis dialog will close automatically once the abort is complete.")
+        msg_label = wx.StaticText(self, label="\n".join(lines))
+        msg_label.SetForegroundColour(FG_SECONDARY)
+        msg_label.SetBackgroundColour(BG_SURFACE)
+        msg_label.SetFont(scaled_font(12))
+        msg_label.Wrap(400)
+        outer.Add(msg_label, 0, wx.LEFT | wx.BOTTOM | wx.RIGHT, 20)
+
+        self.SetSizer(outer)
+        self.Fit()
+        self.CentreOnParent()
+        self.Bind(wx.EVT_CHAR_HOOK, lambda e: None)
+        self.Bind(wx.EVT_CLOSE, lambda e: None)
+        if parent:
+            parent.Enable(False)
+
+    def dismiss(self) -> None:
+        if self:
+            parent = self.GetParent()
+            if parent:
+                parent.Enable(True)
+                parent.Raise()
+            self.Destroy()
 
 
 class DarkConfirmDialog(wx.Dialog):
