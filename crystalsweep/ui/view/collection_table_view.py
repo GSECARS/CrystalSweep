@@ -946,9 +946,13 @@ class CollectionTableView(wx.Panel):
             step = self._make_step_cb(i)
             time = self._make_time_cb(i)
             row._rot_start_ctrl.Bind(wx.EVT_KILL_FOCUS, _CollectionRow._make_commit(row._rot_start_ctrl, rot_start))
+            row._rot_start_ctrl.Bind(wx.EVT_TEXT_ENTER, _CollectionRow._make_commit(row._rot_start_ctrl, rot_start))
             row._rot_end_ctrl.Bind(wx.EVT_KILL_FOCUS, _CollectionRow._make_commit(row._rot_end_ctrl, rot_end))
+            row._rot_end_ctrl.Bind(wx.EVT_TEXT_ENTER, _CollectionRow._make_commit(row._rot_end_ctrl, rot_end))
             row._step_ctrl.Bind(wx.EVT_KILL_FOCUS, _CollectionRow._make_commit(row._step_ctrl, step))
+            row._step_ctrl.Bind(wx.EVT_TEXT_ENTER, _CollectionRow._make_commit(row._step_ctrl, step))
             row._time_ctrl.Bind(wx.EVT_KILL_FOCUS, _CollectionRow._make_commit(row._time_ctrl, time))
+            row._time_ctrl.Bind(wx.EVT_TEXT_ENTER, _CollectionRow._make_commit(row._time_ctrl, time))
             row._remove_btn.set_action(self._make_remove_cb(i))
             if row._get_btn is not None:
                 row._get_btn.set_action(self._make_get_cb(i))

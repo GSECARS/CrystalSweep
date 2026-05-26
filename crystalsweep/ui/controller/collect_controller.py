@@ -82,6 +82,10 @@ class CollectController:
         self._monitored_limit_pvs = subscribe_limit_monitors(pvs, lambda **_: wx.CallAfter(self.validate_limits))
 
     def _on_collect(self) -> None:
+        focused = self._view.FindFocus()
+        if focused is not None:
+            focused.Navigate()
+
         if self._view.collect.test_mode:
             points = self._model.collection.points
         else:
