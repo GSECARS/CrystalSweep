@@ -499,7 +499,7 @@ class FileSettingsView(wx.Panel):
         with wx.FileDialog(
             self,
             "Load CrysAlis calibration file",
-            wildcard="All files (*.*)|*.*" if sys.platform == "win32" else "*",
+            wildcard="PAR files (*.par)|*.par" + ("|All files (*.*)|*.*" if sys.platform == "win32" else ""),
             style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
         ) as dlg:
             if dlg.ShowModal() == wx.ID_CANCEL:
