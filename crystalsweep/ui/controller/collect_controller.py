@@ -595,18 +595,6 @@ class CollectController:
             if self._abort_event.is_set():
                 break
 
-            if row_num == 0:
-                for motor_cfg in other_motors:
-                    raw = first_pt.motor_positions.get(motor_cfg.shorthand)
-                    if raw is None:
-                        continue
-                    try:
-                        caput(motor_cfg.pv, float(raw), wait=True)
-                    except Exception as exc:
-                        _log.warning("Failed to move non-map motor %s before map group: %s", motor_cfg.shorthand, exc)
-                if self._abort_event.is_set():
-                    break
-
             if scan_type == "still" and use_trajectory:
                 self._run_map_row_trajectory(row_points, row_num, n_rows, start_idx, total, motor1, config, file_settings, all_points)
             else:
@@ -627,6 +615,18 @@ class CollectController:
                             caput(motor1_cfg.pv, pos1, wait=True)
                         except Exception as exc:
                             _log.warning("Failed to move map motor1 %s: %s", motor1, exc)
+
+                    for motor_cfg in other_motors:
+                        raw = col_pt.motor_positions.get(motor_cfg.shorthand)
+                        if raw is None:
+                            continue
+                        try:
+                            caput(motor_cfg.pv, float(raw), wait=True)
+                        except Exception as exc:
+                            _log.warning("Failed to move non-map motor %s: %s", motor_cfg.shorthand, exc)
+
+                    if self._abort_event.is_set():
+                        break
 
                     wx.CallAfter(
                         self._view.collect.set_status,
