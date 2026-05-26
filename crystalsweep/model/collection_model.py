@@ -19,7 +19,7 @@ from typing import Literal
 __all__ = ["CollectionPoint", "CollectionTableModel", "ScanType"]
 
 ScanType = Literal["still", "step", "wide"]
-SCAN_TYPES: tuple[ScanType, ...] = ("still", "step", "wide")
+SCAN_TYPES: tuple[ScanType, ...] = ("still", "wide", "step")
 
 
 @dataclass
