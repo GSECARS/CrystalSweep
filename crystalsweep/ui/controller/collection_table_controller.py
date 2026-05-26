@@ -13,6 +13,10 @@
 # ----------------------------------------------------------------------------------
 
 import logging
+import threading
+
+import wx
+from epics import caget, caput
 
 from crystalsweep.model import BeamlineConfig, MainModel
 from crystalsweep.model.collection_model import ScanType
@@ -42,6 +46,8 @@ class CollectionTableController:
         self._view.bind_time_changed(self._on_time_changed)
         self._view.bind_selection_changed(self._on_selection_changed)
         self._view.bind_remove(self._on_remove)
+        self._view.bind_get(self._on_get)
+        self._view.bind_move(self._on_move)
 
         self.refresh_columns()
 
@@ -125,6 +131,48 @@ class CollectionTableController:
     def _on_selection_changed(self, index: int, selected: bool) -> None:
         self._model.collection.set_selected(index, selected)
         self._notify_points_changed()
+
+    def _on_get(self, index: int) -> None:
+        config = self._model.beamline.active
+        motors = [m for m in config.motors if m.pv.strip() and m.shorthand]
+
+        def _worker() -> None:
+            values: dict[str, str] = {}
+            for motor in motors:
+                try:
+                    raw = caget(motor.pv)
+                    if raw is not None:
+                        values[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
+                except Exception:
+                    pass
+            if not values:
+                return
+            for shorthand, value in values.items():
+                self._model.collection.update_motor_position(index, shorthand, value)
+            wx.CallAfter(self._view.update_row_motor_values, index, values)
+            wx.CallAfter(self._notify_points_changed)
+
+        threading.Thread(target=_worker, daemon=True, name="get-motors").start()
+
+    def _on_move(self, index: int) -> None:
+        config = self._model.beamline.active
+        points = self._model.collection.points
+        if not (0 <= index < len(points)):
+            return
+        point = points[index]
+        motors = [m for m in config.motors if m.pv.strip() and m.shorthand]
+
+        def _worker() -> None:
+            for motor in motors:
+                raw = point.motor_positions.get(motor.shorthand)
+                if raw is None:
+                    continue
+                try:
+                    caput(motor.pv, float(raw), wait=True)
+                except Exception as exc:
+                    _log.warning("Failed to move motor %s: %s", motor.shorthand, exc)
+
+        threading.Thread(target=_worker, daemon=True, name="move-motors").start()
 
     def _on_remove(self, index: int) -> None:
         self._model.collection.remove_point(index)

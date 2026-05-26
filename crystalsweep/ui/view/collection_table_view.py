@@ -163,6 +163,8 @@ class _CollectionRow(wx.Panel):
         on_time_changed: Callable[[str], None],
         on_selection_changed: Callable[[bool], None],
         on_remove: Callable[[], None],
+        on_get: Callable[[], None] | None = None,
+        on_move: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(parent, size=(-1, _ROW_H), style=wx.BORDER_NONE)
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
@@ -209,9 +211,13 @@ class _CollectionRow(wx.Panel):
             self._get_btn = FlatButton(self, "Get", color_scheme=MUTED_SCHEME)
             self._get_btn.SetMinSize((-1, inner_h))
             self._get_btn.SetToolTip("Get current motor positions")
+            if on_get is not None:
+                self._get_btn.set_action(on_get)
             self._move_btn = FlatButton(self, "Move", color_scheme=MUTED_SCHEME)
             self._move_btn.SetMinSize((-1, inner_h))
             self._move_btn.SetToolTip("Move motors to stored positions")
+            if on_move is not None:
+                self._move_btn.set_action(on_move)
 
         self._type_combo = DarkCombo(self, choices=list(SCAN_TYPES), choice_colours=_TYPE_COLOURS)
         if point.scan_type in SCAN_TYPES:
@@ -292,6 +298,8 @@ class _CollectionRow(wx.Panel):
 
     def set_limit_error(self, error: bool) -> None:
         self._limit_error = error
+        if self._move_btn is not None:
+            self._move_btn.Enable(not error)
         self.Refresh()
         self._remove_btn_panel.Refresh()
 
@@ -320,6 +328,12 @@ class _CollectionRow(wx.Panel):
     def get_motor_value(self, shorthand: str) -> str:
         ctrl = self._motor_ctrls.get(shorthand)
         return ctrl.GetValue().strip() if ctrl else ""
+
+    def update_motor_values(self, values: dict[str, str]) -> None:
+        for shorthand, value in values.items():
+            ctrl = self._motor_ctrls.get(shorthand)
+            if ctrl is not None:
+                ctrl.SetValue(value)
 
     def get_scan_type(self) -> ScanType:
         sel = self._type_combo.GetStringSelection()
@@ -566,6 +580,8 @@ class CollectionTableView(wx.Panel):
         self._on_time_cb: Callable[[int, str], None] | None = None
         self._on_selection_cb: Callable[[int, bool], None] | None = None
         self._on_remove_cb: Callable[[int], None] | None = None
+        self._on_get_cb: Callable[[int], None] | None = None
+        self._on_move_cb: Callable[[int], None] | None = None
         self._on_min_width_changed_cb: Callable[[int], None] | None = None
 
         self._build_layout()
@@ -717,6 +733,8 @@ class CollectionTableView(wx.Panel):
             on_time_changed=self._make_time_cb(index),
             on_selection_changed=self._make_selection_cb(index),
             on_remove=self._make_remove_cb(index),
+            on_get=self._make_get_cb(index),
+            on_move=self._make_move_cb(index),
         )
         row.SetBackgroundColour(bg)
         self._viewport.rows_sizer.Add(row, 0, wx.EXPAND)
@@ -785,6 +803,16 @@ class CollectionTableView(wx.Panel):
 
     def bind_remove(self, callback: Callable[[int], None]) -> None:
         self._on_remove_cb = callback
+
+    def bind_get(self, callback: Callable[[int], None]) -> None:
+        self._on_get_cb = callback
+
+    def bind_move(self, callback: Callable[[int], None]) -> None:
+        self._on_move_cb = callback
+
+    def update_row_motor_values(self, index: int, values: dict[str, str]) -> None:
+        if 0 <= index < len(self._rows):
+            self._rows[index].update_motor_values(values)
 
     def bind_min_width_changed(self, callback: Callable[[int], None]) -> None:
         self._on_min_width_changed_cb = callback
@@ -889,6 +917,20 @@ class CollectionTableView(wx.Panel):
 
         return _cb
 
+    def _make_get_cb(self, index: int) -> Callable[[], None]:
+        def _cb() -> None:
+            if self._on_get_cb is not None:
+                self._on_get_cb(index)
+
+        return _cb
+
+    def _make_move_cb(self, index: int) -> Callable[[], None]:
+        def _cb() -> None:
+            if self._on_move_cb is not None:
+                self._on_move_cb(index)
+
+        return _cb
+
     def _sync_header_checkbox(self) -> None:
         all_checked = bool(self._rows) and all(row._selected for row in self._rows)
         self._header.set_all_selected(all_checked)
@@ -908,3 +950,7 @@ class CollectionTableView(wx.Panel):
             row._step_ctrl.Bind(wx.EVT_KILL_FOCUS, _CollectionRow._make_commit(row._step_ctrl, step))
             row._time_ctrl.Bind(wx.EVT_KILL_FOCUS, _CollectionRow._make_commit(row._time_ctrl, time))
             row._remove_btn.set_action(self._make_remove_cb(i))
+            if row._get_btn is not None:
+                row._get_btn.set_action(self._make_get_cb(i))
+            if row._move_btn is not None:
+                row._move_btn.set_action(self._make_move_cb(i))
