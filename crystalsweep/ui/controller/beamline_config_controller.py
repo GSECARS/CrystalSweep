@@ -188,6 +188,8 @@ class BeamlineConfigController:
         beamline = self._general_dlg.config_panel.beamline_name() if self._general_dlg else base.beamline
         abort_pvs = self._general_dlg.config_panel.collect_abort_pvs() if self._general_dlg else base.abort_pvs
         restore_pvs = self._general_dlg.config_panel.collect_restore_pvs() if self._general_dlg else base.restore_pvs
+        crysalis_par_path = self._general_dlg.config_panel.crysalis_par_path() if self._general_dlg else base.crysalis_par_path
+        crysalis_load_on_startup = self._general_dlg.config_panel.crysalis_load_on_startup() if self._general_dlg else base.crysalis_load_on_startup
 
         if self._detectors_dlg:
             detectors, active_detector = self._detectors_dlg.config_panel.collect_detectors()
@@ -212,6 +214,8 @@ class BeamlineConfigController:
             motors=motors,
             abort_pvs=abort_pvs,
             restore_pvs=restore_pvs,
+            crysalis_par_path=crysalis_par_path,
+            crysalis_load_on_startup=crysalis_load_on_startup,
         )
 
     def _save(self, config: BeamlineConfig) -> None:

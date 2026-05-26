@@ -62,6 +62,21 @@ class FileSettingsController:
         self._sync_format_from_detector()
         self._fetch_from_detector(update_directory=True, update_filename=True, update_frame=True)
 
+    def apply_crysalis_from_config(self) -> None:
+        """If the active beamline config has crysalis_load_on_startup set, load the PAR file and enable CrysAlis."""
+        cfg = self._model.beamline.active
+        if not cfg.crysalis_load_on_startup or not cfg.crysalis_par_path:
+            return
+        path = Path(cfg.crysalis_par_path)
+        if not path.is_file():
+            _log.warning("apply_crysalis_from_config: PAR file not found: %s", path)
+            return
+        self._model.file_settings.crysalis_calibration = path
+        self._model.file_settings.use_crysalis = True
+        self._view.file_settings.set_crysalis_calibration_label(path)
+        self._view.file_settings.set_crysalis(True)
+        _log.debug("apply_crysalis_from_config: loaded %s", path)
+
     def _sync_format_from_detector(self) -> None:
         cfg = self._model.beamline.active
         det = cfg.active_detector_config if cfg else None

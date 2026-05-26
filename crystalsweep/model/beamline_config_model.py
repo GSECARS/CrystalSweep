@@ -129,6 +129,8 @@ class BeamlineConfig:
     controllers: tuple[ControllerConfig, ...] = field(default_factory=tuple)
     abort_pvs: tuple[tuple[str, str], ...] = field(default_factory=tuple)
     restore_pvs: tuple[str, ...] = field(default_factory=tuple)
+    crysalis_par_path: str = ""
+    crysalis_load_on_startup: bool = False
 
     @property
     def is_empty(self) -> bool:
@@ -301,6 +303,8 @@ class BeamlineConfigModel:
             controllers=controllers,
             abort_pvs=abort_pvs,
             restore_pvs=restore_pvs,
+            crysalis_par_path=str(data.get("crysalis_par_path", "")),
+            crysalis_load_on_startup=bool(data.get("crysalis_load_on_startup", False)),
         )
         self._active = cfg
         return cfg
@@ -338,6 +342,8 @@ class BeamlineConfigModel:
                 for pv in config.restore_pvs
                 if pv
             ],
+            "crysalis_par_path": config.crysalis_par_path,
+            "crysalis_load_on_startup": config.crysalis_load_on_startup,
         }
 
         path = self.path_for(config.name)

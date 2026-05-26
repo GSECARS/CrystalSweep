@@ -13,13 +13,15 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+import sys
 from typing import Callable, Protocol
 
 import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
+from crystalsweep.ui.view.custom.icons import draw_folder
 from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, DANGER, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton, RadioDot
+from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton, IconButton, RadioDot
 
 __all__ = [
     "GeneralConfigView",
@@ -785,6 +787,25 @@ class GeneralConfigView(wx.Panel):
         b_sizer.Add(self._beamline_ctrl, 0, wx.EXPAND)
         b_body.SetSizer(b_sizer)
 
+        self._crysalis_section = _Section(self, "CrysAlis")
+        c_body = self._crysalis_section.body
+        self._crysalis_par_ctrl = DarkTextCtrl(c_body, placeholder="Path to .par calibration file")
+        self._crysalis_par_ctrl.SetMinSize((-1, 28))
+        self._crysalis_par_btn = IconButton(c_body, draw_folder, size=16, tooltip="Browse for .par file", bg=POPUP_BG)
+        self._crysalis_par_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_par())
+        par_row = wx.BoxSizer(wx.HORIZONTAL)
+        par_row.Add(self._crysalis_par_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        par_row.AddSpacer(4)
+        par_row.Add(self._crysalis_par_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+        self._crysalis_startup_chk = wx.CheckBox(c_body, label="Load on startup")
+        self._crysalis_startup_chk.SetBackgroundColour(POPUP_BG)
+        self._crysalis_startup_chk.SetForegroundColour(FG_PRIMARY)
+        c_sizer = wx.BoxSizer(wx.VERTICAL)
+        c_sizer.Add(_label(c_body, "PAR file", secondary=True), 0, wx.BOTTOM, 4)
+        c_sizer.Add(par_row, 0, wx.EXPAND | wx.BOTTOM, 8)
+        c_sizer.Add(self._crysalis_startup_chk, 0)
+        c_body.SetSizer(c_sizer)
+
         self._abort_section = _Section(self, "Abort PVs")
         a_body = self._abort_section.body
         self._abort_header = _TableHeader(a_body, ["PV", "Value", ""], [6, 3, 1])
@@ -817,6 +838,7 @@ class GeneralConfigView(wx.Panel):
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(self._beamline_section, 0, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._crysalis_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._abort_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._restore_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
@@ -828,6 +850,8 @@ class GeneralConfigView(wx.Panel):
 
     def load_config(self, config: BeamlineConfig) -> None:
         self._beamline_ctrl.SetValue(config.beamline)
+        self._crysalis_par_ctrl.SetValue(config.crysalis_par_path)
+        self._crysalis_startup_chk.SetValue(config.crysalis_load_on_startup)
         self._clear_abort_pv_rows()
         for pv, value in config.abort_pvs:
             self._append_abort_pv_row(pv, value)
@@ -839,19 +863,28 @@ class GeneralConfigView(wx.Panel):
     def beamline_name(self) -> str:
         return self._beamline_ctrl.GetValue().strip()
 
+    def crysalis_par_path(self) -> str:
+        return self._crysalis_par_ctrl.GetValue().strip()
+
+    def crysalis_load_on_startup(self) -> bool:
+        return self._crysalis_startup_chk.GetValue()
+
+    def _browse_crysalis_par(self) -> None:
+        with wx.FileDialog(
+            self,
+            "Select CrysAlis PAR calibration file",
+            wildcard="PAR files (*.par)|*.par" + ("|All files (*.*)|*.*" if sys.platform == "win32" else ""),
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        ) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            self._crysalis_par_ctrl.SetValue(dlg.GetPath())
+
     def collect_abort_pvs(self) -> tuple[tuple[str, str], ...]:
-        return tuple(
-            row.to_abort_pv()
-            for row in self._abort_pv_rows
-            if row.to_abort_pv()[0]
-        )
+        return tuple(row.to_abort_pv() for row in self._abort_pv_rows if row.to_abort_pv()[0])
 
     def collect_restore_pvs(self) -> tuple[str, ...]:
-        return tuple(
-            row.to_restore_pv()
-            for row in self._restore_pv_rows
-            if row.to_restore_pv()
-        )
+        return tuple(row.to_restore_pv() for row in self._restore_pv_rows if row.to_restore_pv())
 
     def set_status(self, text: str, error: bool = False) -> None:
         self._status_label.SetForegroundColour(DANGER if error else FG_SECONDARY)

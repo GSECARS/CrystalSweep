@@ -77,6 +77,7 @@ class MainController:
         self._collection_settings_controller.on_config_applied()
         self._file_settings_controller.sync_from_detector()
         self._file_settings_controller.push_to_detector()
+        self._file_settings_controller.apply_crysalis_from_config()
         self._check_epics_status(cfg)
 
     def _check_epics_status(self, cfg: BeamlineConfig | None = None) -> None:
@@ -106,6 +107,7 @@ class MainController:
         self._view.display_window()
         if self._beamline_config_controller.has_active_config():
             self._view.set_active_config_name(self._model.beamline.active.name)
+            self._file_settings_controller.apply_crysalis_from_config()
             self._check_epics_status()
         else:
             wx.CallAfter(self._beamline_config_controller.open_general)
