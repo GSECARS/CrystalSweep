@@ -481,6 +481,9 @@ class CollectController:
                 _log.warning("Failed to restore PVs at collection end: %s", exc)
         self._restore_pv_snapshot = {}
 
+        if not self._abort_event.is_set() and pre_scan_error is None and self._model.file_settings.use_ext:
+            self._on_file_number_updated(self._model.file_settings.frame_number + 1)
+
         wx.CallAfter(self._stop_elapsed_timer)
         if self._on_collecting_changed is not None:
             wx.CallAfter(self._on_collecting_changed, False)
@@ -770,7 +773,7 @@ class CollectController:
         if "Soft limit violation" in msg:
             wx.MessageBox(msg, "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
 
-    def _spawn_crysalis_conversion(self, point: CollectionPoint) -> None:
+    def _spawn_crysalis_conversion(self, point: CollectionPoint, frame_number: int | None = None) -> None:
         if point.scan_type != "step":
             return
         fs = self._model.file_settings
@@ -788,7 +791,7 @@ class CollectController:
         parts = [p for p in [base, label] if p]
         basename = "_".join(parts) if parts else base
 
-        filenumber = fs.frame_number
+        filenumber = frame_number if frame_number is not None else fs.frame_number
 
         try:
             omega_start = float(point.rotation_start) if point.rotation_start else 0.0
@@ -947,6 +950,8 @@ class CollectController:
 
         use_slew = self._view.collection_table.slew_scan
 
+        frame_number_before = self._model.file_settings.frame_number
+
         try:
             self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
         except RuntimeError as exc:
@@ -968,7 +973,7 @@ class CollectController:
             )
             self._abort_event.set()
         else:
-            self._spawn_crysalis_conversion(point)
+            self._spawn_crysalis_conversion(point, frame_number_before)
 
     def _run_wide(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
         done_event = threading.Event()

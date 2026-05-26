@@ -16,7 +16,6 @@
 import logging
 import threading
 import time
-from pathlib import Path
 from typing import Callable
 
 from epics import caget, caput
@@ -266,6 +265,7 @@ class ScanEngine:
             def _worker_slew() -> None:
                 saved_auto_inc = 1
                 disable_inc = False
+                filename = ""
                 try:
                     if file_settings is not None:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
@@ -399,6 +399,7 @@ class ScanEngine:
         def _worker() -> None:
             saved_auto_inc = 1
             disable_inc = False
+            filename = ""
             try:
                 for chk_pos in (omega_start, omega_end):
                     limit_err = check_soft_limits(rotation_cfg.pv, chk_pos)
