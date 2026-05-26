@@ -147,6 +147,10 @@ class BeamlineConfigController:
     @staticmethod
     def _hide_dialog(dlg: wx.Dialog | None, event: wx.CloseEvent) -> None:
         if dlg is not None:
+            focused = dlg.FindFocus()
+            if focused is not None:
+                focused.Navigate()
+            dlg.config_panel.trigger_save()
             dlg.Hide()
         event.Veto() if event.CanVeto() else event.Skip()
 

@@ -1316,6 +1316,7 @@ class _ConfigDialog(wx.Dialog):
     def _on_char_hook(self, event: wx.KeyEvent) -> None:
         if event.GetKeyCode() == wx.WXK_RETURN and not event.ShiftDown():
             self.config_panel.trigger_save()
+            event.Skip()
         else:
             event.Skip()
 
