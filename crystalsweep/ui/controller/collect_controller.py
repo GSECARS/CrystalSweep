@@ -783,7 +783,7 @@ class CollectController:
         det = config.active_detector_config
         file_format = det.file_format if det else "hdf5"
 
-        label = point.label.strip()
+        label = point.label.strip() if fs.use_ext else ""
         base = fs.filename or ""
         parts = [p for p in [base, label] if p]
         basename = "_".join(parts) if parts else base

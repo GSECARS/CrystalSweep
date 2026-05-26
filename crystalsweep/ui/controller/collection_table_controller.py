@@ -48,6 +48,7 @@ class CollectionTableController:
         self._view.bind_remove(self._on_remove)
         self._view.bind_get(self._on_get)
         self._view.bind_move(self._on_move)
+        self._view.bind_use_ext_changed(self._on_use_ext_changed)
 
         self.refresh_columns()
 
@@ -173,6 +174,9 @@ class CollectionTableController:
                     _log.warning("Failed to move motor %s: %s", motor.shorthand, exc)
 
         threading.Thread(target=_worker, daemon=True, name="move-motors").start()
+
+    def _on_use_ext_changed(self, value: bool) -> None:
+        self._model.file_settings.use_ext = value
 
     def _on_remove(self, index: int) -> None:
         self._model.collection.remove_point(index)

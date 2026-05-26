@@ -26,6 +26,7 @@ class FileSettingsModel:
     directory: Path = field(default_factory=Path)
     frame_number: int = field(default=0)
     map_ext: str = field(default="")
+    use_ext: bool = field(default=True)
 
     use_hdf5: bool = field(default=False)
     use_cbf: bool = field(default=False)

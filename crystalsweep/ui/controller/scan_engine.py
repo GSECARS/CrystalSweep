@@ -612,7 +612,8 @@ class ScanEngine:
         local_dir = str(file_settings.directory)
         det = config.active_detector_config
         remote_dir = det.translate_path(local_dir) if det else local_dir
-        label = point.label.strip()
+        use_ext = getattr(file_settings, "use_ext", True)
+        label = point.label.strip() if use_ext else ""
         disable_auto_increment = bool(label)
         base = file_settings.filename or ""
         map_ext = file_settings.map_ext.strip()

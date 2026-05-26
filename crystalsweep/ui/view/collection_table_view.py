@@ -268,6 +268,10 @@ class _CollectionRow(wx.Panel):
         self._selected = selected
         self.Refresh()
 
+    def set_label_enabled(self, enabled: bool) -> None:
+        if not self._collecting:
+            self._label_ctrl.set_disabled(not enabled)
+
     def set_collecting(self, collecting: bool) -> None:
         self._collecting = collecting
         disabled = collecting
@@ -582,6 +586,7 @@ class CollectionTableView(wx.Panel):
         self._on_remove_cb: Callable[[int], None] | None = None
         self._on_get_cb: Callable[[int], None] | None = None
         self._on_move_cb: Callable[[int], None] | None = None
+        self._on_use_ext_changed_cb: Callable[[bool], None] | None = None
         self._on_min_width_changed_cb: Callable[[int], None] | None = None
 
         self._build_layout()
@@ -616,6 +621,19 @@ class CollectionTableView(wx.Panel):
     def set_trajectory_visible(self, visible: bool) -> None:
         self._slew_scan_toggle.Show(visible)
         self.Layout()
+
+    def bind_use_ext_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_use_ext_changed_cb = callback
+
+    def _on_use_ext_toggled(self, value: bool) -> None:
+        for row in self._rows:
+            row.set_label_enabled(value)
+        if self._on_use_ext_changed_cb is not None:
+            self._on_use_ext_changed_cb(value)
+
+    @property
+    def use_ext(self) -> bool:
+        return self._use_ext_toggle.GetValue()
 
     @property
     def trajectory_scan(self) -> bool:
@@ -659,8 +677,14 @@ class CollectionTableView(wx.Panel):
         self._slew_scan_toggle.SetValue(True)
         self._slew_scan_toggle.Hide()
 
+        self._use_ext_toggle = DarkToggle(self, "Use Ext.")
+        self._use_ext_toggle.SetBackgroundColour(BG_CARD)
+        self._use_ext_toggle.SetValue(True)
+        self._use_ext_toggle.Bind(wx.EVT_CHECKBOX, self._on_use_ext_toggled)
+
         title_row = wx.BoxSizer(wx.HORIZONTAL)
         title_row.AddStretchSpacer()
+        title_row.Add(self._use_ext_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._slew_scan_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._delete_selected_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._clear_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
@@ -737,6 +761,7 @@ class CollectionTableView(wx.Panel):
             on_move=self._make_move_cb(index),
         )
         row.SetBackgroundColour(bg)
+        row.set_label_enabled(self._use_ext_toggle.GetValue())
         self._viewport.rows_sizer.Add(row, 0, wx.EXPAND)
         self._rows.append(row)
         self._viewport.refresh_layout()
