@@ -1547,17 +1547,17 @@ class ThemedSplitter(wx.SplitterWindow):
 
 
 class DarkAbortingDialog(wx.Dialog):
-    """Non-modal dark-themed dialog shown while a collection is aborting.
+    """Dark-themed dialog shown while a collection is aborting.
 
-    Steals focus immediately so the user cannot click Collect again until
-    the background thread has fully stopped.  Call *dismiss()* from the
-    main thread to close it once aborting is complete.
+    Blocks the rest of the application until the user clicks OK.
+    Call *ready()* from the main thread once cleanup is complete to
+    enable the OK button.
     """
 
     def __init__(self, parent: wx.Window, elapsed: str = "") -> None:
         super().__init__(
             parent,
-            title="Aborting…",
+            title="Collection Aborted",
             style=wx.DEFAULT_DIALOG_STYLE & ~wx.CLOSE_BOX,
         )
         self.SetBackgroundColour(BG_SURFACE)
@@ -1574,29 +1574,58 @@ class DarkAbortingDialog(wx.Dialog):
         lines.append("the detector is being stopped, and abort PVs are being written.")
         if elapsed:
             lines.append(f"\nElapsed time: {elapsed}")
-        lines.append("\nThis dialog will close automatically once the abort is complete.")
+        self._status_label = wx.StaticText(self, label="\nCleaning up, please wait…")
+        self._status_label.SetForegroundColour(FG_SECONDARY)
+        self._status_label.SetBackgroundColour(BG_SURFACE)
+        self._status_label.SetFont(scaled_font(12))
         msg_label = wx.StaticText(self, label="\n".join(lines))
         msg_label.SetForegroundColour(FG_SECONDARY)
         msg_label.SetBackgroundColour(BG_SURFACE)
         msg_label.SetFont(scaled_font(12))
         msg_label.Wrap(400)
-        outer.Add(msg_label, 0, wx.LEFT | wx.BOTTOM | wx.RIGHT, 20)
+        outer.Add(msg_label, 0, wx.LEFT | wx.RIGHT, 20)
+        outer.Add(self._status_label, 0, wx.LEFT | wx.BOTTOM | wx.RIGHT, 20)
+
+        sep = wx.Panel(self, size=(-1, 1))
+        sep.SetBackgroundColour(SEP_COLOUR)
+        outer.Add(sep, 0, wx.EXPAND)
+
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        btn_sizer.AddStretchSpacer()
+        self._ok_btn = FlatButton(self, "OK")
+        self._ok_btn.SetMinSize((80, 28))
+        self._ok_btn.Enable(False)
+        self._ok_btn.set_action(self._on_ok)
+        btn_sizer.Add(self._ok_btn, 0, wx.ALL, 8)
+        outer.Add(btn_sizer, 0, wx.EXPAND)
 
         self.SetSizer(outer)
         self.Fit()
         self.CentreOnParent()
-        self.Bind(wx.EVT_CHAR_HOOK, lambda e: None)
+        self.Bind(wx.EVT_CHAR_HOOK, self._on_key)
         self.Bind(wx.EVT_CLOSE, lambda e: None)
         if parent:
             parent.Enable(False)
 
-    def dismiss(self) -> None:
+    def _on_ok(self) -> None:
+        parent = self.GetParent()
+        if parent:
+            parent.Enable(True)
+            parent.Raise()
+        self.Destroy()
+
+    def _on_key(self, event: wx.KeyEvent) -> None:
+        if event.GetKeyCode() in (wx.WXK_RETURN, wx.WXK_ESCAPE) and self._ok_btn.IsEnabled():
+            self._on_ok()
+        else:
+            event.Skip()
+
+    def ready(self) -> None:
+        """Enable the OK button once cleanup is complete."""
         if self:
-            parent = self.GetParent()
-            if parent:
-                parent.Enable(True)
-                parent.Raise()
-            self.Destroy()
+            self._status_label.SetLabel("\nCleanup complete.")
+            self._ok_btn.Enable(True)
+            self._ok_btn.SetFocus()
 
 
 class DarkConfirmDialog(wx.Dialog):

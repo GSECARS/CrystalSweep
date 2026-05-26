@@ -224,11 +224,10 @@ class CollectController:
         self._aborting_dlg.Raise()
         self._aborting_dlg.SetFocus()
 
-    def _dismiss_aborting_dialog(self) -> None:
-        dlg = self._aborting_dlg
+    def _ready_aborting_dialog(self) -> None:
+        if self._aborting_dlg is not None:
+            self._aborting_dlg.ready()
         self._aborting_dlg = None
-        if dlg is not None:
-            dlg.dismiss()
 
     def _on_file_number_updated(self, file_number: int) -> None:
         self._model.file_settings.frame_number = file_number
@@ -485,7 +484,7 @@ class CollectController:
         wx.CallAfter(self._stop_elapsed_timer)
         if self._on_collecting_changed is not None:
             wx.CallAfter(self._on_collecting_changed, False)
-        wx.CallAfter(self._dismiss_aborting_dialog)
+        wx.CallAfter(self._ready_aborting_dialog)
         if pre_scan_error is not None:
             wx.CallAfter(self._view.collect.set_status, f"Pre-scan error: {pre_scan_error}", wx.Colour(220, 80, 40))
         elif self._abort_event.is_set():
