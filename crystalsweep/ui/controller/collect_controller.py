@@ -196,25 +196,56 @@ class CollectController:
                 return 1
         return 1
 
-    @staticmethod
-    def _estimate_total_seconds(points: list[CollectionPoint]) -> float:
+    def _estimate_total_seconds(self, points: list[CollectionPoint]) -> float:
+        shutter_delay = self._model.beamline.active.shutter_delay if self._model.beamline.has_active else 0.0
+        use_trajectory = self._view.collection_table.trajectory_scan
+
         total = 0.0
+        consumed_groups: set[str] = set()
         for point in points:
             try:
                 exposure = float(point.time) if point.time else 1.0
             except ValueError:
                 exposure = 1.0
-            if point.scan_type == "step":
-                try:
-                    step = float(point.step) if point.step else 1.0
-                    start = float(point.rotation_start) if point.rotation_start else 0.0
-                    end = float(point.rotation_end) if point.rotation_end else 180.0
-                    n_frames = max(1, round(abs(end - start) / step))
-                except (ValueError, ZeroDivisionError):
-                    n_frames = 1
-                total += exposure * n_frames
+
+            if point.map_group:
+                if point.map_group in consumed_groups:
+                    continue
+                consumed_groups.add(point.map_group)
+                group_points = [p for p in points if p.map_group == point.map_group]
+                if point.scan_type == "still" and use_trajectory:
+                    n_rows = len({p.map_row for p in group_points})
+                    n_cols = len({p.map_col for p in group_points})
+                    overhead = shutter_delay + 1.0
+                    total += exposure * n_cols * n_rows + overhead * n_rows
+                else:
+                    n_points = len(group_points)
+                    if point.scan_type == "step":
+                        try:
+                            step = float(point.step) if point.step else 1.0
+                            start = float(point.rotation_start) if point.rotation_start else 0.0
+                            end = float(point.rotation_end) if point.rotation_end else 180.0
+                            n_frames = max(1, round(abs(end - start) / step))
+                        except (ValueError, ZeroDivisionError):
+                            n_frames = 1
+                        overhead = shutter_delay + 1.0
+                        total += exposure * n_frames * n_points + overhead * n_points
+                    else:
+                        total += exposure * n_points + 1.0 * n_points
             else:
-                total += exposure
+                if point.scan_type == "step":
+                    try:
+                        step = float(point.step) if point.step else 1.0
+                        start = float(point.rotation_start) if point.rotation_start else 0.0
+                        end = float(point.rotation_end) if point.rotation_end else 180.0
+                        n_frames = max(1, round(abs(end - start) / step))
+                    except (ValueError, ZeroDivisionError):
+                        n_frames = 1
+                    total += exposure * n_frames + shutter_delay + 1.0
+                elif point.scan_type == "wide":
+                    total += exposure + shutter_delay + 1.0
+                else:
+                    total += exposure + 1.0
         return total
 
     def _show_aborting_dialog(self, elapsed_str: str) -> None:
