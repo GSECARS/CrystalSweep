@@ -560,8 +560,9 @@ class CollectController:
                 row_points = sorted_cols
 
             first_pt = row_points[0]
-            model_index = all_points.index(first_pt) if first_pt in all_points else -1
-            wx.CallAfter(self._view.collection_table.set_active_row, model_index)
+            if not use_trajectory:
+                model_index = all_points.index(first_pt) if first_pt in all_points else -1
+                wx.CallAfter(self._view.collection_table.set_active_row, model_index)
 
             wx.CallAfter(
                 self._view.collect.set_status,
@@ -610,7 +611,9 @@ class CollectController:
 
             if scan_type == "still" and use_trajectory:
                 row_start_idx = start_idx + row_num * len(row_points)
-                self._run_map_row_trajectory(row_points, row_num, n_rows, row_start_idx, total, motor1, config, file_settings, all_points, keep_shutter_open=keep_shutter_open)
+                row_weight = sum(weights[group_points.index(pt)] for pt in row_points if pt in group_points)
+                self._run_map_row_trajectory(row_points, row_num, n_rows, row_start_idx, total, motor1, config, file_settings, all_points, keep_shutter_open=keep_shutter_open, completed_weight=map_completed_weight, row_weight=row_weight, total_weight=total_weight)
+                map_completed_weight += row_weight
             else:
                 for col_pt in row_points:
                     if self._abort_event.is_set():
@@ -688,6 +691,9 @@ class CollectController:
         file_settings,
         all_points: list[CollectionPoint],
         keep_shutter_open: bool = False,
+        completed_weight: int = 0,
+        row_weight: int = 1,
+        total_weight: int = 1,
     ) -> None:
         n_points = len(row_points)
         try:
@@ -736,7 +742,8 @@ class CollectController:
                     snake_reversed = (row_num % 2 == 1)
                     for f in range(last + 1, current + 1):
                         pt_idx = start_idx + (f - 1)
-                        wx.CallAfter(self._view.collect.set_progress, pt_idx, total)
+                        pt_fraction = (completed_weight + row_weight * f / n_points) / max(1, total_weight)
+                        wx.CallAfter(self._view.collect.set_progress, pt_idx, total, point_fraction=pt_fraction)
                         pt_pos = (n_points - f) if snake_reversed else (f - 1)
                         if 0 <= pt_pos < len(row_points):
                             model_index = all_points.index(row_points[pt_pos]) if row_points[pt_pos] in all_points else -1
@@ -786,8 +793,7 @@ class CollectController:
         if det is not None and det.type == "eiger":
             self._wait_for_eiger_triggering(det.pv_prefix, done_event)
 
-        if not done_event.is_set():
-            wx.CallAfter(self._start_point_timer, start_idx, total, exposure * n_points)
+        wx.CallAfter(self._start_point_timer, start_idx, total, exposure * n_points, completed_weight, row_weight, total_weight)
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
@@ -940,6 +946,8 @@ class CollectController:
         def on_status(phase: str) -> None:
             wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
 
+        wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
+
         try:
             self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
         except RuntimeError as exc:
@@ -1014,13 +1022,13 @@ class CollectController:
 
         frame_number_before = self._model.file_settings.frame_number
 
+        wx.CallAfter(self._view.collect.set_progress, idx, total, 0, n_frames, completed_weight / total_weight)
+
         try:
             self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
-
-        wx.CallAfter(self._view.collect.set_progress, idx, total, 0, n_frames, completed_weight / total_weight)
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
@@ -1057,6 +1065,8 @@ class CollectController:
 
         def on_status(phase: str) -> None:
             wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
+
+        wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
             self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status, keep_shutter_open=keep_shutter_open)
