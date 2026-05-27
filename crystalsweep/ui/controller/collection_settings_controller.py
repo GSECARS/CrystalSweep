@@ -17,6 +17,7 @@ import logging
 import uuid
 
 import wx
+from epics import caget
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import ScanType
@@ -267,7 +268,7 @@ class CollectionSettingsController:
         if cs.scan_type == "step":
             point.step = str(cs.step_size)
         for motor in motors:
-            raw = self._model.epics.caget(motor.pv)
+            raw = caget(motor.pv)
             if raw is not None:
                 try:
                     point.motor_positions[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
@@ -290,9 +291,8 @@ class CollectionSettingsController:
         def current_pos(motor_cfg) -> float:
             if motor_cfg is None:
                 return 0.0
-            raw = self._model.epics.caget(motor_cfg.pv)
             try:
-                return float(raw) if raw is not None else 0.0
+                return float(caget(motor_cfg.pv) or 0.0)
             except (ValueError, TypeError):
                 return 0.0
 
@@ -326,7 +326,7 @@ class CollectionSettingsController:
                 if cs.scan_type == "step":
                     point.step = str(cs.step_size)
                 for motor in motors:
-                    raw = self._model.epics.caget(motor.pv)
+                    raw = caget(motor.pv)
                     if raw is not None:
                         try:
                             point.motor_positions[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
