@@ -136,6 +136,8 @@ class CollectionSettingsController:
         self._view.collection_table.set_trajectory_visible(still_trajectory)
         keep_shutter_visible = (still_trajectory and self._view.collection_table.trajectory_scan) or wide_flip_map
         self._view.collection_table.set_keep_shutter_open_visible(keep_shutter_visible)
+        self._view.collection_table.set_use_ext_visible(not cs.map)
+        self._view.collection_table.set_map_mode(cs.map)
 
     def _apply_type_defaults(self, scan_type: ScanType) -> None:
         cs = self._model.collection_settings
@@ -308,11 +310,18 @@ class CollectionSettingsController:
         axis1 = [origin1 + p for p in axis_positions(cs.map_start, cs.map_end, cs.map_points)]
         axis2 = [origin2 + p for p in axis_positions(cs.map2_start, cs.map2_end, cs.map2_points)] if cs.map2_enabled else [None]
 
+        fs = self._model.file_settings
+        map_ext = fs.map_ext.strip() if fs.map_ext.strip() else "map"
+        frame_number = fs.frame_number
+        det = self._model.beamline.active.active_detector_config
+        width = det.file_number_width if det is not None else 4
+
         group_id = str(uuid.uuid4())
         point_index = 0
         for row_idx, pos2 in enumerate(axis2):
             for col_idx, pos1 in enumerate(axis1):
                 point = self._model.collection.add_point(shorthands)
+                point.label = f"{map_ext}_{frame_number + point_index:0{width}d}"
                 point.selected = True
                 point.scan_type = cs.scan_type
                 point.time = str(cs.exposure)

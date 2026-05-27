@@ -773,19 +773,27 @@ class ScanEngine:
         remote_dir = det.translate_path(local_dir) if det else local_dir
         use_ext = getattr(file_settings, "use_ext", True)
         label = point.label.strip() if use_ext else ""
-        disable_auto_increment = bool(label)
         base = file_settings.filename or ""
         map_ext = file_settings.map_ext.strip()
         if point.map_group:
+            disable_auto_increment = True
             folder_suffix = map_ext if map_ext else "map"
             folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
             remote_dir = f"{remote_dir.rstrip('/')}/{folder_name}"
-            parts = [p for p in [base, map_ext, label] if p]
+            effective_map_ext = map_ext if map_ext else "map"
+            parts = [p for p in [base, effective_map_ext] if p]
+            map_label = point.label.strip()
+            try:
+                frame_number = int(map_label.rsplit("_", 1)[-1])
+            except (ValueError, IndexError):
+                frame_number = file_settings.frame_number
         else:
+            disable_auto_increment = bool(label)
             parts = [p for p in [base, label] if p]
+            frame_number = file_settings.frame_number
         filename = "_".join(parts) if parts else ""
         file_template = det.file_template if det else ""
-        return remote_dir, filename, file_settings.frame_number, disable_auto_increment, file_template
+        return remote_dir, filename, frame_number, disable_auto_increment, file_template
 
     @staticmethod
     def _find_motor(config: BeamlineConfig, shorthand: str) -> MotorConfig | None:

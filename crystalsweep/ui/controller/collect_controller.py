@@ -680,6 +680,9 @@ class CollectController:
             except Exception as exc:
                 _log.warning("Failed to restore map motor2 %s: %s", motor2, exc)
 
+        self._model.file_settings.reset_frame_number()
+        wx.CallAfter(self._view.file_settings.set_frame_number, 0)
+
     def _run_map_row_trajectory(
         self,
         row_points: list[CollectionPoint],
@@ -855,12 +858,17 @@ class CollectController:
             folder_suffix = map_ext if map_ext else "map"
             folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
             directory = f"{directory.rstrip('/')}/{folder_name}"
-            parts = [p for p in [base, map_ext, label] if p]
+            effective_map_ext = map_ext if map_ext else "map"
+            parts = [p for p in [base, effective_map_ext] if p]
+            map_label = point.label.strip()
+            try:
+                filenumber = int(map_label.rsplit("_", 1)[-1])
+            except (ValueError, IndexError):
+                filenumber = frame_number if frame_number is not None else fs.frame_number
         else:
             parts = [p for p in [base, label] if p]
+            filenumber = frame_number if frame_number is not None else fs.frame_number
         basename = "_".join(parts) if parts else base
-
-        filenumber = frame_number if frame_number is not None else fs.frame_number
 
         try:
             omega_start = float(point.rotation_start) if point.rotation_start else 0.0

@@ -493,6 +493,9 @@ class _HeaderRow(wx.Panel):
         self.SetBackgroundColour(_HEADER_BG)
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._col_widths = col_widths
+        self._is_map = False
+        self._motor_shorthands = motor_shorthands
+        self._rotation_shorthand = rotation_shorthand
         self._labels = self._build_labels(motor_shorthands, rotation_shorthand)
         self._all_selected = False
         self._collecting = False
@@ -505,18 +508,25 @@ class _HeaderRow(wx.Panel):
 
     def update_col_widths(self, motor_shorthands: list[str], rotation_shorthand: str, col_widths: list[int]) -> None:
         self._col_widths = col_widths
+        self._motor_shorthands = motor_shorthands
+        self._rotation_shorthand = rotation_shorthand
         self._labels = self._build_labels(motor_shorthands, rotation_shorthand)
+        self.Refresh()
+
+    def set_map_mode(self, is_map: bool) -> None:
+        self._is_map = is_map
+        self._labels = self._build_labels(self._motor_shorthands, self._rotation_shorthand)
         self.Refresh()
 
     def set_all_selected(self, selected: bool) -> None:
         self._all_selected = selected
         self.Refresh()
 
-    @staticmethod
-    def _build_labels(motor_shorthands: list[str], rotation_shorthand: str) -> list[str]:
+    def _build_labels(self, motor_shorthands: list[str], rotation_shorthand: str) -> list[str]:
         rot = rotation_shorthand.capitalize() if rotation_shorthand else "Rot"
         motor_action_labels = ["Get", "Move"] if motor_shorthands else []
-        return ["", "Ext."] + [s.capitalize() for s in motor_shorthands] + motor_action_labels + ["Type", f"{rot} Start", f"{rot} End", "Step", "Time", ""]
+        ext_label = "Map Ext." if self._is_map else "Ext."
+        return ["", ext_label] + [s.capitalize() for s in motor_shorthands] + motor_action_labels + ["Type", f"{rot} Start", f"{rot} End", "Step", "Time", ""]
 
     def _checkbox_rect(self) -> wx.Rect:
         cw = self._col_widths[0]
@@ -571,6 +581,7 @@ class CollectionTableView(wx.Panel):
         self._rotation_precision: int = 4
         self._rotation_shorthand: str = ""
         self._rows: list[_CollectionRow] = []
+        self._is_map: bool = False
 
         self._on_add_cb: Callable[[], None] | None = None
         self._on_clear_cb: Callable[[], None] | None = None
@@ -628,6 +639,19 @@ class CollectionTableView(wx.Panel):
     def set_keep_shutter_open_visible(self, visible: bool) -> None:
         self._keep_shutter_open_toggle.Show(visible)
         self.Layout()
+
+    def set_use_ext_visible(self, visible: bool) -> None:
+        self._use_ext_toggle.Show(visible)
+        self.Layout()
+
+    def set_map_mode(self, is_map: bool) -> None:
+        self._is_map = is_map
+        self._header.set_map_mode(is_map)
+        for row in self._rows:
+            if is_map:
+                row.set_label_enabled(False)
+            else:
+                row.set_label_enabled(self._use_ext_toggle.GetValue())
 
     def bind_use_ext_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_use_ext_changed_cb = callback
@@ -794,7 +818,7 @@ class CollectionTableView(wx.Panel):
             on_move=self._make_move_cb(index),
         )
         row.SetBackgroundColour(bg)
-        row.set_label_enabled(self._use_ext_toggle.GetValue())
+        row.set_label_enabled(False if self._is_map else self._use_ext_toggle.GetValue())
         self._viewport.rows_sizer.Add(row, 0, wx.EXPAND)
         self._rows.append(row)
         self._viewport.refresh_layout()
