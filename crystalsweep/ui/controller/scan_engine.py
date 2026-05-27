@@ -46,6 +46,18 @@ class ScanEngine:
         self._thread: threading.Thread | None = None
         self._scripts = script_model
 
+    @staticmethod
+    def _open_shutter(config: BeamlineConfig) -> None:
+        if config.shutter_pv.strip():
+            caput(config.shutter_pv.strip(), config.shutter_open_value, wait=True)
+            if config.shutter_delay > 0.0:
+                time.sleep(config.shutter_delay)
+
+    @staticmethod
+    def _close_shutter(config: BeamlineConfig) -> None:
+        if config.shutter_pv.strip():
+            caput(config.shutter_pv.strip(), config.shutter_close_value, wait=True)
+
     @property
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -226,6 +238,7 @@ class ScanEngine:
                     pv_base = rotation_cfg.pv.removesuffix(".VAL")
                     if on_status: on_status("moving")
                     caput(f"{pv_base}.VAL", omega_start, wait=True)
+                    self._open_shutter(config)
                     detector.arm_plugin(n_frames)
                     if on_status: on_status("collecting")
                     for frame_idx in range(n_frames):
@@ -244,6 +257,7 @@ class ScanEngine:
                     _log.exception("ScanEngine step-epics error")
                     on_error(exc)
                 finally:
+                    self._close_shutter(config)
                     if disable_inc:
                         detector.restore_auto_increment(saved_auto_inc)
                     if on_file_number_updated is not None:
@@ -272,6 +286,7 @@ class ScanEngine:
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                     if on_status: on_status("preparing")
                     driver.prepare(spec)
+                    self._open_shutter(config)
                     if on_status: on_status("collecting")
                     detector.collect_step(exposure, n_frames)
 
@@ -317,6 +332,7 @@ class ScanEngine:
                     _log.exception("ScanEngine step-slew error")
                     on_error(exc)
                 finally:
+                    self._close_shutter(config)
                     if disable_inc:
                         detector.restore_auto_increment(saved_auto_inc)
                     if on_file_number_updated is not None:
@@ -413,6 +429,7 @@ class ScanEngine:
                 driver.prepare(spec)
                 if on_status: on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
+                self._open_shutter(config)
                 if on_status: on_status("collecting")
                 detector.collect_wide(exposure)
                 driver.run(spec, lambda i, pos: None)
@@ -424,6 +441,7 @@ class ScanEngine:
                 _log.exception("ScanEngine wide-scan error")
                 on_error(exc)
             finally:
+                self._close_shutter(config)
                 if disable_inc:
                     detector.restore_auto_increment(saved_auto_inc)
                 if on_file_number_updated is not None:
@@ -565,6 +583,7 @@ class ScanEngine:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, ref_point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                 detector.arm_plugin(n_points)
+                self._open_shutter(config)
                 detector.collect_step(exposure, n_points)
                 if is_xps:
                     driver.prepare(spec)
@@ -580,6 +599,7 @@ class ScanEngine:
                 _log.exception("ScanEngine map-row-trajectory error")
                 on_error(exc)
             finally:
+                self._close_shutter(config)
                 if disable_inc:
                     detector.restore_auto_increment(saved_auto_inc)
                 if on_file_number_updated is not None:

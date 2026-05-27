@@ -194,6 +194,10 @@ class BeamlineConfigController:
         restore_pvs = self._general_dlg.config_panel.collect_restore_pvs() if self._general_dlg else base.restore_pvs
         crysalis_par_path = self._general_dlg.config_panel.crysalis_par_path() if self._general_dlg else base.crysalis_par_path
         crysalis_load_on_startup = self._general_dlg.config_panel.crysalis_load_on_startup() if self._general_dlg else base.crysalis_load_on_startup
+        shutter_pv = self._general_dlg.config_panel.shutter_pv() if self._general_dlg else base.shutter_pv
+        shutter_open_value = self._general_dlg.config_panel.shutter_open_value() if self._general_dlg else base.shutter_open_value
+        shutter_close_value = self._general_dlg.config_panel.shutter_close_value() if self._general_dlg else base.shutter_close_value
+        shutter_delay = self._general_dlg.config_panel.shutter_delay() if self._general_dlg else base.shutter_delay
 
         if self._detectors_dlg:
             detectors, active_detector = self._detectors_dlg.config_panel.collect_detectors()
@@ -220,6 +224,10 @@ class BeamlineConfigController:
             restore_pvs=restore_pvs,
             crysalis_par_path=crysalis_par_path,
             crysalis_load_on_startup=crysalis_load_on_startup,
+            shutter_pv=shutter_pv,
+            shutter_open_value=shutter_open_value,
+            shutter_close_value=shutter_close_value,
+            shutter_delay=shutter_delay,
         )
 
     def _save(self, config: BeamlineConfig) -> None:

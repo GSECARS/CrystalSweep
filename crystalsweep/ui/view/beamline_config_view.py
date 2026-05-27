@@ -804,6 +804,33 @@ class GeneralConfigView(wx.Panel):
         c_sizer.Add(self._crysalis_startup_chk, 0)
         c_body.SetSizer(c_sizer)
 
+        self._scan_section = _Section(self, "Shutter")
+        sc_body = self._scan_section.body
+        self._shutter_pv_ctrl = DarkTextCtrl(sc_body, placeholder="e.g. 13IDD:Unidig1Bo0")
+        self._shutter_pv_ctrl.SetMinSize((-1, 28))
+        self._shutter_open_ctrl = DarkTextCtrl(sc_body, placeholder="e.g. 1")
+        self._shutter_open_ctrl.SetMinSize((-1, 28))
+        self._shutter_close_ctrl = DarkTextCtrl(sc_body, placeholder="e.g. 0")
+        self._shutter_close_ctrl.SetMinSize((-1, 28))
+        self._shutter_delay_ctrl = DarkTextCtrl(sc_body, value="0.0", placeholder="e.g. 0.2")
+        self._shutter_delay_ctrl.SetMinSize((-1, 28))
+        sc_sizer = wx.BoxSizer(wx.VERTICAL)
+        sc_sizer.Add(_label(sc_body, "PV", secondary=True), 0, wx.BOTTOM, 4)
+        sc_sizer.Add(self._shutter_pv_ctrl, 0, wx.EXPAND | wx.BOTTOM, 8)
+        open_close_row = wx.BoxSizer(wx.HORIZONTAL)
+        open_col = wx.BoxSizer(wx.VERTICAL)
+        open_col.Add(_label(sc_body, "Open value", secondary=True), 0, wx.BOTTOM, 4)
+        open_col.Add(self._shutter_open_ctrl, 0, wx.EXPAND)
+        close_col = wx.BoxSizer(wx.VERTICAL)
+        close_col.Add(_label(sc_body, "Close value", secondary=True), 0, wx.BOTTOM, 4)
+        close_col.Add(self._shutter_close_ctrl, 0, wx.EXPAND)
+        open_close_row.Add(open_col, 1, wx.EXPAND | wx.RIGHT, 8)
+        open_close_row.Add(close_col, 1, wx.EXPAND)
+        sc_sizer.Add(open_close_row, 0, wx.EXPAND | wx.BOTTOM, 8)
+        sc_sizer.Add(_label(sc_body, "Delay after open (s)", secondary=True), 0, wx.BOTTOM, 4)
+        sc_sizer.Add(self._shutter_delay_ctrl, 0, wx.EXPAND)
+        sc_body.SetSizer(sc_sizer)
+
         self._abort_section = _Section(self, "Abort PVs")
         a_body = self._abort_section.body
         self._abort_header = _TableHeader(a_body, ["PV", "Value", ""], [6, 3, 1])
@@ -837,6 +864,7 @@ class GeneralConfigView(wx.Panel):
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(self._beamline_section, 0, wx.EXPAND | wx.ALL, 10)
         outer.Add(self._crysalis_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        outer.Add(self._scan_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._abort_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._restore_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
@@ -850,6 +878,10 @@ class GeneralConfigView(wx.Panel):
         self._beamline_ctrl.SetValue(config.beamline)
         self._crysalis_par_ctrl.SetValue(config.crysalis_par_path)
         self._crysalis_startup_chk.SetValue(config.crysalis_load_on_startup)
+        self._shutter_pv_ctrl.SetValue(config.shutter_pv)
+        self._shutter_open_ctrl.SetValue(config.shutter_open_value)
+        self._shutter_close_ctrl.SetValue(config.shutter_close_value)
+        self._shutter_delay_ctrl.SetValue(str(config.shutter_delay))
         self._clear_abort_pv_rows()
         for pv, value in config.abort_pvs:
             self._append_abort_pv_row(pv, value)
@@ -866,6 +898,21 @@ class GeneralConfigView(wx.Panel):
 
     def crysalis_load_on_startup(self) -> bool:
         return self._crysalis_startup_chk.GetValue()
+
+    def shutter_pv(self) -> str:
+        return self._shutter_pv_ctrl.GetValue().strip()
+
+    def shutter_open_value(self) -> str:
+        return self._shutter_open_ctrl.GetValue().strip()
+
+    def shutter_close_value(self) -> str:
+        return self._shutter_close_ctrl.GetValue().strip()
+
+    def shutter_delay(self) -> float:
+        try:
+            return float(self._shutter_delay_ctrl.GetValue())
+        except ValueError:
+            return 0.0
 
     def _browse_crysalis_par(self) -> None:
         with wx.FileDialog(

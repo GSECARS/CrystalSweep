@@ -131,6 +131,10 @@ class BeamlineConfig:
     restore_pvs: tuple[str, ...] = field(default_factory=tuple)
     crysalis_par_path: str = ""
     crysalis_load_on_startup: bool = False
+    shutter_pv: str = ""
+    shutter_open_value: str = ""
+    shutter_close_value: str = ""
+    shutter_delay: float = 0.0
 
     @property
     def is_empty(self) -> bool:
@@ -305,6 +309,10 @@ class BeamlineConfigModel:
             restore_pvs=restore_pvs,
             crysalis_par_path=str(data.get("crysalis_par_path", "")),
             crysalis_load_on_startup=bool(data.get("crysalis_load_on_startup", False)),
+            shutter_pv=str(data.get("shutter_pv", "")),
+            shutter_open_value=str(data.get("shutter_open_value", "")),
+            shutter_close_value=str(data.get("shutter_close_value", "")),
+            shutter_delay=float(data.get("shutter_delay", 0.0)),
         )
         self._active = cfg
         return cfg
@@ -344,6 +352,10 @@ class BeamlineConfigModel:
             ],
             "crysalis_par_path": config.crysalis_par_path,
             "crysalis_load_on_startup": config.crysalis_load_on_startup,
+            "shutter_pv": config.shutter_pv,
+            "shutter_open_value": config.shutter_open_value,
+            "shutter_close_value": config.shutter_close_value,
+            "shutter_delay": config.shutter_delay,
         }
 
         path = self.path_for(config.name)
