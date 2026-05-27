@@ -717,8 +717,8 @@ class CollectionTableView(wx.Panel):
         title_row = wx.BoxSizer(wx.HORIZONTAL)
         title_row.AddStretchSpacer()
         title_row.Add(self._keep_shutter_open_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
-        title_row.Add(self._use_ext_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._slew_scan_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
+        title_row.Add(self._use_ext_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._delete_selected_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._clear_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
 
