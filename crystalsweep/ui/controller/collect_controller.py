@@ -609,7 +609,8 @@ class CollectController:
                 break
 
             if scan_type == "still" and use_trajectory:
-                self._run_map_row_trajectory(row_points, row_num, n_rows, start_idx, total, motor1, config, file_settings, all_points, keep_shutter_open=keep_shutter_open)
+                row_start_idx = start_idx + row_num * len(row_points)
+                self._run_map_row_trajectory(row_points, row_num, n_rows, row_start_idx, total, motor1, config, file_settings, all_points, keep_shutter_open=keep_shutter_open)
             else:
                 for col_pt in row_points:
                     if self._abort_event.is_set():
@@ -705,13 +706,48 @@ class CollectController:
         error_holder: list[Exception] = []
         frame_holder: list[tuple[int, int]] = [(0, n_points)]
 
+        det = config.active_detector_config
+        counter_pv = None
+        acquire_pv = None
+        if det is not None and det.pv_prefix.strip():
+            _pfx = det.pv_prefix.strip()
+            if not _pfx.endswith(":"):
+                _pfx += ":"
+            counter_pv = f"{_pfx}cam1:NumImagesCounter_RBV"
+            acquire_pv = f"{_pfx}cam1:Acquire"
+
+        def _poll_frames() -> None:
+            if counter_pv is None:
+                return
+            if acquire_pv is not None:
+                while not done_event.is_set():
+                    if int(caget(acquire_pv) or 0):
+                        break
+                    _time.sleep(0.02)
+            while not done_event.is_set():
+                val = int(caget(counter_pv) or 0)
+                if val == 0:
+                    break
+                _time.sleep(0.02)
+            last = 0
+            while not done_event.is_set():
+                current = int(caget(counter_pv) or 0)
+                if current > last:
+                    snake_reversed = (row_num % 2 == 1)
+                    for f in range(last + 1, current + 1):
+                        pt_idx = start_idx + (f - 1)
+                        wx.CallAfter(self._view.collect.set_progress, pt_idx, total)
+                        pt_pos = (n_points - f) if snake_reversed else (f - 1)
+                        if 0 <= pt_pos < len(row_points):
+                            model_index = all_points.index(row_points[pt_pos]) if row_points[pt_pos] in all_points else -1
+                            wx.CallAfter(self._view.collection_table.set_active_row, model_index)
+                    last = current
+                if last >= n_points:
+                    break
+                _time.sleep(0.05)
+
         def on_frame(frame: int, total_frames: int) -> None:
             frame_holder[0] = (frame, total_frames)
-            pt_idx = start_idx + (frame - 1)
-            wx.CallAfter(self._view.collect.set_progress, pt_idx, total, frame, total_frames)
-            if 0 <= frame - 1 < len(row_points):
-                model_index = all_points.index(row_points[frame - 1]) if row_points[frame - 1] in all_points else -1
-                wx.CallAfter(self._view.collection_table.set_active_row, model_index)
 
         def on_done() -> None:
             done_event.set()
@@ -719,6 +755,8 @@ class CollectController:
         def on_error(exc: Exception) -> None:
             error_holder.append(exc)
             done_event.set()
+
+        threading.Thread(target=_poll_frames, daemon=True, name="traj-frame-poll").start()
 
         wx.CallAfter(
             self._view.collect.set_status,
