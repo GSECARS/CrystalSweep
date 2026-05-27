@@ -46,6 +46,7 @@ class ScanEngine:
         self._thread: threading.Thread | None = None
         self._scripts = script_model
         self._shutter_open = False
+        self._abort_event: threading.Event = threading.Event()
 
     @staticmethod
     def _open_shutter(config: BeamlineConfig) -> None:
@@ -160,6 +161,9 @@ class ScanEngine:
             saved_auto_inc = 1
             disable_inc = False
             try:
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 limit_err = check_soft_limits(rotation_cfg.pv, omega_start)
                 if limit_err:
                     on_error(ValueError(f"Soft limit violation — {limit_err}"))
@@ -167,9 +171,15 @@ class ScanEngine:
                 if on_status:
                     on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 if on_status:
                     on_status("collecting")
                 detector.collect_still(exposure)
@@ -269,6 +279,9 @@ class ScanEngine:
                 saved_auto_inc = 1
                 disable_inc = False
                 try:
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
                     for chk_pos in (omega_start, omega_end):
                         limit_err = check_soft_limits(rotation_cfg.pv, chk_pos)
                         if limit_err:
@@ -277,14 +290,20 @@ class ScanEngine:
                     if file_settings is not None:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
                     if on_status:
                         on_status("preparing")
                     driver.prepare(spec)
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
                     self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
                     if on_status:
                         on_status("collecting")
                     for frame_idx in range(n_frames):
-                        if self._driver is None:
+                        if self._abort_event.is_set() or self._driver is None:
                             break
                         angle = omega_start + frame_idx * step_size
                         limit_err = check_soft_limits(rotation_cfg.pv, angle)
@@ -324,10 +343,16 @@ class ScanEngine:
                 disable_inc = False
                 filename = ""
                 try:
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
                     if file_settings is not None:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
 
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
                     if on_status:
                         on_status("preparing")
 
@@ -352,8 +377,13 @@ class ScanEngine:
                     if prepare_error:
                         raise prepare_error[0]
 
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
+
                     def _open_shutter_at_start() -> None:
-                        self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
+                        if not self._abort_event.is_set():
+                            self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
 
                     traj_done = threading.Event()
                     traj_error: list[Exception] = []
@@ -372,7 +402,7 @@ class ScanEngine:
                     last_reported = -1
                     timeout = exposure * n_frames + 60.0
                     deadline = time.monotonic() + timeout
-                    while not traj_done.is_set() or int(caget(capture_pv) or 0):
+                    while (not traj_done.is_set() or int(caget(capture_pv) or 0)) and not self._abort_event.is_set():
                         if time.monotonic() > deadline:
                             _log.warning("ScanEngine step-slew: timed out (traj_done=%s capture=%s)", traj_done.is_set(), caget(capture_pv))
                             break
@@ -482,6 +512,9 @@ class ScanEngine:
             disable_inc = False
             filename = ""
             try:
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 for chk_pos in (omega_start, omega_end):
                     limit_err = check_soft_limits(rotation_cfg.pv, chk_pos)
                     if limit_err:
@@ -490,18 +523,30 @@ class ScanEngine:
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 if on_status:
                     on_status("preparing")
                 driver.prepare(spec)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 if on_status:
                     on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 if on_status:
                     on_status("collecting")
                 detector.collect_wide(exposure)
                 driver.run(spec, lambda i, pos: None)
-                while caget(acquire_pv):
+                while caget(acquire_pv) and not self._abort_event.is_set():
                     time.sleep(0.05)
                 _log.debug("ScanEngine wide: detector readout complete")
                 on_done()
@@ -649,20 +694,41 @@ class ScanEngine:
             saved_auto_inc = 1
             disable_inc = False
             try:
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 if file_settings is not None and ref_point is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, ref_point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 detector.arm_plugin(n_points)
                 self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 detector.collect_step(exposure, n_points)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
                 if is_xps:
                     driver.prepare(spec)
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
                     driver.prepare_array(motor_cfg.pv, epics_positions, exposure, xps_positioner, xps_group)
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
                     driver.run_array(lambda i, pos: on_frame(i + 1, n_points), n_points)
                 else:
                     driver.prepare(spec)
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
                     driver.run(spec, lambda i, pos: on_frame(i + 1, n_points))
-                while caget(acquire_pv):
+                while caget(acquire_pv) and not self._abort_event.is_set():
                     time.sleep(0.05)
                 on_done()
             except Exception as exc:
@@ -685,6 +751,7 @@ class ScanEngine:
         self._thread.start()
 
     def abort(self) -> None:
+        self._abort_event.set()
         if self._driver is not None:
             self._driver.abort()
 

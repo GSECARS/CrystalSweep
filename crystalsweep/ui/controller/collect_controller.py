@@ -44,8 +44,9 @@ class CollectController:
     def __init__(self, model: MainModel, view: MainView) -> None:
         self._model = model
         self._view = view
-        self._engine = ScanEngine(script_model=model.scripts)
         self._abort_event = threading.Event()
+        self._engine = ScanEngine(script_model=model.scripts)
+        self._engine._abort_event = self._abort_event
         self._thread: threading.Thread | None = None
         self._start_time: float = 0.0
         self._on_collecting_changed: Callable[[bool], None] | None = None
@@ -234,43 +235,43 @@ class CollectController:
         wx.CallAfter(self._view.file_settings.set_frame_number, file_number)
 
     def _on_abort(self) -> None:
-        if not self._abort_event.is_set():
-            self._abort_event.set()
-            self._engine.abort()
-            wx.CallAfter(self._view.collect.set_status, "Aborting...", wx.Colour(220, 160, 40))
-            elapsed = _time.monotonic() - self._start_time
-            h, rem = divmod(int(elapsed), 3600)
-            m, s = divmod(rem, 60)
-            elapsed_str = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
-            wx.CallAfter(self._show_aborting_dialog, elapsed_str)
+        if self._abort_event.is_set():
+            return
+
+        self._abort_event.set()
+        self._engine.abort()
+        wx.CallAfter(self._view.collect.set_status, "Aborting...", wx.Colour(220, 160, 40))
+        elapsed = _time.monotonic() - self._start_time
+        h, rem = divmod(int(elapsed), 3600)
+        m, s = divmod(rem, 60)
+        elapsed_str = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+        wx.CallAfter(self._show_aborting_dialog, elapsed_str)
 
         config = self._model.beamline.active
         det = config.active_detector_config
-        if det is not None and det.pv_prefix.strip():
-            def _abort_detector() -> None:
+        abort_pvs = config.abort_pvs
+        snapshot = dict(self._restore_pv_snapshot)
+
+        def _do_abort() -> None:
+            if abort_pvs:
+                for pv, value in abort_pvs:
+                    try:
+                        caput(pv, value, wait=True)
+                    except Exception as exc:
+                        _log.warning("Failed to write abort PV %s: %s", pv, exc)
+            if det is not None and det.pv_prefix.strip():
                 try:
                     get_detector_model(det.type, det.pv_prefix, det.file_format).abort()
                 except Exception as exc:
                     _log.warning("Failed to abort detector: %s", exc)
-            threading.Thread(target=_abort_detector, daemon=True, name="abort-detector").start()
+            if snapshot:
+                try:
+                    caput_many(list(snapshot.keys()), list(snapshot.values()))
+                    _log.info("Restored %d PV(s) on abort", len(snapshot))
+                except Exception as exc:
+                    _log.warning("Failed to restore PVs on abort: %s", exc)
 
-        abort_pvs = config.abort_pvs
-        if abort_pvs:
-            pvs = [pv for pv, _ in abort_pvs]
-            values = [value for _, value in abort_pvs]
-            try:
-                caput_many(pvs, values)
-            except Exception as exc:
-                _log.warning("Failed to write abort PVs: %s", exc)
-
-        if self._restore_pv_snapshot:
-            snapshot = self._restore_pv_snapshot
-            try:
-                caput_many(list(snapshot.keys()), list(snapshot.values()))
-                _log.info("Restored %d PV(s) on abort", len(snapshot))
-            except Exception as exc:
-                _log.warning("Failed to restore PVs on abort: %s", exc)
-
+        threading.Thread(target=_do_abort, daemon=True, name="abort-sequence").start()
         _log.info("Collection aborted by user")
 
     def _on_elapsed_tick(self, _event: wx.TimerEvent) -> None:
