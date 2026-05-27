@@ -103,7 +103,7 @@ class AerotechA1Model:
             spec.start, spec.end, spec.exposure, spec.points, travel_direction,
         )
 
-    def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
+    def run(self, spec: ScanSpec, on_point: Callable[[int, float], None], on_at_start: Callable[[], None] | None = None) -> None:
         if self._aborted:
             _log.info("AerotechA1Model aborted before run()")
             return
@@ -118,7 +118,21 @@ class AerotechA1Model:
             _log.info("AerotechA1Model aborted before run_trajectory()")
             return
 
-        self._automation.run_trajectory()
+        self._automation._move_to_starting_position()
+        if on_at_start is not None:
+            on_at_start()
+        self._automation._pso.enable_modules()
+        import time as _time
+        _time.sleep(0.1)
+        traj = self._automation._active_trajectory
+        total_distance = traj.distance + abs(traj.taxi_distance)
+        self._automation._controller.move_linear(
+            self._automation.axis[0],
+            distance=total_distance * traj.travel_direction,
+            speed=traj.velocity,
+        )
+        _time.sleep(0.1)
+        self._automation._reset_axis()
         _log.debug("AerotechA1Model: trajectory complete")
 
         if not self._aborted:

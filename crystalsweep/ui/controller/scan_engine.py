@@ -164,12 +164,14 @@ class ScanEngine:
                 if limit_err:
                     on_error(ValueError(f"Soft limit violation — {limit_err}"))
                     return
-                if on_status: on_status("moving")
+                if on_status:
+                    on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
-                if on_status: on_status("collecting")
+                if on_status:
+                    on_status("collecting")
                 detector.collect_still(exposure)
                 on_done()
             except Exception as exc:
@@ -262,6 +264,7 @@ class ScanEngine:
         _EPICS_TYPES = {"epics", "step"}
 
         if not slew or controller_type in _EPICS_TYPES:
+
             def _worker_epics() -> None:
                 saved_auto_inc = 1
                 disable_inc = False
@@ -274,10 +277,12 @@ class ScanEngine:
                     if file_settings is not None:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
-                    if on_status: on_status("preparing")
+                    if on_status:
+                        on_status("preparing")
                     driver.prepare(spec)
                     self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
-                    if on_status: on_status("collecting")
+                    if on_status:
+                        on_status("collecting")
                     for frame_idx in range(n_frames):
                         if self._driver is None:
                             break
@@ -322,31 +327,47 @@ class ScanEngine:
                     if file_settings is not None:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
-                    if on_status: on_status("preparing")
-                    driver.prepare(spec)
-                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
-                    if on_status: on_status("moving")
-                    caput(f"{pv_base}.VAL", omega_start, wait=True)
-                    self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
-                    detector.arm_plugin(n_frames)
-                    if on_status: on_status("collecting")
+
+                    if on_status:
+                        on_status("preparing")
+
+                    prepare_done = threading.Event()
+                    prepare_error: list[Exception] = []
+
+                    def _run_prepare() -> None:
+                        try:
+                            driver.prepare(spec)
+                        except Exception as exc:
+                            prepare_error.append(exc)
+                        finally:
+                            prepare_done.set()
+
+                    threading.Thread(target=_run_prepare, daemon=True, name="scan-step-prepare").start()
+
+                    if on_status:
+                        on_status("collecting")
                     detector.collect_step(exposure, n_frames)
 
-                    import threading as _threading
-                    traj_done = _threading.Event()
+                    prepare_done.wait()
+                    if prepare_error:
+                        raise prepare_error[0]
 
+                    def _open_shutter_at_start() -> None:
+                        self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
+
+                    traj_done = threading.Event()
                     traj_error: list[Exception] = []
 
                     def _run_traj() -> None:
                         try:
-                            driver.run(spec, lambda i, pos: None)
+                            driver.run(spec, lambda i, pos: None, on_at_start=_open_shutter_at_start)
                         except Exception as exc:
                             _log.exception("ScanEngine step-slew trajectory error")
                             traj_error.append(exc)
                         finally:
                             traj_done.set()
 
-                    _threading.Thread(target=_run_traj, daemon=True, name="scan-step-traj").start()
+                    threading.Thread(target=_run_traj, daemon=True, name="scan-step-traj").start()
 
                     last_reported = -1
                     timeout = exposure * n_frames + 60.0
@@ -469,12 +490,15 @@ class ScanEngine:
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
-                if on_status: on_status("preparing")
+                if on_status:
+                    on_status("preparing")
                 driver.prepare(spec)
-                if on_status: on_status("moving")
+                if on_status:
+                    on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
                 self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
-                if on_status: on_status("collecting")
+                if on_status:
+                    on_status("collecting")
                 detector.collect_wide(exposure)
                 driver.run(spec, lambda i, pos: None)
                 while caget(acquire_pv):

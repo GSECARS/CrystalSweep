@@ -205,7 +205,6 @@ class ADEigerModel:
         caput(f"{p}cam1:AcquirePeriod", acq_time, wait=True)
         caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
         caput(f"{p}cam1:NumImages", n_frames, wait=True)
-        caput(f"{p}cam1:NumImagesCounter", 0, wait=True)
 
         self.arm_plugin(n_frames)
 
