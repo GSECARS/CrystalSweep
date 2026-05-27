@@ -587,6 +587,7 @@ class CollectionTableView(wx.Panel):
         self._on_get_cb: Callable[[int], None] | None = None
         self._on_move_cb: Callable[[int], None] | None = None
         self._on_use_ext_changed_cb: Callable[[bool], None] | None = None
+        self._on_keep_shutter_open_changed_cb: Callable[[bool], None] | None = None
         self._on_min_width_changed_cb: Callable[[int], None] | None = None
 
         self._build_layout()
@@ -622,14 +623,39 @@ class CollectionTableView(wx.Panel):
         self._slew_scan_toggle.Show(visible)
         self.Layout()
 
+    def set_keep_shutter_open_visible(self, visible: bool) -> None:
+        self._keep_shutter_open_toggle.Show(visible)
+        self.Layout()
+
     def bind_use_ext_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_use_ext_changed_cb = callback
+
+    def bind_keep_shutter_open_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_keep_shutter_open_changed_cb = callback
 
     def _on_use_ext_toggled(self, value: bool) -> None:
         for row in self._rows:
             row.set_label_enabled(value)
         if self._on_use_ext_changed_cb is not None:
             self._on_use_ext_changed_cb(value)
+
+    def _on_trajectory_toggled(self, event: wx.Event) -> None:
+        if not self._slew_scan_toggle.GetValue():
+            self._keep_shutter_open_toggle.SetValue(False)
+            self._keep_shutter_open_toggle.Hide()
+            self.Layout()
+        else:
+            self._keep_shutter_open_toggle.Show()
+            self.Layout()
+        event.Skip()
+
+    def _on_keep_shutter_open_toggled(self, event: wx.Event) -> None:
+        if self._on_keep_shutter_open_changed_cb is not None:
+            self._on_keep_shutter_open_changed_cb(self._keep_shutter_open_toggle.GetValue())
+
+    @property
+    def keep_shutter_open(self) -> bool:
+        return self._keep_shutter_open_toggle.GetValue()
 
     @property
     def use_ext(self) -> bool:
@@ -676,14 +702,21 @@ class CollectionTableView(wx.Panel):
         self._slew_scan_toggle.SetBackgroundColour(BG_CARD)
         self._slew_scan_toggle.SetValue(True)
         self._slew_scan_toggle.Hide()
+        self._slew_scan_toggle.Bind(wx.EVT_CHECKBOX, self._on_trajectory_toggled)
 
         self._use_ext_toggle = DarkToggle(self, "Use Ext.")
         self._use_ext_toggle.SetBackgroundColour(BG_CARD)
         self._use_ext_toggle.SetValue(True)
         self._use_ext_toggle.Bind(wx.EVT_CHECKBOX, self._on_use_ext_toggled)
 
+        self._keep_shutter_open_toggle = DarkToggle(self, "Keep shutter open")
+        self._keep_shutter_open_toggle.SetBackgroundColour(BG_CARD)
+        self._keep_shutter_open_toggle.Bind(wx.EVT_CHECKBOX, self._on_keep_shutter_open_toggled)
+        self._keep_shutter_open_toggle.Hide()
+
         title_row = wx.BoxSizer(wx.HORIZONTAL)
         title_row.AddStretchSpacer()
+        title_row.Add(self._keep_shutter_open_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._use_ext_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._slew_scan_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._delete_selected_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)

@@ -160,6 +160,7 @@ class ScanEngine:
         file_settings: FileSettingsModel | None = None,
         on_file_number_updated: Callable[[int], None] | None = None,
         on_status: Callable[[str], None] | None = None,
+        keep_shutter_open: bool = False,
     ) -> None:
         """Execute a step scan: slew trajectory (default) or per-angle EPICS stills."""
         if self.is_running:
@@ -235,11 +236,7 @@ class ScanEngine:
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                     if on_status: on_status("preparing")
                     driver.prepare(spec)
-                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
-                    if on_status: on_status("moving")
-                    caput(f"{pv_base}.VAL", omega_start, wait=True)
                     self._open_shutter(config)
-                    detector.arm_plugin(n_frames)
                     if on_status: on_status("collecting")
                     for frame_idx in range(n_frames):
                         if self._driver is None:
@@ -257,7 +254,8 @@ class ScanEngine:
                     _log.exception("ScanEngine step-epics error")
                     on_error(exc)
                 finally:
-                    self._close_shutter(config)
+                    if not keep_shutter_open:
+                        self._close_shutter(config)
                     if disable_inc:
                         detector.restore_auto_increment(saved_auto_inc)
                     if on_file_number_updated is not None:
@@ -286,7 +284,11 @@ class ScanEngine:
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                     if on_status: on_status("preparing")
                     driver.prepare(spec)
+                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
+                    if on_status: on_status("moving")
+                    caput(f"{pv_base}.VAL", omega_start, wait=True)
                     self._open_shutter(config)
+                    detector.arm_plugin(n_frames)
                     if on_status: on_status("collecting")
                     detector.collect_step(exposure, n_frames)
 
@@ -332,7 +334,8 @@ class ScanEngine:
                     _log.exception("ScanEngine step-slew error")
                     on_error(exc)
                 finally:
-                    self._close_shutter(config)
+                    if not keep_shutter_open:
+                        self._close_shutter(config)
                     if disable_inc:
                         detector.restore_auto_increment(saved_auto_inc)
                     if on_file_number_updated is not None:
@@ -355,6 +358,7 @@ class ScanEngine:
         file_settings: FileSettingsModel | None = None,
         on_file_number_updated: Callable[[int], None] | None = None,
         on_status: Callable[[str], None] | None = None,
+        keep_shutter_open: bool = False,
     ) -> None:
         """Arm detector for external trigger, run the slew trajectory, wait for readout."""
         if self.is_running:
@@ -441,7 +445,8 @@ class ScanEngine:
                 _log.exception("ScanEngine wide-scan error")
                 on_error(exc)
             finally:
-                self._close_shutter(config)
+                if not keep_shutter_open:
+                    self._close_shutter(config)
                 if disable_inc:
                     detector.restore_auto_increment(saved_auto_inc)
                 if on_file_number_updated is not None:
@@ -523,6 +528,7 @@ class ScanEngine:
         on_done: Callable[[], None],
         on_error: Callable[[Exception], None],
         on_file_number_updated: Callable[[int], None] | None = None,
+        keep_shutter_open: bool = False,
     ) -> None:
         """Run a trajectory across one map row, collecting one still frame per point.
 
@@ -599,7 +605,8 @@ class ScanEngine:
                 _log.exception("ScanEngine map-row-trajectory error")
                 on_error(exc)
             finally:
-                self._close_shutter(config)
+                if not keep_shutter_open:
+                    self._close_shutter(config)
                 if disable_inc:
                     detector.restore_auto_increment(saved_auto_inc)
                 if on_file_number_updated is not None:

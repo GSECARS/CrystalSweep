@@ -521,8 +521,8 @@ class CollectionSettingsView(wx.Panel):
     def _refresh_flip_visibility(self, scan_type: ScanType | None = None) -> None:
         if scan_type is None:
             scan_type = SCAN_TYPES[self._type_combo._selection]
-        show = self._map_toggle.GetValue() and scan_type == "wide"
-        self._flip_toggle.Show(show)
+        show_flip = self._map_toggle.GetValue() and scan_type == "wide"
+        self._flip_toggle.Show(show_flip)
         self.Layout()
         self.GetParent().Layout()
 

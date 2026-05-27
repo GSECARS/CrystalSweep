@@ -130,7 +130,11 @@ class CollectionSettingsController:
 
     def _sync_trajectory_toggle(self) -> None:
         cs = self._model.collection_settings
-        self._view.collection_table.set_trajectory_visible(cs.scan_type == "still" and cs.map)
+        still_trajectory = cs.scan_type == "still" and cs.map
+        wide_flip_map = cs.scan_type == "wide" and cs.map and cs.wide_flip
+        self._view.collection_table.set_trajectory_visible(still_trajectory)
+        keep_shutter_visible = (still_trajectory and self._view.collection_table.trajectory_scan) or wide_flip_map
+        self._view.collection_table.set_keep_shutter_open_visible(keep_shutter_visible)
 
     def _apply_type_defaults(self, scan_type: ScanType) -> None:
         cs = self._model.collection_settings
@@ -213,6 +217,7 @@ class CollectionSettingsController:
 
     def _on_wide_flip_changed(self, value: bool) -> None:
         self._model.collection_settings.wide_flip = value
+        self._sync_trajectory_toggle()
         _log.debug("collection_settings.wide_flip = %s", value)
 
     def _on_rotation_start_changed(self, value: float) -> None:

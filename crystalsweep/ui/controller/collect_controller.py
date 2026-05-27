@@ -512,6 +512,7 @@ class CollectController:
         motor1 = group_points[0].map_motor1
         motor2 = group_points[0].map_motor2
         use_trajectory = self._view.collection_table.trajectory_scan
+        keep_shutter_open = self._view.collection_table.keep_shutter_open
         weights = group_weights if group_weights is not None else [1] * len(group_points)
         map_completed_weight = completed_weight
 
@@ -599,7 +600,7 @@ class CollectController:
                 break
 
             if scan_type == "still" and use_trajectory:
-                self._run_map_row_trajectory(row_points, row_num, n_rows, start_idx, total, motor1, config, file_settings, all_points)
+                self._run_map_row_trajectory(row_points, row_num, n_rows, start_idx, total, motor1, config, file_settings, all_points, keep_shutter_open=keep_shutter_open)
             else:
                 for col_pt in row_points:
                     if self._abort_event.is_set():
@@ -643,10 +644,13 @@ class CollectController:
                     if scan_type == "still":
                         self._run_still(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     elif scan_type == "wide":
-                        self._run_wide(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
+                        self._run_wide(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open)
                     elif scan_type == "step":
                         self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     map_completed_weight += pt_weight
+
+        if keep_shutter_open:
+            self._engine._close_shutter(config)
 
         if original_motor1 is not None and motor1_cfg is not None:
             try:
@@ -672,6 +676,7 @@ class CollectController:
         config,
         file_settings,
         all_points: list[CollectionPoint],
+        keep_shutter_open: bool = False,
     ) -> None:
         n_points = len(row_points)
         try:
@@ -723,6 +728,7 @@ class CollectController:
                 on_done=on_done,
                 on_error=on_error,
                 on_file_number_updated=self._on_file_number_updated,
+                keep_shutter_open=keep_shutter_open,
             )
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
@@ -975,7 +981,7 @@ class CollectController:
         else:
             self._spawn_crysalis_conversion(point, frame_number_before)
 
-    def _run_wide(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
+    def _run_wide(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1, keep_shutter_open: bool = False) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -997,7 +1003,7 @@ class CollectController:
             wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
 
         try:
-            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
+            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status, keep_shutter_open=keep_shutter_open)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
