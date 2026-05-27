@@ -804,7 +804,15 @@ class CollectController:
 
         label = point.label.strip() if fs.use_ext else ""
         base = fs.filename or ""
-        parts = [p for p in [base, label] if p]
+        map_ext = fs.map_ext.strip() if point.map_group else ""
+        directory = str(fs.directory)
+        if point.map_group:
+            folder_suffix = map_ext if map_ext else "map"
+            folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
+            directory = f"{directory.rstrip('/')}/{folder_name}"
+            parts = [p for p in [base, map_ext, label] if p]
+        else:
+            parts = [p for p in [base, label] if p]
         basename = "_".join(parts) if parts else base
 
         filenumber = frame_number if frame_number is not None else fs.frame_number
@@ -858,7 +866,7 @@ class CollectController:
         }
 
         args = {
-            "filepath": str(fs.directory),
+            "filepath": directory,
             "basename": basename,
             "filenumber": filenumber,
             "par_file": str(fs.crysalis_calibration),
