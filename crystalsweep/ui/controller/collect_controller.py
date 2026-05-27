@@ -553,8 +553,11 @@ class CollectController:
                 break
 
             sorted_cols = sorted(row, key=lambda p: p.map_col)
-            snake_forward = (row_num % 2 == 0)
-            row_points = sorted_cols if snake_forward else list(reversed(sorted_cols))
+            if use_trajectory:
+                snake_forward = (row_num % 2 == 0)
+                row_points = sorted_cols if snake_forward else list(reversed(sorted_cols))
+            else:
+                row_points = sorted_cols
 
             first_pt = row_points[0]
             model_index = all_points.index(first_pt) if first_pt in all_points else -1
