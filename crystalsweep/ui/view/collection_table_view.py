@@ -598,6 +598,8 @@ class CollectionTableView(wx.Panel):
         self._delete_selected_btn.Enable(not collecting)
         self._clear_btn.Enable(not collecting)
         self._slew_scan_toggle.SetLocked(collecting)
+        self._use_ext_toggle.SetLocked(collecting)
+        self._keep_shutter_open_toggle.SetLocked(collecting)
         self._header.set_collecting(collecting)
         for row in self._rows:
             row.set_collecting(collecting)
