@@ -639,15 +639,13 @@ class CollectionTableView(wx.Panel):
         if self._on_use_ext_changed_cb is not None:
             self._on_use_ext_changed_cb(value)
 
-    def _on_trajectory_toggled(self, event: wx.Event) -> None:
-        if not self._slew_scan_toggle.GetValue():
+    def _on_trajectory_toggled(self, value: bool) -> None:
+        if not value:
             self._keep_shutter_open_toggle.SetValue(False)
             self._keep_shutter_open_toggle.Hide()
-            self.Layout()
         else:
             self._keep_shutter_open_toggle.Show()
-            self.Layout()
-        event.Skip()
+        self.Layout()
 
     def _on_keep_shutter_open_toggled(self, event: wx.Event) -> None:
         if self._on_keep_shutter_open_changed_cb is not None:

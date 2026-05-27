@@ -513,6 +513,9 @@ class CollectController:
         motor2 = group_points[0].map_motor2
         use_trajectory = self._view.collection_table.trajectory_scan
         keep_shutter_open = self._view.collection_table.keep_shutter_open
+        if scan_type == "wide" and not self._model.collection_settings.wide_flip:
+            keep_shutter_open = False
+        original_shutter_mode: int = 1
         weights = group_weights if group_weights is not None else [1] * len(group_points)
         map_completed_weight = completed_weight
 
@@ -541,6 +544,9 @@ class CollectController:
                 original_motor2 = float(raw) if raw is not None else None
             except Exception:
                 pass
+
+        if keep_shutter_open:
+            original_shutter_mode = self._engine._disable_detector_shutter_control(config)
 
         for row_num, row in enumerate(sorted_rows):
             if self._abort_event.is_set():
@@ -651,6 +657,7 @@ class CollectController:
 
         if keep_shutter_open:
             self._engine._close_shutter(config)
+            self._engine._restore_detector_shutter_control(config, original_shutter_mode)
 
         if original_motor1 is not None and motor1_cfg is not None:
             try:

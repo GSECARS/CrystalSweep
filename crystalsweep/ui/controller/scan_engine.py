@@ -45,6 +45,7 @@ class ScanEngine:
         self._driver = None
         self._thread: threading.Thread | None = None
         self._scripts = script_model
+        self._shutter_open = False
 
     @staticmethod
     def _open_shutter(config: BeamlineConfig) -> None:
@@ -53,10 +54,49 @@ class ScanEngine:
             if config.shutter_delay > 0.0:
                 time.sleep(config.shutter_delay)
 
-    @staticmethod
-    def _close_shutter(config: BeamlineConfig) -> None:
+    def _open_shutter_once(self, config: BeamlineConfig) -> None:
+        if not self._shutter_open:
+            self._open_shutter(config)
+            self._shutter_open = True
+
+    def _close_shutter(self, config: BeamlineConfig) -> None:
         if config.shutter_pv.strip():
             caput(config.shutter_pv.strip(), config.shutter_close_value, wait=True)
+        self._shutter_open = False
+
+    @staticmethod
+    def _disable_detector_shutter_control(config: BeamlineConfig) -> int:
+        det = config.active_detector_config
+        if det is None or not det.pv_prefix.strip():
+            return 1
+        prefix = det.pv_prefix.strip()
+        if not prefix.endswith(":"):
+            prefix += ":"
+        shutter_mode_pv = f"{prefix}cam1:ShutterMode"
+        try:
+            current = caget(shutter_mode_pv)
+            original = int(current) if current is not None else 1
+        except Exception:
+            original = 1
+        try:
+            caput(shutter_mode_pv, 0, wait=True)
+        except Exception as exc:
+            _log.warning("Failed to disable detector shutter control (%s): %s", shutter_mode_pv, exc)
+        return original
+
+    @staticmethod
+    def _restore_detector_shutter_control(config: BeamlineConfig, original_mode: int) -> None:
+        det = config.active_detector_config
+        if det is None or not det.pv_prefix.strip():
+            return
+        prefix = det.pv_prefix.strip()
+        if not prefix.endswith(":"):
+            prefix += ":"
+        shutter_mode_pv = f"{prefix}cam1:ShutterMode"
+        try:
+            caput(shutter_mode_pv, original_mode, wait=True)
+        except Exception as exc:
+            _log.warning("Failed to restore detector shutter control (%s): %s", shutter_mode_pv, exc)
 
     @property
     def is_running(self) -> bool:
@@ -236,7 +276,7 @@ class ScanEngine:
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                     if on_status: on_status("preparing")
                     driver.prepare(spec)
-                    self._open_shutter(config)
+                    self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
                     if on_status: on_status("collecting")
                     for frame_idx in range(n_frames):
                         if self._driver is None:
@@ -287,7 +327,7 @@ class ScanEngine:
                     pv_base = rotation_cfg.pv.removesuffix(".VAL")
                     if on_status: on_status("moving")
                     caput(f"{pv_base}.VAL", omega_start, wait=True)
-                    self._open_shutter(config)
+                    self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
                     detector.arm_plugin(n_frames)
                     if on_status: on_status("collecting")
                     detector.collect_step(exposure, n_frames)
@@ -433,7 +473,7 @@ class ScanEngine:
                 driver.prepare(spec)
                 if on_status: on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
-                self._open_shutter(config)
+                self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
                 if on_status: on_status("collecting")
                 detector.collect_wide(exposure)
                 driver.run(spec, lambda i, pos: None)
@@ -589,7 +629,7 @@ class ScanEngine:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, ref_point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                 detector.arm_plugin(n_points)
-                self._open_shutter(config)
+                self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
                 detector.collect_step(exposure, n_points)
                 if is_xps:
                     driver.prepare(spec)
