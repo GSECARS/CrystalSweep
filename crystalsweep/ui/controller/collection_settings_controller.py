@@ -316,7 +316,17 @@ class CollectionSettingsController:
         det = self._model.beamline.active.active_detector_config
         width = det.file_number_width if det is not None else 4
 
+        motor_snapshot: dict[str, str] = {}
+        for motor in motors:
+            raw = caget(motor.pv)
+            if raw is not None:
+                try:
+                    motor_snapshot[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
+                except (ValueError, TypeError):
+                    pass
+
         group_id = str(uuid.uuid4())
+        new_points: list = []
         point_index = 0
         for row_idx, pos2 in enumerate(axis2):
             for col_idx, pos1 in enumerate(axis1):
@@ -334,13 +344,8 @@ class CollectionSettingsController:
                     point.rotation_end = str(rot_end)
                 if cs.scan_type == "step":
                     point.step = str(cs.step_size)
-                for motor in motors:
-                    raw = caget(motor.pv)
-                    if raw is not None:
-                        try:
-                            point.motor_positions[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
-                        except (ValueError, TypeError):
-                            pass
+                for shorthand, value in motor_snapshot.items():
+                    point.motor_positions[shorthand] = value
                 if cs.map_motor in point.motor_positions:
                     point.motor_positions[cs.map_motor] = f"{pos1:.{prec1}f}"
                 if pos2 is not None and motor2_cfg and cs.map2_motor in point.motor_positions:
@@ -350,8 +355,15 @@ class CollectionSettingsController:
                 point.map_col = col_idx
                 point.map_motor1 = cs.map_motor
                 point.map_motor2 = cs.map2_motor if cs.map2_enabled else ""
-                self._view.collection_table.add_row(point)
+                new_points.append(point)
                 point_index += 1
+
+        top = self._view.GetTopLevelParent()
+        top.Freeze()
+        try:
+            self._view.collection_table.add_rows(new_points)
+        finally:
+            top.Thaw()
 
         n_total = cs.map_points * (cs.map2_points if cs.map2_enabled else 1)
         wx.CallAfter(self._notify_points_changed)
