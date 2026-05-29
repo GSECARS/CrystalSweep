@@ -33,6 +33,23 @@ classifiers = [
 ]
 requires-python = "==3.14.*"
 dependencies = [
+    "h5py>=3.12.1",
+    "numpy>=2.4.4",
+    "p4p>=4.2.2",
+    "pillow>=11.2.0",
+    "pyfai>=2026.3.0",
+    "pyopengl>=3.1.10",
+    "pyopengl-accelerate>=3.1.10",
+    "pydantic>=2.0.0",
+    "tomli-w>=1.2.0",
+    "vispy>=0.14.3",
+    "wxpython>=4.2.5",
+    "lz4>=4.4.5",
+    "blosc>=1.11.4",
+    "bitshuffle>=0.5.2",
+    "pyepics>=3.5.9",
+    "pyautomation>=0.0.1",
+    "newportxps>=2026.1.1",
 ]
 
 [dependency-groups]

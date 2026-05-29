@@ -1,10 +1,10 @@
+#!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: .gitignore
+# File: crystalsweep/ui/__init__.py
 # ----------------------------------------------------------------------------------
-# Purpose: 
-# This file is used by Git to determine which files and directories to ignore 
-# when committing changes.
+# Purpose:
+# This file is used to initialize the CrystalSweep UI.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -12,34 +12,12 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
+__all__ = ["start_ui"]
 
-# Distribution / packaging
-*.egg-info/
-dist/
-build/
-wheels/
 
-# Virtual environments
-.venv/
+def start_ui() -> None:
+    """Starts the CrystalSweep UI."""
+    # Lazy import to avoid loading wx on CLI mode
+    from crystalsweep.ui.controller import UIApplication
 
-# OS generated files
-.DS_Store
-._*
-Thumbs.db
-Desktop.ini
-*~
-
-# Editors
-.idea/
-.vscode/
-*.code-workspace
-
-# Tools
-.ruff_cache/
-.pytest_cache/
-
-# Configuration files
-configs/
+    UIApplication()
