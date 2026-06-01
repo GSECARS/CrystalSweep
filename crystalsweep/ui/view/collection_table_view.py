@@ -971,6 +971,24 @@ class CollectionTableView(wx.Panel):
         self._viewport.set_virtual_height(0)
         self.Layout()
 
+        # Pre-warm the row pool so the very first add_row is as fast as later ones. Done on the next idle tick so it doesn't block this call.
+        wx.CallAfter(self._prewarm_pool)
+
+    def _prewarm_pool(self) -> None:
+        """Construct the row pool up front so the first add is faster."""
+        if self._pool:
+            return
+        vh = self._viewport.viewport_height()
+        if vh <= 0:
+            # Estimate the visible row count from own client area; if that is also zero, assume a small default so there is still a pool.
+            vh = self.GetClientSize().height or (_ROW_H * 10)
+        visible = max(1, (vh + _ROW_H - 1) // _ROW_H)
+        needed = visible + 2 * _OVERSCAN_ROWS
+        self._ensure_pool_capacity(needed)
+        # Newly built rows must start hidden until they get bound.
+        for row in self._pool:
+            row.clear_binding()
+
     def add_row(self, point: CollectionPoint) -> None:
         self.add_rows([point])
 
@@ -1265,7 +1283,7 @@ class CollectionTableView(wx.Panel):
         point = self._points[data_idx]
         bg = BG_CARD if data_idx % 2 == 0 else _ROW_ALT
         selected = self._selected_flags[data_idx]
-        active = (self._active_index == data_idx)
+        active = self._active_index == data_idx
         limit_error = self._limit_error_flags[data_idx]
         field_errors = self._field_errors[data_idx]
         label_enabled = (not self._is_map) and self._use_ext_toggle.GetValue()

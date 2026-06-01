@@ -51,9 +51,10 @@ class CollectionTableModel:
     def points(self) -> list[CollectionPoint]:
         return list(self._points)
 
-    def add_point(self, motor_shorthands: list[str]) -> CollectionPoint:
-        """Append a new point with a unique default label and empty motor positions."""
-        label = self._unique_label()
+    def add_point(self, motor_shorthands: list[str], label: str | None = None) -> CollectionPoint:
+        """Append a new point with empty motor positions."""
+        if label is None:
+            label = self._unique_label()
         point = CollectionPoint(
             label=label,
             motor_positions={s: "" for s in motor_shorthands},
