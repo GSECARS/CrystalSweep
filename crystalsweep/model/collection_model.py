@@ -65,6 +65,19 @@ class CollectionTableModel:
         if 0 <= index < len(self._points):
             del self._points[index]
 
+    def remove_points(self, indices: list[int]) -> None:
+        """Remove multiple points by index in a single pass."""
+        if not indices:
+            return
+        drop = {i for i in indices if 0 <= i < len(self._points)}
+        if not drop:
+            return
+        self._points = [p for i, p in enumerate(self._points) if i not in drop]
+
+    def clear_points(self) -> None:
+        """Remove all points."""
+        self._points.clear()
+
     def update_label(self, index: int, label: str) -> None:
         if 0 <= index < len(self._points):
             self._points[index].label = label

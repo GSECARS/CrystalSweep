@@ -1003,6 +1003,40 @@ class CollectionTableView(wx.Panel):
         self._viewport.set_virtual_height(len(self._points) * _ROW_H)
         self._sync_header_checkbox()
 
+    def remove_rows(self, indices: list[int]) -> None:
+        """Remove multiple rows at once with a single virtual-height update."""
+        if not indices:
+            return
+        drop = {i for i in indices if 0 <= i < len(self._points)}
+        if not drop:
+            return
+        self._points = [p for i, p in enumerate(self._points) if i not in drop]
+        self._selected_flags = [f for i, f in enumerate(self._selected_flags) if i not in drop]
+        self._limit_error_flags = [f for i, f in enumerate(self._limit_error_flags) if i not in drop]
+        self._field_errors = [e for i, e in enumerate(self._field_errors) if i not in drop]
+        if self._active_index is not None:
+            if self._active_index in drop:
+                self._active_index = None
+            else:
+                shift = sum(1 for d in drop if d < self._active_index)
+                self._active_index -= shift
+        self._viewport.set_virtual_height(len(self._points) * _ROW_H)
+        self._sync_header_checkbox()
+        self._repopulate_visible()
+
+    def clear_rows(self) -> None:
+        """Remove all rows at once."""
+        if not self._points:
+            return
+        self._points = []
+        self._selected_flags = []
+        self._limit_error_flags = []
+        self._field_errors = []
+        self._active_index = None
+        self._viewport.set_virtual_height(0)
+        self._sync_header_checkbox()
+        self._repopulate_visible()
+
     def refresh_row(self, index: int, point: CollectionPoint) -> None:
         if 0 <= index < len(self._points):
             self._points[index] = point

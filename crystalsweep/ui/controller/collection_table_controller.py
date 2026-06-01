@@ -186,16 +186,18 @@ class CollectionTableController:
 
     def _on_clear(self) -> None:
         count = len(self._model.collection.points)
-        for _ in range(count):
-            self._model.collection.remove_point(0)
-            self._view.remove_row(0)
+        if count == 0:
+            return
+        self._model.collection.clear_points()
+        self._view.clear_rows()
         self._notify_points_changed()
         _log.debug("Cleared all %d collection points", count)
 
     def _on_delete_selected(self) -> None:
         indices = [i for i, p in enumerate(self._model.collection.points) if p.selected]
-        for index in reversed(indices):
-            self._model.collection.remove_point(index)
-            self._view.remove_row(index)
+        if not indices:
+            return
+        self._model.collection.remove_points(indices)
+        self._view.remove_rows(indices)
         self._notify_points_changed()
         _log.debug("Deleted %d selected collection points", len(indices))
