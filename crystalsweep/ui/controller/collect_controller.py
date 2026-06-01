@@ -687,7 +687,7 @@ class CollectController:
                     pt_idx = start_idx + gidx
                     pt_weight = weights[gidx]
                     if scan_type == "still":
-                        self._run_still(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
+                        self._run_still(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open)
                     elif scan_type == "wide":
                         self._run_wide(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open)
                     elif scan_type == "step":
@@ -965,7 +965,7 @@ class CollectController:
         except Exception as exc:
             _log.warning("Failed to spawn crysalis conversion: %s", exc)
 
-    def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
+    def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1, keep_shutter_open: bool = False) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -989,7 +989,7 @@ class CollectController:
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
-            self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
+            self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status, keep_shutter_open=keep_shutter_open)
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return

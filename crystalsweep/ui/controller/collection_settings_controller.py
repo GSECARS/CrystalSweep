@@ -131,10 +131,10 @@ class CollectionSettingsController:
 
     def _sync_trajectory_toggle(self) -> None:
         cs = self._model.collection_settings
-        still_trajectory = cs.scan_type == "still" and cs.map
+        still_map = cs.scan_type == "still" and cs.map
         wide_flip_map = cs.scan_type == "wide" and cs.map and cs.wide_flip
-        self._view.collection_table.set_trajectory_visible(still_trajectory)
-        keep_shutter_visible = (still_trajectory and self._view.collection_table.trajectory_scan) or wide_flip_map
+        self._view.collection_table.set_trajectory_visible(still_map)
+        keep_shutter_visible = still_map or wide_flip_map
         self._view.collection_table.set_keep_shutter_open_visible(keep_shutter_visible)
         self._view.collection_table.set_use_ext_visible(not cs.map)
         self._view.collection_table.set_map_mode(cs.map)

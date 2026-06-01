@@ -128,6 +128,7 @@ class ScanEngine:
         file_settings: FileSettingsModel | None = None,
         on_file_number_updated: Callable[[int], None] | None = None,
         on_status: Callable[[str], None] | None = None,
+        keep_shutter_open: bool = False,
     ) -> None:
         """Trigger one detector frame at the current rotation position."""
         if self.is_running:
@@ -161,6 +162,11 @@ class ScanEngine:
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
+                if keep_shutter_open:
+                    self._open_shutter_once(config)
                 if self._abort_event.is_set():
                     on_done()
                     return
