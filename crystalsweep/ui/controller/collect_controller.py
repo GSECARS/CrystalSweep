@@ -147,7 +147,7 @@ class CollectController:
                         continue
                     try:
                         pos = float(raw)
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         continue
                     motor_errors[motor_cfg.shorthand] = bool(check_soft_limits(motor_cfg.pv, pos))
 
@@ -158,13 +158,13 @@ class CollectController:
                         try:
                             pos = float(point.rotation_start)
                             rot_start_error = bool(check_soft_limits(rotation_cfg.pv, pos))
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             pass
                     if point.rotation_end:
                         try:
                             pos = float(point.rotation_end)
                             rot_end_error = bool(check_soft_limits(rotation_cfg.pv, pos))
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             pass
 
                 if any(motor_errors.values()) or rot_start_error or rot_end_error:
@@ -192,7 +192,7 @@ class CollectController:
                 start = float(point.rotation_start) if point.rotation_start else 0.0
                 end = float(point.rotation_end) if point.rotation_end else 0.0
                 return max(1, round(abs(end - start) / step)) if step > 0 else 1
-            except (ValueError, ZeroDivisionError):
+            except ValueError, ZeroDivisionError:
                 return 1
         return 1
 
@@ -226,7 +226,7 @@ class CollectController:
                             start = float(point.rotation_start) if point.rotation_start else 0.0
                             end = float(point.rotation_end) if point.rotation_end else 180.0
                             n_frames = max(1, round(abs(end - start) / step))
-                        except (ValueError, ZeroDivisionError):
+                        except ValueError, ZeroDivisionError:
                             n_frames = 1
                         overhead = shutter_delay + 1.0
                         total += exposure * n_frames * n_points + overhead * n_points
@@ -239,7 +239,7 @@ class CollectController:
                         start = float(point.rotation_start) if point.rotation_start else 0.0
                         end = float(point.rotation_end) if point.rotation_end else 180.0
                         n_frames = max(1, round(abs(end - start) / step))
-                    except (ValueError, ZeroDivisionError):
+                    except ValueError, ZeroDivisionError:
                         n_frames = 1
                     total += exposure * n_frames + shutter_delay + 1.0
                 elif point.scan_type == "wide":
@@ -596,7 +596,7 @@ class CollectController:
 
             sorted_cols = sorted(row, key=lambda p: p.map_col)
             if use_trajectory:
-                snake_forward = (row_num % 2 == 0)
+                snake_forward = row_num % 2 == 0
                 row_points = sorted_cols if snake_forward else list(reversed(sorted_cols))
             else:
                 row_points = sorted_cols
@@ -654,7 +654,21 @@ class CollectController:
             if scan_type == "still" and use_trajectory:
                 row_start_idx = start_idx + row_num * len(row_points)
                 row_weight = sum(weights[group_points.index(pt)] for pt in row_points if pt in group_points)
-                self._run_map_row_trajectory(row_points, row_num, n_rows, row_start_idx, total, motor1, config, file_settings, all_points, keep_shutter_open=keep_shutter_open, completed_weight=map_completed_weight, row_weight=row_weight, total_weight=total_weight)
+                self._run_map_row_trajectory(
+                    row_points,
+                    row_num,
+                    n_rows,
+                    row_start_idx,
+                    total,
+                    motor1,
+                    config,
+                    file_settings,
+                    all_points,
+                    keep_shutter_open=keep_shutter_open,
+                    completed_weight=map_completed_weight,
+                    row_weight=row_weight,
+                    total_weight=total_weight,
+                )
                 map_completed_weight += row_weight
             else:
                 for col_pt in row_points:
@@ -697,9 +711,13 @@ class CollectController:
                     pt_idx = start_idx + gidx
                     pt_weight = weights[gidx]
                     if scan_type == "still":
-                        self._run_still(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open)
+                        self._run_still(
+                            col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open
+                        )
                     elif scan_type == "wide":
-                        self._run_wide(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open)
+                        self._run_wide(
+                            col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open
+                        )
                     elif scan_type == "step":
                         self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     map_completed_weight += pt_weight
@@ -784,7 +802,7 @@ class CollectController:
             while not done_event.is_set():
                 current = int(caget(counter_pv) or 0)
                 if current > last:
-                    snake_reversed = (row_num % 2 == 1)
+                    snake_reversed = row_num % 2 == 1
                     for f in range(last + 1, current + 1):
                         pt_idx = start_idx + (f - 1)
                         pt_fraction = (completed_weight + row_weight * f / n_points) / max(1, total_weight)
@@ -904,7 +922,7 @@ class CollectController:
             map_label = point.label.strip()
             try:
                 filenumber = int(map_label.rsplit("_", 1)[-1])
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 filenumber = frame_number if frame_number is not None else fs.frame_number
         else:
             parts = [p for p in [base, label] if p]
@@ -970,12 +988,24 @@ class CollectController:
 
         try:
             from crystalsweep.model.crysalis_converter import run_conversion
+
             p = multiprocessing.Process(target=run_conversion, args=(args,), daemon=True)
             p.start()
         except Exception as exc:
             _log.warning("Failed to spawn crysalis conversion: %s", exc)
 
-    def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1, keep_shutter_open: bool = False) -> None:
+    def _run_still(
+        self,
+        point: CollectionPoint,
+        idx: int,
+        total: int,
+        config,
+        file_settings=None,
+        completed_weight: int = 0,
+        point_weight: int = 1,
+        total_weight: int = 1,
+        keep_shutter_open: bool = False,
+    ) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -999,7 +1029,16 @@ class CollectController:
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
-            self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status, keep_shutter_open=keep_shutter_open)
+            self._engine.run_still(
+                point,
+                config,
+                on_done=on_done,
+                on_error=on_error,
+                file_settings=file_settings,
+                on_file_number_updated=self._on_file_number_updated,
+                on_status=on_status,
+                keep_shutter_open=keep_shutter_open,
+            )
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -1025,7 +1064,9 @@ class CollectController:
         else:
             self._spawn_crysalis_conversion(point)
 
-    def _run_step(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
+    def _run_step(
+        self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1
+    ) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -1054,8 +1095,10 @@ class CollectController:
             weighted = (completed_weight + inner * point_weight) / total_weight
             wx.CallAfter(
                 self._view.collect.set_progress,
-                idx, total,
-                frame, total_frames,
+                idx,
+                total,
+                frame,
+                total_frames,
                 weighted,
             )
 
@@ -1075,7 +1118,17 @@ class CollectController:
         wx.CallAfter(self._view.collect.set_progress, idx, total, 0, n_frames, completed_weight / total_weight)
 
         try:
-            self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
+            self._engine.run_step(
+                point,
+                config,
+                on_frame=on_frame,
+                on_done=on_done,
+                on_error=on_error,
+                slew=use_slew,
+                file_settings=file_settings,
+                on_file_number_updated=self._on_file_number_updated,
+                on_status=on_status,
+            )
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -1095,7 +1148,18 @@ class CollectController:
         else:
             self._spawn_crysalis_conversion(point, frame_number_before)
 
-    def _run_wide(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1, keep_shutter_open: bool = False) -> None:
+    def _run_wide(
+        self,
+        point: CollectionPoint,
+        idx: int,
+        total: int,
+        config,
+        file_settings=None,
+        completed_weight: int = 0,
+        point_weight: int = 1,
+        total_weight: int = 1,
+        keep_shutter_open: bool = False,
+    ) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
@@ -1119,7 +1183,16 @@ class CollectController:
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
-            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status, keep_shutter_open=keep_shutter_open)
+            self._engine.run_wide(
+                point,
+                config,
+                on_done=on_done,
+                on_error=on_error,
+                file_settings=file_settings,
+                on_file_number_updated=self._on_file_number_updated,
+                on_status=on_status,
+                keep_shutter_open=keep_shutter_open,
+            )
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return

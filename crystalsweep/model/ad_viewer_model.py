@@ -24,7 +24,7 @@ import bitshuffle
 import blosc
 import lz4.block
 import numpy as np
-from p4p.client.thread import Cancelled, Context, Disconnected, Subscription
+from p4p.client.thread import Context, Subscription
 
 __all__ = ["ADViewerModel"]
 

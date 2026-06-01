@@ -24,12 +24,8 @@ import wx
 from crystalsweep.model.collection_model import SCAN_TYPES, ScanType
 from crystalsweep.ui.view.custom.theme import (
     BG_CARD,
-    BG_ELEVATED,
-    BG_SURFACE,
     DISABLED_FG,
-    FG_PRIMARY,
     FG_SECONDARY,
-    SEP_COLOUR,
     scaled_font,
 )
 from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle, FlatButton, MUTED_SCHEME
@@ -45,18 +41,18 @@ _MAP_PRESETS: tuple[tuple[int, int], ...] = (
     (50, 5),
 )
 
-_TABLE_ROW_H   = 28
-_TABLE_HDR_H   = 26
-_TABLE_BORDER  = wx.Colour(50, 50, 56)
-_TABLE_HDR_BG  = wx.Colour(22, 22, 26)
+_TABLE_ROW_H = 28
+_TABLE_HDR_H = 26
+_TABLE_BORDER = wx.Colour(50, 50, 56)
+_TABLE_HDR_BG = wx.Colour(22, 22, 26)
 _TABLE_ROW_ALT = wx.Colour(32, 32, 36)
-_BOX_S         = 12
-_BOX_R         = 3
-_CHECK_FG      = wx.Colour(72, 199, 116)
-_CHECK_BG      = wx.Colour(38, 38, 42)
-_CHECK_BORDER  = wx.Colour(80, 80, 92)
-_CHECK_W       = 26
-_PAD           = 5
+_BOX_S = 12
+_BOX_R = 3
+_CHECK_FG = wx.Colour(72, 199, 116)
+_CHECK_BG = wx.Colour(38, 38, 42)
+_CHECK_BORDER = wx.Colour(80, 80, 92)
+_CHECK_W = 26
+_PAD = 5
 
 
 def _draw_checkbox(gc: wx.GraphicsContext, cx: int, cy: int, checked: bool, grayed: bool = False) -> None:
@@ -77,11 +73,13 @@ def _draw_checkbox(gc: wx.GraphicsContext, cx: int, cy: int, checked: bool, gray
         gc.SetPen(wx.Pen(wx.Colour(255, 255, 255), 1))
         x, y = r.x, r.y
         s = _BOX_S
-        gc.StrokeLines([
-            wx.Point2D(x + s * 0.2, y + s * 0.5),
-            wx.Point2D(x + s * 0.42, y + s * 0.72),
-            wx.Point2D(x + s * 0.8, y + s * 0.28),
-        ])
+        gc.StrokeLines(
+            [
+                wx.Point2D(x + s * 0.2, y + s * 0.5),
+                wx.Point2D(x + s * 0.42, y + s * 0.72),
+                wx.Point2D(x + s * 0.8, y + s * 0.28),
+            ]
+        )
 
 
 class _MapHeaderRow(wx.Panel):
@@ -269,6 +267,7 @@ class _MapTable(wx.Panel):
         sizer.Add(self.row1, 0, wx.EXPAND)
         sizer.Add(self.row2, 0, wx.EXPAND)
         self.SetSizer(sizer)
+
 
 _TYPE_COLOURS: dict[str, wx.Colour] = {
     "still": wx.Colour(99, 179, 237),
@@ -504,9 +503,7 @@ class CollectionSettingsView(wx.Panel):
         show_rotation = scan_type in ("wide", "step")
         show_step = scan_type == "step"
 
-        for w in (self._rot_start_lbl, self._rot_start_ctrl,
-                  self._rot_end_lbl, self._rot_end_ctrl,
-                  self._rot_range_lbl, self._rot_range_ctrl):
+        for w in (self._rot_start_lbl, self._rot_start_ctrl, self._rot_end_lbl, self._rot_end_ctrl, self._rot_range_lbl, self._rot_range_ctrl):
             w.Show(show_rotation)
 
         self._step_lbl.Show(show_step)
@@ -548,16 +545,20 @@ class CollectionSettingsView(wx.Panel):
 
     def set_enabled(self, enabled: bool) -> None:
         for ctrl in (
-            self._type_combo, self._exposure_ctrl,
-            self._rot_start_ctrl, self._rot_end_ctrl, self._rot_range_ctrl,
-            self._step_ctrl, self._add_btn, self._update_selected_btn,
+            self._type_combo,
+            self._exposure_ctrl,
+            self._rot_start_ctrl,
+            self._rot_end_ctrl,
+            self._rot_range_ctrl,
+            self._step_ctrl,
+            self._add_btn,
+            self._update_selected_btn,
         ):
             ctrl.Enable(enabled)
         self._map_toggle.SetLocked(not enabled)
         self._flip_toggle.SetLocked(not enabled)
         lbl_colour = FG_SECONDARY if enabled else DISABLED_FG
-        for lbl in (self._type_lbl, self._exp_lbl,
-                    self._rot_start_lbl, self._rot_end_lbl, self._rot_range_lbl, self._step_lbl):
+        for lbl in (self._type_lbl, self._exp_lbl, self._rot_start_lbl, self._rot_end_lbl, self._rot_range_lbl, self._step_lbl):
             lbl.SetForegroundColour(lbl_colour)
             lbl.Refresh()
         if not self._map_table.IsShown():

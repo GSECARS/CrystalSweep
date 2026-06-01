@@ -86,7 +86,9 @@ class NewportXPSModel:
             )
             _log.debug(
                 "NewportXPSModel step trajectory defined (range=%.4f exposure=%.4f points=%d)",
-                omega_range, spec.exposure, spec.points,
+                omega_range,
+                spec.exposure,
+                spec.points,
             )
 
     def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
@@ -143,7 +145,7 @@ class NewportXPSModel:
 
         axis_name = positioner_name
         if axis_name.startswith(group_name):
-            axis_name = axis_name[len(group_name):].lstrip("-.")
+            axis_name = axis_name[len(group_name) :].lstrip("-.")
 
         self._xps.set_trajectory_group(group_name)
         result = self._xps.define_array_trajectory(
@@ -153,10 +155,7 @@ class NewportXPSModel:
             verbose=False,
         )
         if result is None:
-            raise RuntimeError(
-                f"define_array_trajectory failed — check positioner name '{axis_name}' "
-                f"against XPS group '{group_name}' axes."
-            )
+            raise RuntimeError(f"define_array_trajectory failed — check positioner name '{axis_name}' against XPS group '{group_name}' axes.")
         _log.debug("NewportXPSModel array trajectory defined: %d positions, dtime=%.4f", len(xps_positions), exposure)
 
     def run_array(self, on_point: Callable[[int, float], None], n_points: int) -> None:

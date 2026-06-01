@@ -36,7 +36,7 @@ def check_soft_limits(pv: str, position: float) -> str | None:
     try:
         lo = float(llm)
         hi = float(hlm)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if lo == hi == 0.0:
         return None

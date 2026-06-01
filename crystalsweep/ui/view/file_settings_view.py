@@ -23,12 +23,8 @@ import wx
 
 from crystalsweep.ui.view.custom.icons import draw_folder, draw_folder_open, draw_refresh, draw_update
 from crystalsweep.ui.view.custom.theme import (
-    ACCENT,
     BG_CARD,
-    BG_ELEVATED,
-    BG_SURFACE,
     DISABLED_FG,
-    FG_PRIMARY,
     FG_SECONDARY,
     PONI_LOADED,
     SEP_COLOUR,
@@ -294,14 +290,22 @@ class FileSettingsView(wx.Panel):
 
     def set_enabled(self, enabled: bool) -> None:
         for ctrl in (
-            self._filename_ctrl, self._filename_update_btn,
-            self._frame_ctrl, self._frame_reset_btn, self._frame_update_btn,
-            self._path_ctrl, self._path_browse_btn, self._path_update_btn,
-            self._map_ext_ctrl, self._crysalis_cal_btn,
+            self._filename_ctrl,
+            self._filename_update_btn,
+            self._frame_ctrl,
+            self._frame_reset_btn,
+            self._frame_update_btn,
+            self._path_ctrl,
+            self._path_browse_btn,
+            self._path_update_btn,
+            self._map_ext_ctrl,
+            self._crysalis_cal_btn,
         ):
             ctrl.Enable(enabled)
         for toggle in (
-            self._hdf5_toggle, self._cbf_toggle, self._tif_toggle,
+            self._hdf5_toggle,
+            self._cbf_toggle,
+            self._tif_toggle,
         ):
             toggle.SetLocked(not enabled)
         if enabled:

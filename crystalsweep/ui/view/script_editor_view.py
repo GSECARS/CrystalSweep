@@ -19,10 +19,7 @@ import wx
 import wx.stc as stc
 
 from crystalsweep.ui.view.custom.theme import (
-    BG_ELEVATED,
-    BG_SURFACE,
     DANGER,
-    FG_PRIMARY,
     FG_SECONDARY,
     PONI_LOADED,
     SEP_COLOUR,
@@ -35,20 +32,20 @@ _SB_TRACK = wx.Colour(28, 28, 32)
 
 __all__ = ["ScriptEditorDialog"]
 
-_EDITOR_BG       = wx.Colour(28, 28, 32)
-_EDITOR_FG       = wx.Colour(220, 220, 228)
-_GUTTER_BG       = wx.Colour(22, 22, 26)
-_GUTTER_FG       = wx.Colour(90, 90, 100)
-_CARET           = wx.Colour(220, 220, 228)
-_SEL_BG          = wx.Colour(50, 80, 120)
-_KEYWORD_FG      = wx.Colour(86, 156, 214)
-_KEYWORD2_FG     = wx.Colour(78, 201, 176)
-_STRING_FG       = wx.Colour(206, 145, 120)
-_COMMENT_FG      = wx.Colour(106, 153, 85)
-_NUMBER_FG       = wx.Colour(181, 206, 168)
-_OPERATOR_FG     = wx.Colour(212, 212, 212)
-_DECORATOR_FG    = wx.Colour(220, 220, 100)
-_DEFNAME_FG      = wx.Colour(220, 220, 170)
+_EDITOR_BG = wx.Colour(28, 28, 32)
+_EDITOR_FG = wx.Colour(220, 220, 228)
+_GUTTER_BG = wx.Colour(22, 22, 26)
+_GUTTER_FG = wx.Colour(90, 90, 100)
+_CARET = wx.Colour(220, 220, 228)
+_SEL_BG = wx.Colour(50, 80, 120)
+_KEYWORD_FG = wx.Colour(86, 156, 214)
+_KEYWORD2_FG = wx.Colour(78, 201, 176)
+_STRING_FG = wx.Colour(206, 145, 120)
+_COMMENT_FG = wx.Colour(106, 153, 85)
+_NUMBER_FG = wx.Colour(181, 206, 168)
+_OPERATOR_FG = wx.Colour(212, 212, 212)
+_DECORATOR_FG = wx.Colour(220, 220, 100)
+_DEFNAME_FG = wx.Colour(220, 220, 170)
 
 _MONO_FACE = "Consolas" if wx.Platform == "__WXMSW__" else "Menlo"
 _FONT_SIZE = 11
@@ -74,35 +71,37 @@ def _apply_python_highlighting(ed: stc.StyledTextCtrl) -> None:
         if bold:
             ed.StyleSetBold(num, True)
 
-    _s(stc.STC_P_DEFAULT,       _EDITOR_FG)
-    _s(stc.STC_P_COMMENTLINE,   _COMMENT_FG)
-    _s(stc.STC_P_NUMBER,        _NUMBER_FG)
-    _s(stc.STC_P_STRING,        _STRING_FG)
-    _s(stc.STC_P_CHARACTER,     _STRING_FG)
-    _s(stc.STC_P_WORD,          _KEYWORD_FG,  bold=True)
-    _s(stc.STC_P_TRIPLE,        _STRING_FG)
-    _s(stc.STC_P_TRIPLEDOUBLE,  _STRING_FG)
-    _s(stc.STC_P_CLASSNAME,     _DEFNAME_FG,  bold=True)
-    _s(stc.STC_P_DEFNAME,       _DEFNAME_FG)
-    _s(stc.STC_P_OPERATOR,      _OPERATOR_FG)
-    _s(stc.STC_P_IDENTIFIER,    _EDITOR_FG)
-    _s(stc.STC_P_COMMENTBLOCK,  _COMMENT_FG)
-    _s(stc.STC_P_STRINGEOL,     _STRING_FG)
-    _s(stc.STC_P_WORD2,         _KEYWORD2_FG)
-    _s(stc.STC_P_DECORATOR,     _DECORATOR_FG)
+    _s(stc.STC_P_DEFAULT, _EDITOR_FG)
+    _s(stc.STC_P_COMMENTLINE, _COMMENT_FG)
+    _s(stc.STC_P_NUMBER, _NUMBER_FG)
+    _s(stc.STC_P_STRING, _STRING_FG)
+    _s(stc.STC_P_CHARACTER, _STRING_FG)
+    _s(stc.STC_P_WORD, _KEYWORD_FG, bold=True)
+    _s(stc.STC_P_TRIPLE, _STRING_FG)
+    _s(stc.STC_P_TRIPLEDOUBLE, _STRING_FG)
+    _s(stc.STC_P_CLASSNAME, _DEFNAME_FG, bold=True)
+    _s(stc.STC_P_DEFNAME, _DEFNAME_FG)
+    _s(stc.STC_P_OPERATOR, _OPERATOR_FG)
+    _s(stc.STC_P_IDENTIFIER, _EDITOR_FG)
+    _s(stc.STC_P_COMMENTBLOCK, _COMMENT_FG)
+    _s(stc.STC_P_STRINGEOL, _STRING_FG)
+    _s(stc.STC_P_WORD2, _KEYWORD2_FG)
+    _s(stc.STC_P_DECORATOR, _DECORATOR_FG)
 
-    ed.SetKeyWords(0,
+    ed.SetKeyWords(
+        0,
         "False None True and as assert async await break class continue def del "
         "elif else except finally for from global if import in is lambda nonlocal "
-        "not or pass raise return try while with yield"
+        "not or pass raise return try while with yield",
     )
-    ed.SetKeyWords(1,
+    ed.SetKeyWords(
+        1,
         "abs all any bin bool bytearray bytes callable chr classmethod compile "
         "complex delattr dict dir divmod enumerate eval exec filter float format "
         "frozenset getattr globals hasattr hash help hex id input int isinstance "
         "issubclass iter len list locals map max min next object oct open ord pow "
         "print property range repr reversed round set setattr slice sorted "
-        "staticmethod str sum super tuple type vars zip self cls __name__ __file__"
+        "staticmethod str sum super tuple type vars zip self cls __name__ __file__",
     )
 
 

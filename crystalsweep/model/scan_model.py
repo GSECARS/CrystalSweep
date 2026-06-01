@@ -86,5 +86,6 @@ def get_driver(controller: str) -> ScanDriver:
     if cls is None:
         _log.warning("Unknown scan controller %r, falling back to EpicsScanModel.", controller)
         from crystalsweep.model.epics_scan_model import EpicsScanModel
+
         cls = EpicsScanModel
     return cls()

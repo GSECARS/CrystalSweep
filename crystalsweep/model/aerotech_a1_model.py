@@ -100,7 +100,11 @@ class AerotechA1Model:
         self._automation.load_trajectory(trajectory)
         _log.debug(
             "AerotechA1Model: trajectory loaded (start=%.4f end=%.4f exposure=%.4f points=%d dir=%d)",
-            spec.start, spec.end, spec.exposure, spec.points, travel_direction,
+            spec.start,
+            spec.end,
+            spec.exposure,
+            spec.points,
+            travel_direction,
         )
 
     def run(self, spec: ScanSpec, on_point: Callable[[int, float], None], on_at_start: Callable[[], None] | None = None) -> None:
@@ -123,6 +127,7 @@ class AerotechA1Model:
             on_at_start()
         self._automation._pso.enable_modules()
         import time as _time
+
         _time.sleep(0.1)
         traj = self._automation._active_trajectory
         total_distance = traj.distance + abs(traj.taxi_distance)
@@ -150,7 +155,9 @@ class AerotechA1Model:
 
         _log.debug(
             "AerotechA1Model wide slew: pv=%s end=%.4f velocity=%.4f",
-            pv_base, spec.end, velocity,
+            pv_base,
+            spec.end,
+            velocity,
         )
 
     def abort(self) -> None:

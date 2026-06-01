@@ -65,6 +65,7 @@ class DetectorConfig:
     def file_number_width(self) -> int:
         """Extract the zero-padding width from the file template (e.g. %4.4d → 4). Defaults to 4."""
         import re
+
         m = re.search(r"%(\d+)\.(\d+)d", self.file_template)
         if m:
             return int(m.group(2))
@@ -83,7 +84,7 @@ class DetectorConfig:
         loc_norm = loc.replace("\\", "/").rstrip("/")
         rem_norm = rem.rstrip("/")
         if norm.lower().startswith(loc_norm.lower()):
-            remainder = norm[len(loc_norm):]
+            remainder = norm[len(loc_norm) :]
             return rem_norm + remainder
         return local_path
 
@@ -101,7 +102,7 @@ class DetectorConfig:
         rem_norm = rem.rstrip("/")
         loc_norm = loc.replace("\\", "/").rstrip("/")
         if norm.lower().startswith(rem_norm.lower()):
-            remainder = norm[len(rem_norm):]
+            remainder = norm[len(rem_norm) :]
             return loc_norm + remainder
         return remote_path
 
@@ -286,10 +287,7 @@ class BeamlineConfigModel:
                 beam_angle=float(rm_data.get("beam_angle", 0.0)),
             )
 
-        abort_pvs = tuple(
-            (str(entry.get("pv", "")), str(entry.get("value", "")))
-            for entry in (data.get("abort_pvs", []) or [])
-        )
+        abort_pvs = tuple((str(entry.get("pv", "")), str(entry.get("value", ""))) for entry in (data.get("abort_pvs", []) or []))
 
         restore_pvs = tuple(
             str(entry.get("pv", "")) if isinstance(entry, dict) else str(entry)
@@ -325,31 +323,48 @@ class BeamlineConfigModel:
         payload: dict = {
             "beamline": config.beamline,
             "rotation_motor": (
-                {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision, "controller": config.rotation_motor.controller, "xps_group": config.rotation_motor.xps_group, "xps_positioner": config.rotation_motor.xps_positioner, "beam_angle": config.rotation_motor.beam_angle}
+                {
+                    "shorthand": config.rotation_motor.shorthand,
+                    "description": config.rotation_motor.description,
+                    "pv": config.rotation_motor.pv,
+                    "precision": config.rotation_motor.precision,
+                    "controller": config.rotation_motor.controller,
+                    "xps_group": config.rotation_motor.xps_group,
+                    "xps_positioner": config.rotation_motor.xps_positioner,
+                    "beam_angle": config.rotation_motor.beam_angle,
+                }
                 if config.rotation_motor is not None
                 else {}
             ),
             "detectors": [
-                {"name": d.name, "pv_prefix": d.pv_prefix, "type": d.type, "file_format": d.file_format, "file_template": d.file_template, "path_prefix_local": d.path_prefix_local, "path_prefix_remote": d.path_prefix_remote, "active": idx == config.active_detector}
+                {
+                    "name": d.name,
+                    "pv_prefix": d.pv_prefix,
+                    "type": d.type,
+                    "file_format": d.file_format,
+                    "file_template": d.file_template,
+                    "path_prefix_local": d.path_prefix_local,
+                    "path_prefix_remote": d.path_prefix_remote,
+                    "active": idx == config.active_detector,
+                }
                 for idx, d in enumerate(config.detectors)
             ],
-            "controllers": [
-                {"name": c.name, "type": c.type, "params": c.params}
-                for c in config.controllers
-            ],
+            "controllers": [{"name": c.name, "type": c.type, "params": c.params} for c in config.controllers],
             "motors": [
-                {"shorthand": m.shorthand, "description": m.description, "pv": m.pv, "precision": m.precision, "mapping_enabled": m.mapping_enabled, "controller": m.controller, "xps_group": m.xps_group, "xps_positioner": m.xps_positioner}
+                {
+                    "shorthand": m.shorthand,
+                    "description": m.description,
+                    "pv": m.pv,
+                    "precision": m.precision,
+                    "mapping_enabled": m.mapping_enabled,
+                    "controller": m.controller,
+                    "xps_group": m.xps_group,
+                    "xps_positioner": m.xps_positioner,
+                }
                 for m in config.motors
             ],
-            "abort_pvs": [
-                {"pv": pv, "value": value}
-                for pv, value in config.abort_pvs
-            ],
-            "restore_pvs": [
-                {"pv": pv}
-                for pv in config.restore_pvs
-                if pv
-            ],
+            "abort_pvs": [{"pv": pv, "value": value} for pv, value in config.abort_pvs],
+            "restore_pvs": [{"pv": pv} for pv in config.restore_pvs if pv],
             "crysalis_par_path": config.crysalis_par_path,
             "crysalis_load_on_startup": config.crysalis_load_on_startup,
             "shutter_pv": config.shutter_pv,

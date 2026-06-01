@@ -791,7 +791,7 @@ class ScanEngine:
             map_label = point.label.strip()
             try:
                 frame_number = int(map_label.rsplit("_", 1)[-1])
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 frame_number = file_settings.frame_number
         else:
             disable_auto_increment = bool(label)

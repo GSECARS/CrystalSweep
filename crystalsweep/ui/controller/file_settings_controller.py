@@ -139,8 +139,7 @@ class FileSettingsController:
             except Exception as exc:
                 _log.warning("sync_from_detector: failed to fetch file info: %s", exc)
                 return
-            wx.CallAfter(self._apply_detector_file_info, directory, filename, file_number,
-                         update_directory, update_filename, update_frame)
+            wx.CallAfter(self._apply_detector_file_info, directory, filename, file_number, update_directory, update_filename, update_frame)
 
         threading.Thread(target=_fetch, daemon=True, name="detector-file-sync").start()
 

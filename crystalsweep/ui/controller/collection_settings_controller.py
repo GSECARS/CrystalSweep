@@ -274,7 +274,7 @@ class CollectionSettingsController:
             if raw is not None:
                 try:
                     point.motor_positions[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
         self._view.collection_table.add_row(point)
         self._notify_points_changed()
@@ -295,7 +295,7 @@ class CollectionSettingsController:
                 return 0.0
             try:
                 return float(caget(motor_cfg.pv) or 0.0)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return 0.0
 
         motor1_cfg = next((m for m in motors if m.shorthand == cs.map_motor), None)
@@ -322,7 +322,7 @@ class CollectionSettingsController:
             if raw is not None:
                 try:
                     motor_snapshot[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
 
         group_id = str(uuid.uuid4())

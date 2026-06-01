@@ -18,6 +18,7 @@ from pathlib import Path
 
 __all__ = ["FileSettingsModel"]
 
+
 @dataclass()
 class FileSettingsModel:
     """Holds state for the file settings section of the GUI."""

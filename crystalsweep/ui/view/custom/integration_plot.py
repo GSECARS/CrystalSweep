@@ -475,12 +475,7 @@ class IntegrationPlot(wx.Panel):
         event.Skip()
 
     def _clear_hover_state(self) -> None:
-        changed = (
-            self._btn_hovered
-            or self._btn_pressed
-            or self._unit_btn_hovered != -1
-            or self._hover_data_x is not None
-        )
+        changed = self._btn_hovered or self._btn_pressed or self._unit_btn_hovered != -1 or self._hover_data_x is not None
         self._btn_hovered = False
         self._btn_pressed = False
         self._unit_btn_hovered = -1

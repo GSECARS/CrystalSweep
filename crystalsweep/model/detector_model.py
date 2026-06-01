@@ -163,7 +163,16 @@ class ADEigerModel:
         if disable_auto_increment:
             saved = int(caget(f"{p}{plugin}:AutoIncrement") or 1)
             caput(f"{p}{plugin}:AutoIncrement", 0, wait=True)
-        _log.debug("ADEigerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s", p, plugin, directory, filename, frame_number, file_template, disable_auto_increment)
+        _log.debug(
+            "ADEigerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s",
+            p,
+            plugin,
+            directory,
+            filename,
+            frame_number,
+            file_template,
+            disable_auto_increment,
+        )
         return saved
 
     def restore_auto_increment(self, saved_value: int) -> None:
@@ -326,7 +335,16 @@ class ADPilatusModel:
         if disable_auto_increment:
             saved = int(caget(f"{p}{plugin}:AutoIncrement") or 1)
             caput(f"{p}{plugin}:AutoIncrement", 0, wait=True)
-        _log.debug("ADPilatusModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s", p, plugin, directory, filename, frame_number, file_template, disable_auto_increment)
+        _log.debug(
+            "ADPilatusModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s",
+            p,
+            plugin,
+            directory,
+            filename,
+            frame_number,
+            file_template,
+            disable_auto_increment,
+        )
         return saved
 
     def restore_auto_increment(self, saved_value: int) -> None:
@@ -489,7 +507,16 @@ class ADSpinnakerModel:
         if disable_auto_increment:
             saved = int(caget(f"{p}{plugin}:AutoIncrement") or 1)
             caput(f"{p}{plugin}:AutoIncrement", 0, wait=True)
-        _log.debug("ADSpinnakerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s", p, plugin, directory, filename, frame_number, file_template, disable_auto_increment)
+        _log.debug(
+            "ADSpinnakerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s",
+            p,
+            plugin,
+            directory,
+            filename,
+            frame_number,
+            file_template,
+            disable_auto_increment,
+        )
         return saved
 
     def restore_auto_increment(self, saved_value: int) -> None:

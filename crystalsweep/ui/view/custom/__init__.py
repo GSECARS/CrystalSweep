@@ -17,7 +17,20 @@ from crystalsweep.ui.view.custom.image_canvas import ImageCanvas
 from crystalsweep.ui.view.custom.integration_plot import IntegrationPlot
 from crystalsweep.ui.view.custom.intensity_histogram import IntensityHistogramWidget
 from crystalsweep.ui.view.custom.settings_popup import ImageSettingsPopup
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkConfirmDialog, DarkMenuBar, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton, FrameLabel, IconButton, LiveToggle, SectionDivider, ThemedSplitter
+from crystalsweep.ui.view.custom.widgets import (
+    DarkCombo,
+    DarkConfirmDialog,
+    DarkMenuBar,
+    DarkScrollBar,
+    DarkTextCtrl,
+    DarkToggle,
+    FlatButton,
+    FrameLabel,
+    IconButton,
+    LiveToggle,
+    SectionDivider,
+    ThemedSplitter,
+)
 
 __all__ = [
     "COLORMAP_NAMES",
