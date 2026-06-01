@@ -757,17 +757,13 @@ class CollectionSettingsView(wx.Panel):
     def _on_map_step_enter(self, event: wx.Event) -> None:
         self._map_table.row1.sync_points_from_step()
         self._fire_float(self._map_table.row1.step_ctrl, self._on_map_step_changed_cb)
+        self._fire_int(self._map_table.row1.points_ctrl, self._on_map_points_changed_cb)
         event.Skip()
 
     def _on_map_points_enter(self, event: wx.Event) -> None:
         self._map_table.row1.sync_step_from_points()
-        if self._on_map_points_changed_cb is None:
-            event.Skip()
-            return
-        try:
-            self._on_map_points_changed_cb(int(self._map_table.row1.points_ctrl.GetValue()))
-        except ValueError:
-            pass
+        self._fire_int(self._map_table.row1.points_ctrl, self._on_map_points_changed_cb)
+        self._fire_float(self._map_table.row1.step_ctrl, self._on_map_step_changed_cb)
         event.Skip()
 
     def _on_map2_enable_changed(self, event: wx.Event) -> None:
@@ -787,17 +783,13 @@ class CollectionSettingsView(wx.Panel):
     def _on_map2_step_enter(self, event: wx.Event) -> None:
         self._map_table.row2.sync_points_from_step()
         self._fire_float(self._map_table.row2.step_ctrl, self._on_map2_step_changed_cb)
+        self._fire_int(self._map_table.row2.points_ctrl, self._on_map2_points_changed_cb)
         event.Skip()
 
     def _on_map2_points_enter(self, event: wx.Event) -> None:
         self._map_table.row2.sync_step_from_points()
-        if self._on_map2_points_changed_cb is None:
-            event.Skip()
-            return
-        try:
-            self._on_map2_points_changed_cb(int(self._map_table.row2.points_ctrl.GetValue()))
-        except ValueError:
-            pass
+        self._fire_int(self._map_table.row2.points_ctrl, self._on_map2_points_changed_cb)
+        self._fire_float(self._map_table.row2.step_ctrl, self._on_map2_step_changed_cb)
         event.Skip()
 
     def _on_add_clicked(self) -> None:
@@ -815,6 +807,14 @@ class CollectionSettingsView(wx.Panel):
             cb()
         else:
             cb(value)
+
+    def _fire_int(self, ctrl: DarkTextCtrl, cb: Callable[[int], None] | None) -> None:
+        if cb is None:
+            return
+        try:
+            cb(int(ctrl.GetValue()))
+        except ValueError:
+            pass
 
     def _fire_float(self, ctrl: DarkTextCtrl, cb: Callable[[float], None] | None) -> None:
         if cb is None:
