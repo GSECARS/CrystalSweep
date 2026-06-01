@@ -38,7 +38,7 @@ class ScanEngine:
 
     Supported scan types
     --------------------
-    still  — move rotation motor to rotation_start, trigger one detector frame.
+    still  — trigger one detector frame without moving the rotation motor.
     """
 
     def __init__(self, script_model: ScriptModel | None = None) -> None:
@@ -129,7 +129,7 @@ class ScanEngine:
         on_file_number_updated: Callable[[int], None] | None = None,
         on_status: Callable[[str], None] | None = None,
     ) -> None:
-        """Move rotation motor to rotation_start and trigger one detector frame."""
+        """Trigger one detector frame at the current rotation position."""
         if self.is_running:
             raise RuntimeError("A scan is already in progress.")
 
@@ -149,28 +149,12 @@ class ScanEngine:
             on_error(exc)
             return
 
-        try:
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-        except ValueError:
-            omega_start = 0.0
-
-        pv_base = rotation_cfg.pv.removesuffix(".VAL")
         detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
 
         def _worker() -> None:
             saved_auto_inc = 1
             disable_inc = False
             try:
-                if self._abort_event.is_set():
-                    on_done()
-                    return
-                limit_err = check_soft_limits(rotation_cfg.pv, omega_start)
-                if limit_err:
-                    on_error(ValueError(f"Soft limit violation — {limit_err}"))
-                    return
-                if on_status:
-                    on_status("moving")
-                caput(f"{pv_base}.VAL", omega_start, wait=True)
                 if self._abort_event.is_set():
                     on_done()
                     return
