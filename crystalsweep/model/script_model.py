@@ -38,6 +38,20 @@ def is_map(point: CollectionPoint) -> bool:
     return bool(point.map_group)
 
 
+def pre_collection(points: list[CollectionPoint], config: BeamlineConfig) -> str | None:
+    """Called once before the entire collection starts (before any scans or maps).
+
+    Return an error string to abort the collection, or None to proceed.
+    *points* is the full list of points that will be collected.
+    """
+    return None
+
+
+def post_collection(points: list[CollectionPoint], config: BeamlineConfig) -> None:
+    """Called once after the entire collection completes (after all scans and maps)."""
+    pass
+
+
 def pre_scan(point: CollectionPoint, config: BeamlineConfig) -> str | None:
     """Called before each scan point.
 
@@ -114,7 +128,7 @@ class ScriptModel:
 
         fn = getattr(module, name, None)
         if fn is None:
-            _log.error("hooks.py does not define a function named %r", name)
+            _log.debug("hooks.py does not define a function named %r", name)
             return None
 
         try:

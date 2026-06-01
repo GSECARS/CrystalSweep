@@ -4,7 +4,7 @@
 # File: crystalsweep/ui/view/script_editor_view.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Modal dialog for editing hooks.py (pre_scan + post_scan) with Python syntax
+# Modal dialog for editing hooks.py (pre_collection, post_collection, pre_scan, post_scan) with Python syntax
 # highlighting via wx.stc (Scintilla) and a styled dark scrollbar.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas

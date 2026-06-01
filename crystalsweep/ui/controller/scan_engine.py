@@ -119,6 +119,22 @@ class ScanEngine:
         if self._scripts is not None:
             self._scripts.call("post_scan", point, config)
 
+    def pre_collection(self, points: list[CollectionPoint], config: BeamlineConfig) -> str | None:
+        """Run once before the entire collection starts. Delegates to the user script if available.
+
+        Returns an error string to abort the collection, or None to proceed.
+        """
+        if self._scripts is not None:
+            result = self._scripts.call("pre_collection", points, config)
+            if isinstance(result, str):
+                return result
+        return None
+
+    def post_collection(self, points: list[CollectionPoint], config: BeamlineConfig) -> None:
+        """Run once after the entire collection completes. Delegates to the user script if available."""
+        if self._scripts is not None:
+            self._scripts.call("post_collection", points, config)
+
     def run_still(
         self,
         point: CollectionPoint,

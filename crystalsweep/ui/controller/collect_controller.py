@@ -345,6 +345,12 @@ class CollectController:
         file_settings = self._model.file_settings
         all_points = self._model.collection.points
         pre_scan_error: str | None = None
+        pre_collection_error: str | None = None
+
+        pre_collection_error = self._engine.pre_collection(points, config)
+        if pre_collection_error is not None:
+            _log.warning("Pre-collection failed: %s", pre_collection_error)
+            self._abort_event.set()
 
         self._restore_pv_snapshot = {}
         for pv in config.restore_pvs:
@@ -513,14 +519,18 @@ class CollectController:
                 _log.warning("Failed to restore PVs at collection end: %s", exc)
         self._restore_pv_snapshot = {}
 
-        if not self._abort_event.is_set() and pre_scan_error is None and self._model.file_settings.use_ext:
+        self._engine.post_collection(points, config)
+
+        if not self._abort_event.is_set() and pre_scan_error is None and pre_collection_error is None and self._model.file_settings.use_ext:
             self._on_file_number_updated(self._model.file_settings.frame_number + 1)
 
         wx.CallAfter(self._stop_elapsed_timer)
         if self._on_collecting_changed is not None:
             wx.CallAfter(self._on_collecting_changed, False)
         wx.CallAfter(self._ready_aborting_dialog)
-        if pre_scan_error is not None:
+        if pre_collection_error is not None:
+            wx.CallAfter(self._view.collect.set_status, f"Pre-collection error: {pre_collection_error}", wx.Colour(220, 80, 40))
+        elif pre_scan_error is not None:
             wx.CallAfter(self._view.collect.set_status, f"Pre-scan error: {pre_scan_error}", wx.Colour(220, 80, 40))
         elif self._abort_event.is_set():
             wx.CallAfter(self._view.collect.set_status, "Aborted", wx.Colour(220, 160, 40))
