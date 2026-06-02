@@ -14,6 +14,7 @@
 # ----------------------------------------------------------------------------------
 
 import sys
+import time
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -57,6 +58,10 @@ class ADViewerView(wx.Panel):
         self._live_updates: bool = True
         self._auto_scale: bool = True
         self._filter_gaps: bool = True
+        # Throttle the intensity histogram + contrast-readback so they don't bottleneck the live image canvas
+        self._histogram_min_interval_s: float = 0.1
+        self._last_histogram_update: float = 0.0
+        self._last_pushed_levels: tuple[float, float] | None = None
         self._current_colormap: str = _DEFAULT_COLORMAP
         self._current_npt: int = _DEFAULT_NPT
         self._current_unit: str = _INTEGRATION_UNITS[0]
@@ -179,11 +184,21 @@ class ADViewerView(wx.Panel):
         self.display_frame(frame)
 
     def display_frame(self, frame: np.ndarray) -> None:
+        """Forward frame to the GPU every call and throttle the side widgets."""
         self._current_frame = frame
         self._image_canvas.set_image(frame)
+
+        now = time.perf_counter()
+        if now - self._last_histogram_update < self._histogram_min_interval_s:
+            return
+        self._last_histogram_update = now
         self._intensity_histogram.set_data(frame, auto_scale=False)
         lo, hi = self._image_canvas.get_contrast_range()
-        self._intensity_histogram.set_levels(lo, hi)
+        # Only push contrast levels when they actually moved
+        levels = (lo, hi)
+        if levels != self._last_pushed_levels:
+            self._intensity_histogram.set_levels(lo, hi)
+            self._last_pushed_levels = levels
 
     def set_live_updates(self, enabled: bool) -> None:
         self._live_updates = enabled
@@ -333,10 +348,12 @@ class ADViewerView(wx.Panel):
             filter_gaps=self._filter_gaps,
             contrast_min=lo,
             contrast_max=hi,
+            bin_method=self._image_canvas.bin_method,
             on_colormap_changed=self._apply_colormap,
             on_auto_scale_changed=self._apply_auto_scale,
             on_filter_gaps_changed=self._apply_filter_gaps,
             on_levels_changed=self._on_histogram_levels_changed,
+            on_bin_method_changed=self._apply_bin_method,
             on_reset_view=self._apply_reset_view,
         )
         btn_sz = self._settings_btn.GetSize()
@@ -389,6 +406,9 @@ class ADViewerView(wx.Panel):
             self._intensity_histogram.set_data(self._current_frame, auto_scale=False)
             lo, hi = self._image_canvas.get_contrast_range()
             self._intensity_histogram.set_levels(lo, hi)
+
+    def _apply_bin_method(self, method: str) -> None:
+        self._image_canvas.set_bin_method(method)
 
     def _apply_live_updates(self, enabled: bool) -> None:
         self._live_updates = enabled

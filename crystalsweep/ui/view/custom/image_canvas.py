@@ -17,12 +17,63 @@ import time
 from typing import Callable
 
 import numpy as np
+import vispy
 import wx
+
+# Force vispy onto the PyOpenGL-backed bridge (`glplus`)
+vispy.use(app="wx", gl="glplus")
+
 from vispy import scene
 
 from crystalsweep.ui.view.custom.colormaps import CUSTOM_COLORMAPS
 
 __all__ = ["ImageCanvas"]
+
+# Integer dtypes the GPU can sample natively via vispy's Image visual
+_GPU_NATIVE_INT_DTYPES = (np.uint8, np.uint16, np.uint32, np.int8, np.int16, np.int32)
+
+# Largest integer downsampling factor we'll ever apply to a live frame.
+_MAX_LIVE_BIN = 4
+
+
+BIN_METHOD_NONE = "none"
+BIN_METHOD_STRIDE = "stride"
+BIN_METHOD_MEAN = "mean"
+BIN_METHODS = (BIN_METHOD_NONE, BIN_METHOD_STRIDE, BIN_METHOD_MEAN)
+
+
+def _bin_stride(image: np.ndarray, n: int) -> np.ndarray:
+    """Zero-copy stride decimation: `image[::n, ::n]`. Fastest possible reduction with slight anti-aliasing"""
+    if n <= 1:
+        return image
+    return image[::n, ::n]
+
+
+def _bin_mean(image: np.ndarray, n: int) -> np.ndarray:
+    """Block mean binning: reshape to (h/n, n, w/n, n[, c]) then average. Full anti-aliasing downsampling."""
+    if n <= 1:
+        return image
+    h, w = image.shape[:2]
+    h2 = (h // n) * n
+    w2 = (w // n) * n
+    if h2 == 0 or w2 == 0:
+        return image
+    cropped = image[:h2, :w2]
+    if cropped.ndim == 2:
+        view = cropped.reshape(h2 // n, n, w2 // n, n)
+        return view.mean(axis=(1, 3), dtype=np.float32).astype(image.dtype, copy=False)
+    c = cropped.shape[2]
+    view = cropped.reshape(h2 // n, n, w2 // n, n, c)
+    return view.mean(axis=(1, 3), dtype=np.float32).astype(image.dtype, copy=False)
+
+
+def _bin_for_display(image: np.ndarray, n: int, method: str) -> np.ndarray:
+    """Downsample image by integer factor n using the selected method."""
+    if n <= 1:
+        return image
+    if method == BIN_METHOD_MEAN:
+        return _bin_mean(image, n)
+    return _bin_stride(image, n)
 
 
 class ImageCanvas(wx.Panel):
@@ -36,7 +87,7 @@ class ImageCanvas(wx.Panel):
             parent=self,
             app="wx",
             vsync=True,
-            config={"samples": 4, "double_buffer": True, "depth_size": 0, "stencil_size": 0},
+            config={"samples": 0, "double_buffer": True, "depth_size": 0, "stencil_size": 0},
         )
         self._view = self._canvas.central_widget.add_view()
         self._view.camera = scene.PanZoomCamera(aspect=1)
@@ -59,6 +110,15 @@ class ImageCanvas(wx.Panel):
         self._max_value = 255.0
         self._data_min = 0.0
         self._data_max = 255.0
+
+        # Redraw only the latest pending frame
+        self._pending_image: np.ndarray | None = None
+        self._redraw_interval_ms: int = 16  # ~60 Hz cap
+        self._redraw_timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self._on_redraw_tick, self._redraw_timer)
+
+        # Live-display binning method with default of none so the GPU always receives the full-resolution frame
+        self._bin_method: str = BIN_METHOD_NONE
 
         self._panning = False
         self._last_mouse_pos: tuple[int, int] | None = None
@@ -88,7 +148,7 @@ class ImageCanvas(wx.Panel):
             pos=np.array([[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]], dtype=np.float32),
             color=(99 / 255, 179 / 255, 237 / 255, 180 / 255),
             width=2,
-            method="agg",
+            method="gl",
             parent=self._view.scene,
         )
         self._roi_line.visible = False
@@ -97,7 +157,7 @@ class ImageCanvas(wx.Panel):
             pos=np.array([[0, 0], [1, 1]], dtype=np.float32),
             color=(237 / 255, 179 / 255, 99 / 255, 200 / 255),
             width=2,
-            method="agg",
+            method="gl",
             parent=self._view.scene,
         )
         self._line_visual.visible = False
@@ -139,24 +199,65 @@ class ImageCanvas(wx.Panel):
         self._canvas.update()
 
     def set_image(self, image: np.ndarray) -> None:
+        """Stash image as the latest pending frame and use the redraw timer to push it to the GPU."""
         if image is None or image.size == 0:
             return
+        self._pending_image = image
+        if not self._redraw_timer.IsRunning():
+            self._redraw_timer.StartOnce(self._redraw_interval_ms)
+
+    def _on_redraw_tick(self, _: wx.TimerEvent) -> None:
+        """Apply the latest pending frame and re-arm if more arrived."""
+        image = self._pending_image
+        self._pending_image = None
+        if image is not None:
+            self._apply_image(image)
+        # If a fresh frame arrived while we were uploading, schedule another tick rather than blocking on it inline.
+        if self._pending_image is not None:
+            self._redraw_timer.StartOnce(self._redraw_interval_ms)
+
+    def _apply_image(self, image: np.ndarray) -> None:
         is_rgb = image.ndim == 3 and image.shape[2] in (3, 4)
-        raw = np.clip(np.nan_to_num(image.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0), 0, None)
-        if is_rgb:
-            self._raw_image = raw[:, :, :3] if raw.shape[2] == 4 else raw
+        if is_rgb and image.shape[2] == 4:
+            image = image[:, :, :3]
+
+        # Always cache the full-res frame for pixel-info, ROI sums, etc.
+        if image.dtype.type in _GPU_NATIVE_INT_DTYPES:
+            full_res = image if image.flags.c_contiguous else np.ascontiguousarray(image)
         else:
-            self._raw_image = raw
-        self._data_min = float(raw.min())
-        self._data_max = float(raw.max())
+            # Float / unknown dtype: still need to sanitize NaNs/Infs once.
+            full_res = np.nan_to_num(image.astype(np.float32, copy=False), nan=0.0, posinf=0.0, neginf=0.0, copy=False)
+        self._raw_image = full_res
+
+        bin_factor = self._pick_live_bin_factor(full_res.shape[:2])
+        gpu_image = _bin_for_display(full_res, bin_factor, self._bin_method)
+        if not gpu_image.flags.c_contiguous:
+            gpu_image = np.ascontiguousarray(gpu_image)
+
         if self._auto_scale:
-            self._min_value, self._max_value = self._compute_auto_clim(raw)
-        self._image_visual.set_data(raw)
-        self._image_visual.clim = (self._min_value, self._max_value)
+            self._min_value, self._max_value = self._compute_auto_clim(gpu_image)
+            self._data_min, self._data_max = self._min_value, self._max_value
+            self._image_visual.clim = (self._min_value, self._max_value)
+
+        self._image_visual.set_data(gpu_image)
         if self._first_image:
             self.reset_view()
             self._first_image = False
         self._canvas.update()
+
+    def _pick_live_bin_factor(self, image_hw: tuple[int, int]) -> int:
+        """Pick the smallest integer bin factor (1..N) such that the binned image still has at least as many pixels as the canvas, on the limiting axis."""
+
+        if self._bin_method == BIN_METHOD_NONE:
+            return 1
+        cw, ch = self._canvas.size
+        if cw <= 0 or ch <= 0:
+            return 1
+        ih, iw = image_hw
+        ratio = max(iw / cw, ih / ch)
+        if ratio <= 1.0:
+            return 1
+        return min(_MAX_LIVE_BIN, int(ratio))
 
     def set_contrast(self, min_val: float, max_val: float) -> None:
         self._auto_scale = False
@@ -176,6 +277,19 @@ class ImageCanvas(wx.Panel):
         self._filter_gaps = enabled
         if self._auto_scale and self._raw_image is not None:
             self.set_auto_scale(True)
+
+    def set_bin_method(self, method: str) -> None:
+        """Switch the live downsampling method. Use one of ``BIN_METHODS``."""
+        if method not in BIN_METHODS:
+            raise ValueError(f"Unknown bin method: {method!r}; expected one of {BIN_METHODS}")
+        self._bin_method = method
+        if self._raw_image is not None:
+            self._apply_image(self._raw_image)
+
+    @property
+    def bin_method(self) -> str:
+        """Current live downsampling method."""
+        return self._bin_method
 
     def get_data_range(self) -> tuple[float, float]:
         return self._data_min, self._data_max
@@ -220,13 +334,25 @@ class ImageCanvas(wx.Panel):
     def native(self) -> wx.Window:
         return self._canvas.native
 
+    # Stride so the auto-clim estimator never touches more than ~256k pixels.
+    _AUTO_CLIM_SAMPLE_BUDGET = 256_000
+
     def _compute_auto_clim(self, img: np.ndarray) -> tuple[float, float]:
-        flat = img.reshape(-1) if img.ndim > 2 else img.reshape(-1)
+        """Cheap, sampled min/max (or 1-99 percentile) estimator."""
+        flat = img.reshape(-1)
+        step = max(1, flat.size // self._AUTO_CLIM_SAMPLE_BUDGET)
+        sample = flat[::step]
         if self._filter_gaps:
-            nonzero = flat[flat > 0]
-            if nonzero.size > 0:
-                return float(np.percentile(nonzero, 1)), float(np.percentile(nonzero, 99))
-        return float(flat.min()), float(flat.max())
+            nonzero = sample[sample > 0]
+            n = nonzero.size
+            if n >= 3:
+                k_lo = min(max(int(n * 0.01), 0), n - 1)
+                k_hi = min(max(int(n * 0.99), k_lo + 1), n - 1)
+                part = np.partition(nonzero, (k_lo, k_hi))
+                return float(part[k_lo]), float(part[k_hi])
+            if n > 0:
+                return float(nonzero.min()), float(nonzero.max())
+        return float(sample.min()), float(sample.max())
 
     def _screen_to_image(self, sx: int, sy: int) -> tuple[float, float] | None:
         if self._raw_image is None:
@@ -409,7 +535,7 @@ class ImageCanvas(wx.Panel):
                 dy = cur[1] - self._roi_drag_start_img[1]
                 ox1, oy1, ox2, oy2 = self._roi_drag_orig_coords
                 if self._raw_image is not None:
-                    h, w = self._raw_image.shape
+                    h, w = self._raw_image.shape[:2]
                     rw, rh = ox2 - ox1, oy2 - oy1
                     nx1 = max(0, min(int(ox1 + dx), w - rw))
                     ny1 = max(0, min(int(oy1 + dy), h - rh))
