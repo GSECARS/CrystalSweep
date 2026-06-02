@@ -21,6 +21,7 @@ import numpy as np
 import wx
 
 from crystalsweep.model import MainModel
+from crystalsweep.model.ad_viewer_model import FrameModel
 from crystalsweep.model.integration_model import HAS_PYFAI
 from crystalsweep.ui.view import MainView
 
@@ -50,13 +51,17 @@ class ADViewerController:
         self.resubscribe_detector()
 
     def resubscribe_detector(self) -> None:
-        """(Re)subscribe to the active detector's image PV, or unsubscribe if none."""
+        """(Re)subscribe to the active detector's image PV, but only when the PV actually changes."""
         active = self._model.beamline.active.active_detector_config
         pv_name = active.image_pv if active is not None else ""
         if not pv_name:
-            _log.info("No active detector configured; AD viewer is idle.")
-            self._model.ad_viewer.unsubscribe()
+            if self._model.ad_viewer.is_subscribed:
+                _log.info("No active detector configured; AD viewer is idle.")
+                self._model.ad_viewer.unsubscribe()
             self._view.ad_viewer.set_status_overlay("No detector configured")
+            return
+        if self._model.ad_viewer.is_subscribed and self._model.ad_viewer.pv_name == pv_name:
+            self._view.ad_viewer.set_status_overlay("")
             return
         self._view.ad_viewer.set_status_overlay("")
         self._model.ad_viewer.subscribe(
@@ -64,11 +69,11 @@ class ADViewerController:
             frame_callback=self._on_new_frame,
         )
 
-    def _on_new_frame(self, frame: np.ndarray) -> None:
+    def _on_new_frame(self, frame: FrameModel) -> None:
         """Deliver a detector frame to the view on the GUI thread, dropping frames if busy."""
         with self._pending_lock:
             already_pending = self._pending_frame is not None
-            self._pending_frame = frame
+            self._pending_frame = frame.image
         if not already_pending:
             wx.CallAfter(self._on_new_frame_gui)
 
