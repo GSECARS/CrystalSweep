@@ -62,6 +62,8 @@ class FileSettingsView(wx.Panel):
         self._on_apex_changed_cb: Callable[[bool], None] | None = None
         self._on_apex_calibration_cb: Callable[[Path], None] | None = None
 
+        self._detector_format: str | None = None
+
         self.SetBackgroundColour(BG_CARD)
         self._build_layout()
 
@@ -309,6 +311,7 @@ class FileSettingsView(wx.Panel):
         ):
             toggle.SetLocked(not enabled)
         if enabled:
+            self._apply_detector_format_lock()
             self._refresh_crysalis_toggle_lock()
         else:
             self._crysalis_toggle.SetLocked(True)
@@ -347,6 +350,13 @@ class FileSettingsView(wx.Panel):
         self._tif_toggle.SetValue(value)
 
     def set_detector_format(self, format_key: str | None) -> None:
+        self._detector_format = format_key
+        self._apply_detector_format_lock()
+
+    def _apply_detector_format_lock(self) -> None:
+        """Lock the toggle for the detector's native format so it can't be
+        unchecked, and force its value to True. Unlock the other two."""
+        format_key = self._detector_format
         if format_key == "hdf5":
             self._hdf5_toggle.SetValue(True)
             self._hdf5_toggle.SetLocked(True)
