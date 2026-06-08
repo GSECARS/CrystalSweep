@@ -1,4 +1,7 @@
-# CrystalSweep
+<h1 align="center">
+  <img src="crystalsweep/assets/crystalsweep_logo.svg" alt="CrystalSweep logo" width="48" align="absmiddle">
+  &nbsp;CrystalSweep
+</h1>
 
 ![License](https://img.shields.io/badge/License-MIT-teal.svg) ![Python](https://img.shields.io/badge/Python-3.14-22558a.svg?logo=python&color=22558a)
 

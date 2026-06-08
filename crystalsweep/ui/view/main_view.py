@@ -17,6 +17,7 @@ from typing import Callable
 
 import wx
 
+from crystalsweep.assets import LOGO_PNG
 from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
@@ -219,6 +220,7 @@ class MainView(wx.Frame):
         """Configures the main wx Frame of the application."""
         self.SetTitle(f"CrystalSweep - {self._version}")
         self.SetBackgroundColour(BG_SURFACE)
+        self._apply_app_icon()
 
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         if self._menu_bar is not None:
@@ -228,6 +230,22 @@ class MainView(wx.Frame):
         self.SetSizer(main_sizer)
         self.SetSize(1600, 900)
         self.SetMinSize((800, 520))
+
+    def _apply_app_icon(self) -> None:
+        """Sets the window/taskbar icon from the bundled PNG logo."""
+        logo = LOGO_PNG
+        if not logo.is_file():
+            return
+        image = wx.Image(str(logo), wx.BITMAP_TYPE_PNG)
+        if not image.IsOk():
+            return
+        bundle = wx.IconBundle()
+        for size in (16, 24, 32, 48, 64, 128, 256):
+            scaled = image.Scale(size, size, wx.IMAGE_QUALITY_HIGH)
+            icon = wx.Icon()
+            icon.CopyFromBitmap(wx.Bitmap(scaled))
+            bundle.AddIcon(icon)
+        self.SetIcons(bundle)
 
     def _update_left_min_size(self) -> None:
         min_w = self.collection_table.min_content_width

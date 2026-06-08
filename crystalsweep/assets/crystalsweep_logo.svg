@@ -1,0 +1,100 @@
+<svg id="Component_7_1" data-name="Component 7 – 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="42" height="42" viewBox="0 0 42 42">
+  <defs>
+    <clipPath id="clip-path">
+      <rect x="21" width="15" height="36" fill="none"/>
+    </clipPath>
+    <clipPath id="clip-path-2">
+      <rect x="18" width="24" height="42" fill="none"/>
+    </clipPath>
+    <clipPath id="clip-path-3">
+      <rect x="12" width="24" height="30" fill="none"/>
+    </clipPath>
+  </defs>
+  <rect id="Rectangle_87" data-name="Rectangle 87" width="6" height="6" fill="#d8faff"/>
+  <rect id="Rectangle_88" data-name="Rectangle 88" width="6" height="6" transform="translate(6)" fill="#d5f2ff"/>
+  <rect id="Rectangle_89" data-name="Rectangle 89" width="6" height="6" transform="translate(12)" fill="#c1e7f8"/>
+  <rect id="Rectangle_90" data-name="Rectangle 90" width="6" height="6" transform="translate(18)" fill="#e5f7ff"/>
+  <rect id="Rectangle_91" data-name="Rectangle 91" width="6" height="6" transform="translate(24)" fill="#c6e5f3"/>
+  <rect id="Rectangle_92" data-name="Rectangle 92" width="6" height="6" transform="translate(30)" fill="#e1f0f6"/>
+  <rect id="Rectangle_93" data-name="Rectangle 93" width="6" height="6" transform="translate(36)" fill="#d4f2ff"/>
+  <rect id="Rectangle_98" data-name="Rectangle 98" width="6" height="6" transform="translate(18)" fill="#e5f7ff"/>
+  <rect id="Rectangle_102" data-name="Rectangle 102" width="6" height="6" transform="translate(36 6)" fill="#d8faff"/>
+  <rect id="Rectangle_103" data-name="Rectangle 103" width="6" height="6" transform="translate(0 6)" fill="#d5f2ff"/>
+  <rect id="Rectangle_104" data-name="Rectangle 104" width="6" height="6" transform="translate(6 6)" fill="#c1e7f8"/>
+  <rect id="Rectangle_105" data-name="Rectangle 105" width="6" height="6" transform="translate(12 6)" fill="#e5f7ff"/>
+  <rect id="Rectangle_106" data-name="Rectangle 106" width="6" height="6" transform="translate(18 6)" fill="#c6e5f3"/>
+  <rect id="Rectangle_107" data-name="Rectangle 107" width="6" height="6" transform="translate(24 6)" fill="#e1f0f6"/>
+  <rect id="Rectangle_108" data-name="Rectangle 108" width="6" height="6" transform="translate(30 6)" fill="#d4f2ff"/>
+  <rect id="Rectangle_117" data-name="Rectangle 117" width="6" height="6" transform="translate(0 12)" fill="#d8faff"/>
+  <rect id="Rectangle_118" data-name="Rectangle 118" width="6" height="6" transform="translate(6 12)" fill="#d5f2ff"/>
+  <rect id="Rectangle_119" data-name="Rectangle 119" width="6" height="6" transform="translate(12 12)" fill="#c1e7f8"/>
+  <rect id="Rectangle_120" data-name="Rectangle 120" width="6" height="6" transform="translate(18 12)" fill="#e5f7ff"/>
+  <rect id="Rectangle_121" data-name="Rectangle 121" width="6" height="6" transform="translate(24 12)" fill="#c6e5f3"/>
+  <rect id="Rectangle_122" data-name="Rectangle 122" width="6" height="6" transform="translate(30 12)" fill="#e1f0f6"/>
+  <rect id="Rectangle_123" data-name="Rectangle 123" width="6" height="6" transform="translate(36 12)" fill="#d4f2ff"/>
+  <rect id="Rectangle_128" data-name="Rectangle 128" width="6" height="6" transform="translate(18 12)" fill="#53c1f3"/>
+  <rect id="Rectangle_132" data-name="Rectangle 132" width="6" height="6" transform="translate(36 18)" fill="#d8faff"/>
+  <rect id="Rectangle_133" data-name="Rectangle 133" width="6" height="6" transform="translate(0 18)" fill="#d5f2ff"/>
+  <rect id="Rectangle_134" data-name="Rectangle 134" width="6" height="6" transform="translate(6 18)" fill="#c1e7f8"/>
+  <rect id="Rectangle_135" data-name="Rectangle 135" width="6" height="6" transform="translate(12 18)" fill="#e5f7ff"/>
+  <rect id="Rectangle_136" data-name="Rectangle 136" width="6" height="6" transform="translate(18 18)" fill="#c6e5f3"/>
+  <rect id="Rectangle_137" data-name="Rectangle 137" width="6" height="6" transform="translate(24 18)" fill="#e1f0f6"/>
+  <rect id="Rectangle_138" data-name="Rectangle 138" width="6" height="6" transform="translate(30 18)" fill="#d4f2ff"/>
+  <rect id="Rectangle_142" data-name="Rectangle 142" width="6" height="6" transform="translate(12 18)" fill="#53c1f3"/>
+  <rect id="Rectangle_143" data-name="Rectangle 143" width="6" height="6" transform="translate(18 18)" fill="#2e6de9"/>
+  <rect id="Rectangle_144" data-name="Rectangle 144" width="6" height="6" transform="translate(24 18)" fill="#53c1f3"/>
+  <rect id="Rectangle_147" data-name="Rectangle 147" width="6" height="6" transform="translate(0 24)" fill="#d8faff"/>
+  <rect id="Rectangle_148" data-name="Rectangle 148" width="6" height="6" transform="translate(6 24)" fill="#d5f2ff"/>
+  <rect id="Rectangle_149" data-name="Rectangle 149" width="6" height="6" transform="translate(12 24)" fill="#c1e7f8"/>
+  <rect id="Rectangle_150" data-name="Rectangle 150" width="6" height="6" transform="translate(18 24)" fill="#e5f7ff"/>
+  <rect id="Rectangle_151" data-name="Rectangle 151" width="6" height="6" transform="translate(24 24)" fill="#c6e5f3"/>
+  <rect id="Rectangle_152" data-name="Rectangle 152" width="6" height="6" transform="translate(30 24)" fill="#e1f0f6"/>
+  <rect id="Rectangle_153" data-name="Rectangle 153" width="6" height="6" transform="translate(36 24)" fill="#d4f2ff"/>
+  <rect id="Rectangle_157" data-name="Rectangle 157" width="6" height="6" transform="translate(18 24)" fill="#53c1f3"/>
+  <rect id="Rectangle_158" data-name="Rectangle 158" width="6" height="6" transform="translate(24 24)" fill="#53c1f3"/>
+  <rect id="Rectangle_159" data-name="Rectangle 159" width="6" height="6" transform="translate(30 24)" fill="#53c1f3"/>
+  <rect id="Rectangle_161" data-name="Rectangle 161" width="6" height="6" transform="translate(36 30)" fill="#d8faff"/>
+  <rect id="Rectangle_162" data-name="Rectangle 162" width="6" height="6" transform="translate(0 30)" fill="#d5f2ff"/>
+  <rect id="Rectangle_163" data-name="Rectangle 163" width="6" height="6" transform="translate(6 30)" fill="#c1e7f8"/>
+  <rect id="Rectangle_164" data-name="Rectangle 164" width="6" height="6" transform="translate(12 30)" fill="#e5f7ff"/>
+  <rect id="Rectangle_165" data-name="Rectangle 165" width="6" height="6" transform="translate(18 30)" fill="#c6e5f3"/>
+  <rect id="Rectangle_166" data-name="Rectangle 166" width="6" height="6" transform="translate(24 30)" fill="#e1f0f6"/>
+  <rect id="Rectangle_167" data-name="Rectangle 167" width="6" height="6" transform="translate(30 30)" fill="#d4f2ff"/>
+  <rect id="Rectangle_173" data-name="Rectangle 173" width="6" height="6" transform="translate(24 30)" fill="#53c1f3"/>
+  <rect id="Rectangle_175" data-name="Rectangle 175" width="6" height="6" transform="translate(0 36)" fill="#d8faff"/>
+  <rect id="Rectangle_176" data-name="Rectangle 176" width="6" height="6" transform="translate(6 36)" fill="#d5f2ff"/>
+  <rect id="Rectangle_177" data-name="Rectangle 177" width="6" height="6" transform="translate(12 36)" fill="#c1e7f8"/>
+  <rect id="Rectangle_178" data-name="Rectangle 178" width="6" height="6" transform="translate(18 36)" fill="#e5f7ff"/>
+  <rect id="Rectangle_179" data-name="Rectangle 179" width="6" height="6" transform="translate(24 36)" fill="#c6e5f3"/>
+  <rect id="Rectangle_180" data-name="Rectangle 180" width="6" height="6" transform="translate(30 36)" fill="#e1f0f6"/>
+  <rect id="Rectangle_181" data-name="Rectangle 181" width="6" height="6" transform="translate(36 36)" fill="#d4f2ff"/>
+  <g id="Scroll_Group_4" data-name="Scroll Group 4" transform="translate(3 3)" clip-path="url(#clip-path)" style="isolation: isolate">
+    <g id="Ellipse_77" data-name="Ellipse 77" fill="none" stroke="#000ea4" stroke-linecap="round" stroke-width="1" opacity="0.2">
+      <circle cx="18" cy="18" r="18" stroke="none"/>
+      <circle cx="18" cy="18" r="17.5" fill="none"/>
+    </g>
+  </g>
+  <g id="Scroll_Group_3" data-name="Scroll Group 3" clip-path="url(#clip-path-2)" style="isolation: isolate">
+    <g id="Ellipse_78" data-name="Ellipse 78" fill="none" stroke="#75778d" stroke-width="1" opacity="0.4">
+      <circle cx="21" cy="21" r="21" stroke="none"/>
+      <circle cx="21" cy="21" r="20.5" fill="none"/>
+    </g>
+  </g>
+  <g id="Scroll_Group_1" data-name="Scroll Group 1" transform="translate(6 6)" clip-path="url(#clip-path-3)" style="isolation: isolate">
+    <g id="Ellipse_79" data-name="Ellipse 79" fill="none" stroke="#75778d" stroke-width="1" opacity="0.2">
+      <circle cx="15" cy="15" r="15" stroke="none"/>
+      <circle cx="15" cy="15" r="14.5" fill="none"/>
+    </g>
+  </g>
+  <circle id="Ellipse_80" data-name="Ellipse 80" cx="1" cy="1" r="1" transform="translate(5 14)" fill="rgba(158,13,229,0.68)"/>
+  <circle id="Ellipse_81" data-name="Ellipse 81" cx="1" cy="1" r="1" transform="translate(11 2)" fill="rgba(158,13,229,0.68)"/>
+  <circle id="Ellipse_82" data-name="Ellipse 82" cx="1" cy="1" r="1" transform="translate(5 27)" fill="rgba(158,13,229,0.68)"/>
+  <circle id="Ellipse_83" data-name="Ellipse 83" cx="1" cy="1" r="1" transform="translate(17 14)" fill="rgba(158,13,229,0.68)"/>
+  <circle id="Ellipse_84" data-name="Ellipse 84" cx="0.5" cy="0.5" r="0.5" transform="translate(3 3)" fill="rgba(21,196,142,0.68)"/>
+  <circle id="Ellipse_85" data-name="Ellipse 85" cx="0.5" cy="0.5" r="0.5" transform="translate(20 8)" fill="rgba(21,196,142,0.68)"/>
+  <circle id="Ellipse_86" data-name="Ellipse 86" cx="0.5" cy="0.5" r="0.5" transform="translate(3 38)" fill="rgba(21,196,142,0.68)"/>
+  <circle id="Ellipse_87" data-name="Ellipse 87" cx="0.5" cy="0.5" r="0.5" transform="translate(20 32)" fill="rgba(21,196,142,0.68)"/>
+  <circle id="Ellipse_88" data-name="Ellipse 88" cx="1" cy="1" r="1" transform="translate(11 38)" fill="rgba(158,13,229,0.68)"/>
+  <circle id="Ellipse_89" data-name="Ellipse 89" cx="0.75" cy="0.75" r="0.75" transform="translate(32 20)" fill="rgba(21,190,196,0.68)"/>
+  <circle id="Ellipse_90" data-name="Ellipse 90" cx="1" cy="1" r="1" transform="translate(17 26)" fill="rgba(158,13,229,0.68)"/>
+</svg>
