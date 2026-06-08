@@ -50,6 +50,7 @@ dependencies = [
     "pyepics>=3.5.9",
     "pyautomation>=0.0.1",
     "newportxps>=2026.1.1",
+    "cryio>=2018.5.30",
 ]
 
 [dependency-groups]

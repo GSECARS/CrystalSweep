@@ -13,8 +13,12 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+import json
 import logging
 import multiprocessing
+import subprocess
+import sys
+import tempfile
 import threading
 import time as _time
 from typing import Callable
@@ -867,6 +871,8 @@ class CollectController:
                 wx.Colour(220, 80, 40),
             )
             self._abort_event.set()
+        else:
+            self._spawn_format_conversion_for_trajectory_row(row_points)
 
     def _wait_for_eiger_triggering(self, pv_prefix: str, done_event: threading.Event | None = None) -> None:
         prefix = pv_prefix.strip()
@@ -893,6 +899,156 @@ class CollectController:
         msg = str(exc)
         if "Soft limit violation" in msg:
             wx.MessageBox(msg, "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+
+    def _selected_extras(self) -> tuple[str, list[str]] | None:
+        """Return (source_format, extras) when extra formats are enabled, else None."""
+        fs = self._model.file_settings
+        selected: list[str] = []
+        if fs.use_hdf5:
+            selected.append("hdf5")
+        if fs.use_cbf:
+            selected.append("cbf")
+        if fs.use_tif:
+            selected.append("tif")
+
+        config = self._model.beamline.active
+        det = config.active_detector_config if config else None
+        source_format = det.file_format if det else "hdf5"
+        extras = [fmt for fmt in selected if fmt != source_format]
+        if not extras:
+            return None
+        return source_format, extras
+
+    def _launch_format_converter(self, directory: str, basename: str, source_format: str, extras: list[str], width: int, output_dirs: dict[str, str]) -> None:
+        """Spawn the format converter as a detached subprocess."""
+        args = {
+            "directory": directory,
+            "basename": basename,
+            "source_format": source_format,
+            "target_formats": extras,
+            "file_number_width": width,
+            "output_dirs": output_dirs,
+        }
+        try:
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
+            try:
+                json.dump(args, tmp)
+            finally:
+                tmp.close()
+            subprocess.Popen(
+                [sys.executable, "-m", "crystalsweep.model.format_converter", tmp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception as exc:
+            _log.warning("Failed to spawn format conversion: %s", exc)
+
+    def _spawn_format_conversion(self, point: CollectionPoint, frame_number: int | None = None) -> None:
+        """Spawn the format converter for a collection point.
+
+        Source detector files always stay where the IOC wrote them.
+        Converted files always land under a sibling ``_converted`` folder with
+        one subfolder per format (``cbf``, ``tif``).
+        - Single (non-map): ``<directory>/<basename>_converted/<fmt>/``
+        - Map: ``<map_dir>/<base>_<map_ext>_converted/<fmt>/`` (shared across
+          all points in the map).
+        """
+        result = self._selected_extras()
+        if result is None:
+            return
+        source_format, extras = result
+
+        fs = self._model.file_settings
+        config = self._model.beamline.active
+        det = config.active_detector_config
+        width = det.file_number_width if det else 4
+
+        label = point.label.strip() if fs.use_ext else ""
+        base = fs.filename or ""
+        map_ext = fs.map_ext.strip() if point.map_group else ""
+        directory = str(fs.directory)
+        if point.map_group:
+            folder_suffix = map_ext if map_ext else "map"
+            folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
+            directory = f"{directory.rstrip('/')}/{folder_name}"
+            effective_map_ext = map_ext if map_ext else "map"
+            parts = [p for p in [base, effective_map_ext] if p]
+            map_label = point.label.strip()
+            try:
+                filenumber = int(map_label.rsplit("_", 1)[-1])
+            except ValueError, IndexError:
+                filenumber = frame_number if frame_number is not None else fs.frame_number
+            map_stem = "_".join(parts) if parts else base
+            basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
+            converted_root = f"{directory.rstrip('/')}/{map_stem}_converted"
+        else:
+            parts = [p for p in [base, label] if p]
+            filenumber = frame_number if frame_number is not None else fs.frame_number
+            stem = "_".join(parts) if parts else base
+            basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
+            converted_root = f"{directory.rstrip('/')}/{basename}_converted"
+
+        output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
+
+        self._launch_format_converter(
+            directory=directory,
+            basename=basename,
+            source_format=source_format,
+            extras=extras,
+            width=width,
+            output_dirs=output_dirs,
+        )
+
+    def _spawn_format_conversion_for_trajectory_row(
+        self,
+        row_points: list[CollectionPoint],
+        first_frame_number: int | None = None,
+    ) -> None:
+        """Spawn conversion for a still-trajectory map row.
+
+        The whole row is written to a single multi-frame HDF5 file with the
+        basename of the first point in the row. Converted frames join the
+        shared per-format folder inside the map's ``_converted`` directory.
+        """
+        if not row_points:
+            return
+        ref = row_points[0]
+        result = self._selected_extras()
+        if result is None:
+            return
+        source_format, extras = result
+
+        fs = self._model.file_settings
+        config = self._model.beamline.active
+        det = config.active_detector_config
+        width = det.file_number_width if det else 4
+
+        base = fs.filename or ""
+        map_ext = fs.map_ext.strip()
+        folder_suffix = map_ext if map_ext else "map"
+        folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
+        directory = f"{str(fs.directory).rstrip('/')}/{folder_name}"
+        effective_map_ext = map_ext if map_ext else "map"
+        parts = [p for p in [base, effective_map_ext] if p]
+        map_label = ref.label.strip()
+        try:
+            filenumber = int(map_label.rsplit("_", 1)[-1])
+        except ValueError, IndexError:
+            filenumber = first_frame_number if first_frame_number is not None else fs.frame_number
+        map_stem = "_".join(parts) if parts else base
+        basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
+        converted_root = f"{directory.rstrip('/')}/{map_stem}_converted"
+        output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
+
+        self._launch_format_converter(
+            directory=directory,
+            basename=basename,
+            source_format=source_format,
+            extras=extras,
+            width=width,
+            output_dirs=output_dirs,
+        )
 
     def _spawn_crysalis_conversion(self, point: CollectionPoint, frame_number: int | None = None) -> None:
         if point.scan_type != "step":
@@ -926,6 +1082,19 @@ class CollectController:
             parts = [p for p in [base, label] if p]
             filenumber = frame_number if frame_number is not None else fs.frame_number
         basename = "_".join(parts) if parts else base
+
+        # Crysalis output lives under a shared `_converted/crysalis/` folder.
+        # Single (non-map): `<dir>/<basename>_<NNNN>_converted/crysalis/` (flat).
+        # Map: `<map_dir>/<base>_<map_ext>_converted/crysalis/<basename>_<NNNN>/`
+        # (per-point subfolder since the map's `_converted` is shared).
+        det_width = det.file_number_width if det else 4
+        full_basename = f"{basename}_{int(filenumber):0{max(1, det_width)}d}"
+        if point.map_group:
+            converted_root = f"{directory.rstrip('/')}/{basename}_converted"
+            crysalis_output_dir = f"{converted_root}/crysalis/{full_basename}"
+        else:
+            converted_root = f"{directory.rstrip('/')}/{full_basename}_converted"
+            crysalis_output_dir = f"{converted_root}/crysalis"
 
         try:
             omega_start = float(point.rotation_start) if point.rotation_start else 0.0
@@ -982,6 +1151,7 @@ class CollectController:
             "par_file": str(fs.crysalis_calibration),
             "scan_info": scan_info,
             "file_format": file_format,
+            "output_dir": crysalis_output_dir,
         }
 
         try:
@@ -1060,6 +1230,7 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._spawn_format_conversion(point)
             self._spawn_crysalis_conversion(point)
 
     def _run_step(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
@@ -1142,6 +1313,7 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._spawn_format_conversion(point, frame_number_before)
             self._spawn_crysalis_conversion(point, frame_number_before)
 
     def _run_wide(
@@ -1213,4 +1385,5 @@ class CollectController:
             self._abort_event.set()
 
         else:
+            self._spawn_format_conversion(point)
             self._spawn_crysalis_conversion(point)

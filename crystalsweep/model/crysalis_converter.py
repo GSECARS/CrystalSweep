@@ -39,8 +39,8 @@ from pathlib import Path
 _log = logging.getLogger(__name__)
 
 
-def _make_directory(filepath: str, basename: str) -> str:
-    new_directory = os.path.normpath(os.path.join(filepath, basename + "_crys"))
+def _make_directory(filepath: str, basename: str, output_dir: str | None = None) -> str:
+    new_directory = os.path.normpath(output_dir) if output_dir else os.path.normpath(os.path.join(filepath, basename + "_crys"))
     if os.path.isdir(new_directory):
         shutil.rmtree(new_directory)
     os.makedirs(new_directory)
@@ -174,11 +174,12 @@ def run_conversion(args: dict) -> None:
     par_file = args.get("par_file", "")
     scan_info = args.get("scan_info", {})
     file_format = args.get("file_format", "hdf5")
+    output_dir = args.get("output_dir") or None
 
     full_basename = f"{basename}_{filenumber:04d}"
-    _log.info("run_conversion: filepath=%r full_basename=%r file_format=%r", filepath, full_basename, file_format)
+    _log.info("run_conversion: filepath=%r full_basename=%r file_format=%r output_dir=%r", filepath, full_basename, file_format, output_dir)
 
-    new_directory = _make_directory(filepath, full_basename)
+    new_directory = _make_directory(filepath, full_basename, output_dir)
 
     if par_file and os.path.isfile(par_file):
         _create_par_file(new_directory, full_basename, par_file)
