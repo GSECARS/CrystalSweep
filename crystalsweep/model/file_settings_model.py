@@ -33,6 +33,8 @@ class FileSettingsModel:
     use_cbf: bool = field(default=False)
     use_tif: bool = field(default=False)
 
+    use_snake_combine: bool = field(default=False)
+
     use_crysalis: bool = field(default=False)
     crysalis_calibration: Path | None = field(default=None)
 

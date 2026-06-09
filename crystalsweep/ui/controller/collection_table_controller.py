@@ -49,6 +49,8 @@ class CollectionTableController:
         self._view.bind_get(self._on_get)
         self._view.bind_move(self._on_move)
         self._view.bind_use_ext_changed(self._on_use_ext_changed)
+        self._view.bind_snake_combine_changed(self._on_snake_combine_changed)
+        self._view.set_snake_combine(self._model.file_settings.use_snake_combine)
 
         self.refresh_columns()
 
@@ -177,6 +179,10 @@ class CollectionTableController:
 
     def _on_use_ext_changed(self, value: bool) -> None:
         self._model.file_settings.use_ext = value
+
+    def _on_snake_combine_changed(self, value: bool) -> None:
+        self._model.file_settings.use_snake_combine = value
+        _log.debug("file_settings.use_snake_combine = %s", value)
 
     def _on_remove(self, index: int) -> None:
         self._model.collection.remove_point(index)

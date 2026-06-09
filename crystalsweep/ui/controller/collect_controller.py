@@ -741,6 +741,9 @@ class CollectController:
             except Exception as exc:
                 _log.warning("Failed to restore map motor2 %s: %s", motor2, exc)
 
+        if not self._abort_event.is_set() and self._model.file_settings.use_snake_combine:
+            self._spawn_snake_combine_for_map(group_points)
+
         self._model.file_settings.reset_frame_number()
         wx.CallAfter(self._view.file_settings.set_frame_number, 0)
 
@@ -943,6 +946,60 @@ class CollectController:
             )
         except Exception as exc:
             _log.warning("Failed to spawn format conversion: %s", exc)
+
+    def _launch_snake_combiner(self, input_dir: str, output_path: str, pattern: str, first_row_reversed: bool, flipped_dir: str | None = None) -> None:
+        """Spawn the snake-map combiner as a detached subprocess."""
+        args = {
+            "input_dir": input_dir,
+            "output_path": output_path,
+            "pattern": pattern,
+            "first_row_reversed": first_row_reversed,
+            "flipped_dir": flipped_dir or "",
+        }
+        try:
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
+            try:
+                json.dump(args, tmp)
+            finally:
+                tmp.close()
+            subprocess.Popen(
+                [sys.executable, "-m", "crystalsweep.model.snake_combiner", tmp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception as exc:
+            _log.warning("Failed to spawn snake combiner: %s", exc)
+
+    def _spawn_snake_combine_for_map(self, group_points: list[CollectionPoint]) -> None:
+        """Spawn the snake combiner for a finished map collection.
+
+        Inputs are the per-row .h5 files the IOC wrote into the map's folder.
+        Output is a sibling ``<map_stem>_combined.h5`` next to that folder.
+        Snake convention matches ``_run_map_group``: row 0 forward, row 1
+        reversed, etc., so ``first_row_reversed`` is False here.
+        """
+        if not group_points:
+            return
+
+        fs = self._model.file_settings
+        base = fs.filename or ""
+        map_ext = fs.map_ext.strip()
+        folder_suffix = map_ext if map_ext else "map"
+        folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
+        input_dir = f"{str(fs.directory).rstrip('/')}/{folder_name}"
+        map_stem = folder_name
+        output_path = f"{input_dir}/{map_stem}.h5"
+        flipped_dir = f"{input_dir}/{map_stem}_flipped"
+        pattern = f"{map_stem}_*.h5"
+
+        self._launch_snake_combiner(
+            input_dir=input_dir,
+            output_path=output_path,
+            pattern=pattern,
+            first_row_reversed=False,
+            flipped_dir=flipped_dir,
+        )
 
     def _spawn_format_conversion(self, point: CollectionPoint, frame_number: int | None = None) -> None:
         """Spawn the format converter for a collection point.
