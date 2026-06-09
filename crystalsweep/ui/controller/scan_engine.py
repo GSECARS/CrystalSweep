@@ -681,7 +681,10 @@ class ScanEngine:
             prefix += ":"
         acquire_pv = f"{prefix}cam1:Acquire"
 
-        ref_point = row_points[0] if row_points else None
+        # Always derive the file basename/number from the forward-direction first
+        # point of the row (lowest map_col), so snake-reversed rows do not pick the
+        # row's last label and produce gaps like 0001, 0012, 0013, 0024, ...
+        ref_point = min(row_points, key=lambda p: getattr(p, "map_col", 0)) if row_points else None
 
         xps_group = params.get("xps_group") or motor_cfg.xps_group or ""
         xps_positioner = params.get("xps_positioner") or motor_cfg.xps_positioner or ""

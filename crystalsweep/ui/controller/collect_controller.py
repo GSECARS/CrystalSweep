@@ -1013,7 +1013,9 @@ class CollectController:
         """
         if not row_points:
             return
-        ref = row_points[0]
+        # Match scan_engine: name files from the forward-direction first point
+        # (lowest map_col), independent of snake direction.
+        ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
         result = self._selected_extras()
         if result is None:
             return
