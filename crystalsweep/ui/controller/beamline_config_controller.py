@@ -201,8 +201,12 @@ class BeamlineConfigController:
 
         if self._detectors_dlg:
             detectors, active_detector = self._detectors_dlg.config_panel.collect_detectors()
+            preview_exposure, preview_timeout, preview_num_images = self._detectors_dlg.config_panel.collect_preview()
         else:
             detectors, active_detector = base.detectors, base.active_detector
+            preview_exposure = base.preview_exposure
+            preview_timeout = base.preview_timeout
+            preview_num_images = base.preview_num_images
 
         controllers = self._controllers_dlg.config_panel.collect_controllers() if self._controllers_dlg else base.controllers
 
@@ -228,6 +232,9 @@ class BeamlineConfigController:
             shutter_open_value=shutter_open_value,
             shutter_close_value=shutter_close_value,
             shutter_delay=shutter_delay,
+            preview_exposure=preview_exposure,
+            preview_timeout=preview_timeout,
+            preview_num_images=preview_num_images,
         )
 
     def _save(self, config: BeamlineConfig) -> None:

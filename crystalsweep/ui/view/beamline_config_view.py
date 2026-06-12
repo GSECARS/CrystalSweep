@@ -216,6 +216,9 @@ class _TableRow(wx.Panel):
 _DET_ROW_H = _ROW_H * 3 + 2
 _PLACEHOLDER_PATH_LOCAL = "e.g. T:\\ (leave blank to send as-is)"
 _PLACEHOLDER_PATH_REMOTE = "e.g. /home/dac_user/cars6/Data"
+_PLACEHOLDER_PREVIEW_EXPOSURE = "seconds (e.g. 0.1)"
+_PLACEHOLDER_PREVIEW_TIMEOUT = "seconds (e.g. 60)"
+_PLACEHOLDER_PREVIEW_NUM = "e.g. 1000000"
 
 
 class _DetectorRow(_TableRow):
@@ -1040,10 +1043,33 @@ class DetectorsConfigView(wx.Panel):
         d_sizer.Add(self._add_detector_btn, 0, wx.EXPAND)
         d_body.SetSizer(d_sizer)
 
+        self._preview_section = _Section(self, "Preview")
+        p_body = self._preview_section.body
+        self.preview_exposure_ctrl = DarkTextCtrl(p_body, value="0.1", placeholder=_PLACEHOLDER_PREVIEW_EXPOSURE)
+        self.preview_exposure_ctrl.set_restrict_to_float(True)
+        self.preview_timeout_ctrl = DarkTextCtrl(p_body, value="60", placeholder=_PLACEHOLDER_PREVIEW_TIMEOUT)
+        self.preview_timeout_ctrl.set_restrict_to_float(True)
+        self.preview_num_ctrl = DarkTextCtrl(p_body, value="1000000", placeholder=_PLACEHOLDER_PREVIEW_NUM)
+        p_grid = wx.FlexGridSizer(rows=3, cols=2, vgap=6, hgap=8)
+        p_grid.AddGrowableCol(1, 1)
+        for label_text, ctrl in (
+            ("Exposure (s)", self.preview_exposure_ctrl),
+            ("Timeout (s)", self.preview_timeout_ctrl),
+            ("Images", self.preview_num_ctrl),
+        ):
+            lbl = wx.StaticText(p_body, label=label_text)
+            lbl.SetForegroundColour(FG_SECONDARY)
+            lbl.SetBackgroundColour(p_body.GetBackgroundColour())
+            lbl.SetFont(scaled_font(11))
+            p_grid.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+            p_grid.Add(ctrl, 0, wx.EXPAND)
+        p_body.SetSizer(p_grid)
+
         self._status_label = _status_label(self)
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(self._detectors_section, 1, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._preview_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
         self.SetMinSize((500, -1))
@@ -1055,8 +1081,27 @@ class DetectorsConfigView(wx.Panel):
         self._clear_detector_rows()
         for idx, detector in enumerate(config.detectors):
             self._append_detector_row(detector, active=idx == config.active_detector)
+        self.preview_exposure_ctrl.SetValue(f"{config.preview_exposure:g}")
+        self.preview_timeout_ctrl.SetValue(f"{config.preview_timeout:g}")
+        self.preview_num_ctrl.SetValue(str(config.preview_num_images))
         self.Layout()
         self.set_status("")
+
+    def collect_preview(self) -> tuple[float, float, int]:
+        """Return (exposure, timeout, num_images), coercing invalid input to defaults."""
+        try:
+            exposure = max(0.0, float(self.preview_exposure_ctrl.GetValue().strip() or "0"))
+        except ValueError:
+            exposure = 0.1
+        try:
+            timeout = max(0.0, float(self.preview_timeout_ctrl.GetValue().strip() or "0"))
+        except ValueError:
+            timeout = 60.0
+        try:
+            num_images = max(1, int(float(self.preview_num_ctrl.GetValue().strip() or "0")))
+        except ValueError:
+            num_images = 1000000
+        return exposure, timeout, num_images
 
     def collect_detectors(self) -> tuple[tuple[DetectorConfig, ...], int]:
         detectors: list[DetectorConfig] = []

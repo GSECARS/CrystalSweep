@@ -22,7 +22,7 @@ import wx
 from epics import caget, camonitor, camonitor_clear, caput
 
 from crystalsweep.model import MainModel
-from crystalsweep.model.beamline_config_model import BeamlineConfig, MotorConfig
+from crystalsweep.model.beamline_config_model import BeamlineConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.preview_view import CenteringMotorSpec, PreviewView
 
 __all__ = ["PreviewController"]
@@ -42,6 +42,16 @@ def _val_pv(pv: str) -> str:
     return f"{base}.VAL"
 
 
+def _cam_pv(detector: DetectorConfig, field: str) -> str:
+    """Return ``<prefix>cam1:<field>``; appends ``:`` to the prefix when missing."""
+    prefix = detector.pv_prefix.strip()
+    if not prefix:
+        return ""
+    if not prefix.endswith(":"):
+        prefix += ":"
+    return f"{prefix}cam1:{field}"
+
+
 class PreviewController:
     """Bridges PreviewView with the active beamline config and EPICS."""
 
@@ -53,13 +63,24 @@ class PreviewController:
         # the row to update via view.update_centering_value(pv=setpoint).
         self._rbv_to_setpoint: dict[str, str] = {}
 
+        # Preview state: saved detector PV values keyed by PV name so we can
+        # restore them when the preview is stopped (manually or by timeout).
+        self._previewing = False
+        self._saved_pv_values: dict[str, object] = {}
+        self._timeout_timer: threading.Timer | None = None
+
         self._view.bind_jog_minus(self._on_jog_minus)
         self._view.bind_jog_plus(self._on_jog_plus)
+        self._view.bind_start(self._on_start_preview)
+        self._view.bind_stop(self._on_stop_preview)
 
         self.on_config_applied(self._model.beamline.active)
 
     def on_config_applied(self, cfg: BeamlineConfig | None) -> None:
         """Rebuild rows + monitors whenever the active beamline config changes."""
+        if self._previewing:
+            # Stop any in-flight preview before tearing down state.
+            self._stop_preview(restore=True)
         self._clear_monitors()
         specs = self._collect_specs(cfg)
         self._view.set_centering_motors(specs)
@@ -70,6 +91,8 @@ class PreviewController:
 
     def shutdown(self) -> None:
         """Best-effort cleanup; safe to call multiple times."""
+        if self._previewing:
+            self._stop_preview(restore=True)
         self._clear_monitors()
 
     @staticmethod
@@ -167,3 +190,110 @@ class PreviewController:
                 _log.warning("Jog failed for %s: %s", spec.pv, exc)
 
         threading.Thread(target=_worker, daemon=True, name=f"jog-{spec.shorthand or spec.pv}").start()
+
+    # ----- Start / stop preview -------------------------------------------------
+
+    def _on_start_preview(self) -> None:
+        if self._previewing:
+            return
+        cfg = self._model.beamline.active
+        detector = cfg.active_detector_config if cfg is not None else None
+        if detector is None or not detector.pv_prefix.strip():
+            _log.warning("No active detector with a PV prefix; cannot start preview.")
+            return
+
+        exposure_pv = _cam_pv(detector, "AcquireTime")
+        period_pv = _cam_pv(detector, "AcquirePeriod")
+        num_pv = _cam_pv(detector, "NumImages")
+        image_mode_pv = _cam_pv(detector, "ImageMode")
+        acquire_pv = _cam_pv(detector, "Acquire")
+
+        exposure = float(cfg.preview_exposure)
+        num_images = int(cfg.preview_num_images)
+        timeout = float(cfg.preview_timeout)
+
+        self._previewing = True
+        self._view.set_previewing(True)
+
+        def _worker() -> None:
+            try:
+                # Snapshot current values so we can restore them on stop.
+                snapshot: dict[str, object] = {}
+                for pv in (exposure_pv, period_pv, num_pv, image_mode_pv):
+                    try:
+                        current = caget(pv)
+                    except Exception:
+                        current = None
+                    if current is not None:
+                        snapshot[pv] = current
+                self._saved_pv_values = snapshot
+
+                # Apply preview settings (continuous image mode = 2 in areaDetector).
+                if exposure_pv:
+                    caput(exposure_pv, exposure, wait=True)
+                if period_pv:
+                    caput(period_pv, exposure, wait=True)
+                if num_pv:
+                    caput(num_pv, num_images, wait=True)
+                if image_mode_pv:
+                    caput(image_mode_pv, 2, wait=True)
+                if acquire_pv:
+                    caput(acquire_pv, 1, wait=False)
+            except Exception as exc:
+                _log.warning("Failed to start preview acquisition: %s", exc)
+                wx.CallAfter(self._stop_preview, True)
+                return
+
+            if timeout > 0:
+                self._timeout_timer = threading.Timer(timeout, lambda: wx.CallAfter(self._on_timeout_expired))
+                self._timeout_timer.daemon = True
+                self._timeout_timer.start()
+
+        threading.Thread(target=_worker, daemon=True, name="preview-start").start()
+
+    def _on_stop_preview(self) -> None:
+        if not self._previewing:
+            return
+        self._stop_preview(restore=True)
+
+    def _on_timeout_expired(self) -> None:
+        if not self._previewing:
+            return
+        _log.info("Preview timeout reached; stopping acquisition.")
+        self._stop_preview(restore=True)
+
+    def _stop_preview(self, restore: bool) -> None:
+        """Tear down preview: cancel timer, stop acquire, restore saved PVs."""
+        if self._timeout_timer is not None:
+            try:
+                self._timeout_timer.cancel()
+            except Exception:
+                pass
+            self._timeout_timer = None
+
+        self._previewing = False
+        self._view.set_previewing(False)
+
+        detector = self._active_detector()
+        acquire_pv = _cam_pv(detector, "Acquire") if detector is not None else ""
+        snapshot = self._saved_pv_values
+        self._saved_pv_values = {}
+
+        def _worker() -> None:
+            if acquire_pv:
+                try:
+                    caput(acquire_pv, 0, wait=False)
+                except Exception as exc:
+                    _log.warning("Failed to stop acquisition: %s", exc)
+            if restore:
+                for pv, value in snapshot.items():
+                    try:
+                        caput(pv, value, wait=False)
+                    except Exception as exc:
+                        _log.warning("Failed to restore %s: %s", pv, exc)
+
+        threading.Thread(target=_worker, daemon=True, name="preview-stop").start()
+
+    def _active_detector(self) -> DetectorConfig | None:
+        cfg = self._model.beamline.active
+        return cfg.active_detector_config if cfg is not None else None

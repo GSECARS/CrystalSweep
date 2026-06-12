@@ -137,6 +137,9 @@ class BeamlineConfig:
     shutter_open_value: str = ""
     shutter_close_value: str = ""
     shutter_delay: float = 0.0
+    preview_exposure: float = 0.1
+    preview_timeout: float = 60.0
+    preview_num_images: int = 1000000
 
     @property
     def is_empty(self) -> bool:
@@ -314,6 +317,9 @@ class BeamlineConfigModel:
             shutter_open_value=str(data.get("shutter_open_value", "")),
             shutter_close_value=str(data.get("shutter_close_value", "")),
             shutter_delay=float(data.get("shutter_delay", 0.0)),
+            preview_exposure=max(0.0, float(data.get("preview_exposure", 0.1))),
+            preview_timeout=max(0.0, float(data.get("preview_timeout", 60.0))),
+            preview_num_images=max(1, int(data.get("preview_num_images", 1000000))),
         )
         self._active = cfg
         return cfg
@@ -376,6 +382,9 @@ class BeamlineConfigModel:
             "shutter_open_value": config.shutter_open_value,
             "shutter_close_value": config.shutter_close_value,
             "shutter_delay": config.shutter_delay,
+            "preview_exposure": config.preview_exposure,
+            "preview_timeout": config.preview_timeout,
+            "preview_num_images": config.preview_num_images,
         }
 
         path = self.path_for(config.name)
