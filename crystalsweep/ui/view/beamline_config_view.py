@@ -1337,7 +1337,7 @@ class PositionersConfigView(wx.Panel):
 class _ConfigDialog(wx.Dialog):
     """Generic scrollable dialog wrapper; pressing Enter triggers save."""
 
-    def __init__(self, parent: wx.Window, title: str, size: tuple[int, int] = (680, 500)) -> None:
+    def __init__(self, parent: wx.Window, title: str, size: tuple[int, int] = (820, 620)) -> None:
         super().__init__(parent, title=title, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
         self.SetBackgroundColour(BG_SURFACE)
         self._viewport = wx.Panel(self, style=wx.BORDER_NONE)
@@ -1354,7 +1354,7 @@ class _ConfigDialog(wx.Dialog):
         outer.Add(self._scrollbar, 0, wx.EXPAND)
         self.SetSizer(outer)
         self.SetSize(*size)
-        self.SetMinSize((420, 320))
+        self.SetMinSize((520, 420))
         self.CentreOnParent()
 
     def _make_panel(self, viewport: wx.Panel) -> wx.Panel:
@@ -1408,7 +1408,7 @@ class _ConfigDialog(wx.Dialog):
 
 class GeneralConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "General configuration", size=(520, 400))
+        super().__init__(parent, "General configuration", size=(660, 520))
 
     def _make_panel(self, viewport: wx.Panel) -> GeneralConfigView:
         return GeneralConfigView(viewport)
@@ -1416,7 +1416,7 @@ class GeneralConfigDialog(_ConfigDialog):
 
 class DetectorsConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "Detectors configuration", size=(620, 380))
+        super().__init__(parent, "Detectors configuration", size=(760, 500))
 
     def _make_panel(self, viewport: wx.Panel) -> DetectorsConfigView:
         return DetectorsConfigView(viewport)
@@ -1424,7 +1424,7 @@ class DetectorsConfigDialog(_ConfigDialog):
 
 class ControllersConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "Controllers configuration", size=(700, 380))
+        super().__init__(parent, "Controllers configuration", size=(840, 500))
 
     def _make_panel(self, viewport: wx.Panel) -> ControllersConfigView:
         return ControllersConfigView(viewport)
@@ -1432,7 +1432,7 @@ class ControllersConfigDialog(_ConfigDialog):
 
 class PositionersConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "Positioners configuration", size=(680, 500))
+        super().__init__(parent, "Positioners configuration", size=(900, 620))
 
     def _make_panel(self, viewport: wx.Panel) -> PositionersConfigView:
         return PositionersConfigView(viewport)

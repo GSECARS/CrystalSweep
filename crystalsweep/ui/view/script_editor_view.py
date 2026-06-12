@@ -165,8 +165,8 @@ class ScriptEditorDialog(wx.Dialog):
         outer.Add(bottom, 0, wx.EXPAND)
         self.SetSizer(outer)
 
-        self.SetSize(780, 560)
-        self.SetMinSize((480, 340))
+        self.SetSize(920, 720)
+        self.SetMinSize((580, 460))
         self.CentreOnParent()
 
         self.Bind(wx.EVT_CHAR_HOOK, self._on_char_hook)
