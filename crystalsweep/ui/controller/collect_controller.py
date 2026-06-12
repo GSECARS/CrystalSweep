@@ -191,13 +191,9 @@ class CollectController:
     def _point_frame_weight(point: CollectionPoint) -> int:
         """Return the number of frames for a point (1 for still/wide, n_frames for step)."""
         if point.scan_type == "step":
-            try:
-                step = float(point.step) if point.step else 1.0
-                start = float(point.rotation_start) if point.rotation_start else 0.0
-                end = float(point.rotation_end) if point.rotation_end else 0.0
-                return max(1, round(abs(end - start) / step)) if step > 0 else 1
-            except ValueError, ZeroDivisionError:
-                return 1
+            params = point.parse_step_params()
+            return params.n_frames if params is not None else 1
+
         return 1
 
     def _estimate_total_seconds(self, points: list[CollectionPoint]) -> float:
@@ -207,47 +203,44 @@ class CollectController:
         total = 0.0
         consumed_groups: set[str] = set()
         for point in points:
-            try:
-                exposure = float(point.time) if point.time else 1.0
-            except ValueError:
-                exposure = 1.0
+            exposure = point.parse_exposure()
+            if exposure is None:
+                continue
 
             if point.map_group:
                 if point.map_group in consumed_groups:
                     continue
                 consumed_groups.add(point.map_group)
                 group_points = [p for p in points if p.map_group == point.map_group]
+                n_points = len(group_points)
+                n_rows = len({p.map_row for p in group_points})
+                overhead = shutter_delay + 1.0
                 if point.scan_type == "still" and use_trajectory:
-                    n_rows = len({p.map_row for p in group_points})
                     n_cols = len({p.map_col for p in group_points})
-                    overhead = shutter_delay + 1.0
                     total += exposure * n_cols * n_rows + overhead * n_rows
+                elif point.scan_type == "step":
+                    params = point.parse_step_params()
+                    if params is None:
+                        continue
+                    total += params.exposure * params.n_frames * n_points + overhead * n_points + 1.0 * n_rows
+                elif point.scan_type == "wide":
+                    wp = point.parse_wide_params()
+                    if wp is None:
+                        continue
+                    total += wp.exposure * n_points + overhead * n_points + 1.0 * n_rows
                 else:
-                    n_points = len(group_points)
-                    if point.scan_type == "step":
-                        try:
-                            step = float(point.step) if point.step else 1.0
-                            start = float(point.rotation_start) if point.rotation_start else 0.0
-                            end = float(point.rotation_end) if point.rotation_end else 180.0
-                            n_frames = max(1, round(abs(end - start) / step))
-                        except ValueError, ZeroDivisionError:
-                            n_frames = 1
-                        overhead = shutter_delay + 1.0
-                        total += exposure * n_frames * n_points + overhead * n_points
-                    else:
-                        total += exposure * n_points + 1.0 * n_points
+                    total += exposure * n_points + overhead * n_points + 1.0 * n_rows
             else:
                 if point.scan_type == "step":
-                    try:
-                        step = float(point.step) if point.step else 1.0
-                        start = float(point.rotation_start) if point.rotation_start else 0.0
-                        end = float(point.rotation_end) if point.rotation_end else 180.0
-                        n_frames = max(1, round(abs(end - start) / step))
-                    except ValueError, ZeroDivisionError:
-                        n_frames = 1
-                    total += exposure * n_frames + shutter_delay + 1.0
+                    params = point.parse_step_params()
+                    if params is None:
+                        continue
+                    total += params.exposure * params.n_frames + shutter_delay + 1.0
                 elif point.scan_type == "wide":
-                    total += exposure + shutter_delay + 1.0
+                    wp = point.parse_wide_params()
+                    if wp is None:
+                        continue
+                    total += wp.exposure + shutter_delay + 1.0
                 else:
                     total += exposure + 1.0
         return total
@@ -764,10 +757,15 @@ class CollectController:
         total_weight: int = 1,
     ) -> None:
         n_points = len(row_points)
-        try:
-            exposure = float(row_points[0].time) if row_points[0].time else 1.0
-        except ValueError:
-            exposure = 1.0
+        exposure = row_points[0].parse_exposure()
+        if exposure is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[map row {row_num}]: exposure time is required",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
 
         epics_positions = []
         for pt in row_points:
@@ -1155,27 +1153,24 @@ class CollectController:
             converted_root = f"{directory.rstrip('/')}/{full_basename}_converted"
             crysalis_output_dir = f"{converted_root}/crysalis"
 
-        try:
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-        except ValueError:
-            omega_start = 0.0
-        try:
-            omega_end = float(point.rotation_end) if point.rotation_end else omega_start
-        except ValueError:
-            omega_end = omega_start
-        try:
-            step = float(point.step) if point.step else abs(omega_end - omega_start)
-        except ValueError:
-            step = abs(omega_end - omega_start) or 1.0
-        try:
-            count = max(1, round(abs(omega_end - omega_start) / step)) if step > 0 else 1
-        except ZeroDivisionError:
+        step_p = point.parse_step_params()
+        wide_p = point.parse_wide_params()
+        exposure_time = point.parse_exposure() or 0.0
+        if step_p is not None:
+            omega_start = step_p.omega_start
+            omega_end = step_p.omega_end
+            step = step_p.step
+            count = step_p.n_frames
+        elif wide_p is not None:
+            omega_start = wide_p.omega_start
+            omega_end = wide_p.omega_end
+            step = abs(omega_end - omega_start)
             count = 1
-
-        try:
-            exposure_time = float(point.time) if point.time else 1.0
-        except ValueError:
-            exposure_time = 1.0
+        else:
+            omega_start = 0.0
+            omega_end = 0.0
+            step = 0.0
+            count = 1
 
         scan_info = {
             "omega_start": omega_start,
@@ -1236,10 +1231,15 @@ class CollectController:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
-        try:
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError:
-            exposure = 1.0
+        exposure = point.parse_exposure()
+        if exposure is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: exposure time is required",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
 
         def on_done() -> None:
             print(f"[collect] [{idx}/{total}] {point.label}: still scan complete")
@@ -1296,18 +1296,18 @@ class CollectController:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
-        try:
-            exposure = float(point.time) if point.time else 1.0
-            step_size = float(point.step) if point.step else 1.0
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-            omega_end = float(point.rotation_end) if point.rotation_end else 0.0
-        except ValueError:
-            exposure = 1.0
-            step_size = 1.0
-            omega_start = 0.0
-            omega_end = 0.0
+        params = point.parse_step_params()
+        if params is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: step size is required for step scans",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
 
-        n_frames = max(1, round(abs(omega_end - omega_start) / step_size)) if step_size > 0 else 1
+        exposure = params.exposure
+        n_frames = params.n_frames
         total_duration = exposure * n_frames
 
         frame_holder: list[tuple[int, int]] = [(0, n_frames)]
@@ -1390,10 +1390,15 @@ class CollectController:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
-        try:
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError:
-            exposure = 1.0
+        exposure = point.parse_exposure()
+        if exposure is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: exposure time is required",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
 
         def on_done() -> None:
             print(f"[collect] [{idx}/{total}] {point.label}: wide scan complete")

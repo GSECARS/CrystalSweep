@@ -14,12 +14,26 @@
 # ----------------------------------------------------------------------------------
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, NamedTuple
 
-__all__ = ["CollectionPoint", "CollectionTableModel", "ScanType"]
+__all__ = ["CollectionPoint", "CollectionTableModel", "ScanType", "StepParams", "WideParams"]
 
 ScanType = Literal["still", "step", "wide"]
 SCAN_TYPES: tuple[ScanType, ...] = ("still", "wide", "step")
+
+
+class StepParams(NamedTuple):
+    exposure: float
+    step: float
+    omega_start: float
+    omega_end: float
+    n_frames: int
+
+
+class WideParams(NamedTuple):
+    exposure: float
+    omega_start: float
+    omega_end: float
 
 
 @dataclass
@@ -39,6 +53,55 @@ class CollectionPoint:
     map_col: int = -1
     map_motor1: str = ""
     map_motor2: str = ""
+
+    def parse_exposure(self) -> float | None:
+        """Return exposure time in seconds. Returns None if missing or invalid."""
+        if not self.time:
+            return None
+        try:
+            return float(self.time)
+        except ValueError:
+            return None
+
+    def parse_step_params(self) -> StepParams | None:
+        """Parse step scan parameters. Returns None if any value is missing or invalid."""
+        if not self.step or not self.time or not self.rotation_start or not self.rotation_end:
+            return None
+        try:
+            exposure = float(self.time)
+            step = float(self.step)
+            omega_start = float(self.rotation_start)
+            omega_end = float(self.rotation_end)
+        except ValueError, ZeroDivisionError:
+            return None
+        if step <= 0 or omega_start == omega_end:
+            return None
+        n_frames = max(1, round(abs(omega_end - omega_start) / step))
+        return StepParams(
+            exposure=exposure,
+            step=step,
+            omega_start=omega_start,
+            omega_end=omega_end,
+            n_frames=n_frames,
+        )
+
+    def parse_wide_params(self) -> WideParams | None:
+        """Parse wide scan parameters. Returns None if any value is missing or invalid."""
+        if not self.time or not self.rotation_start or not self.rotation_end:
+            return None
+        try:
+            exposure = float(self.time)
+            omega_start = float(self.rotation_start)
+            omega_end = float(self.rotation_end)
+        except ValueError:
+            return None
+        if omega_start == omega_end:
+            return None
+        return WideParams(
+            exposure=exposure,
+            omega_start=omega_start,
+            omega_end=omega_end,
+        )
 
 
 class CollectionTableModel:

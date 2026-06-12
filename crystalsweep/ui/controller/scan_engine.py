@@ -160,10 +160,9 @@ class ScanEngine:
             on_error(ValueError("No active detector configured."))
             return
 
-        try:
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError as exc:
-            on_error(exc)
+        exposure = point.parse_exposure()
+        if exposure is None:
+            on_error(ValueError("Exposure time is required."))
             return
 
         detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
@@ -234,23 +233,16 @@ class ScanEngine:
             on_error(ValueError("No active detector configured."))
             return
 
-        try:
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-            omega_end = float(point.rotation_end) if point.rotation_end else 0.0
-            step_size = float(point.step) if point.step else 1.0
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError as exc:
-            on_error(exc)
+        params_parsed = point.parse_step_params()
+        if params_parsed is None:
+            on_error(ValueError("Step scan requires valid exposure, step size, rotation_start, and rotation_end."))
             return
 
-        if step_size <= 0:
-            on_error(ValueError(f"Step size must be > 0, got {step_size}."))
-            return
-        if omega_start == omega_end:
-            on_error(ValueError("rotation_start and rotation_end must differ for a step scan."))
-            return
-
-        n_frames = max(1, round(abs(omega_end - omega_start) / step_size))
+        exposure = params_parsed.exposure
+        step_size = params_parsed.step
+        omega_start = params_parsed.omega_start
+        omega_end = params_parsed.omega_end
+        n_frames = params_parsed.n_frames
 
         controller_cfg = next((c for c in config.controllers if c.name == rotation_cfg.controller), None)
         params = dict(controller_cfg.params) if controller_cfg else {}
@@ -471,17 +463,14 @@ class ScanEngine:
             on_error(ValueError("No active detector configured."))
             return
 
-        try:
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-            omega_end = float(point.rotation_end) if point.rotation_end else 0.0
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError as exc:
-            on_error(exc)
+        wp = point.parse_wide_params()
+        if wp is None:
+            on_error(ValueError("Wide scan requires valid exposure, rotation_start, and rotation_end."))
             return
 
-        if omega_start == omega_end:
-            on_error(ValueError("rotation_start and rotation_end must differ for a wide scan."))
-            return
+        omega_start = wp.omega_start
+        omega_end = wp.omega_end
+        exposure = wp.exposure
 
         controller_cfg = next((c for c in config.controllers if c.name == rotation_cfg.controller), None)
         params = dict(controller_cfg.params) if controller_cfg else {}
