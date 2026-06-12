@@ -22,9 +22,10 @@ from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
-from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, SEP_COLOUR
-from crystalsweep.ui.view.custom.widgets import DarkConfirmDialog, DarkMenuBar, SectionDivider, ThemedSplitter
+from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font
+from crystalsweep.ui.view.custom.widgets import DarkConfirmDialog, DarkMenuBar, DarkTabbedPanel, SectionDivider, ThemedSplitter
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
+from crystalsweep.ui.view.preview_view import PreviewView
 
 __all__ = ["MainView"]
 
@@ -76,7 +77,12 @@ class MainView(wx.Frame):
         left_sizer.AddSpacer(25)
         left_sizer.Add(SectionDivider(self._left_panel, "Collection Points"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_table, 1, wx.EXPAND)
-        left_sizer.Add(collect_sep, 0, wx.EXPAND)
+        left_sizer.AddSpacer(25)
+        left_sizer.Add(SectionDivider(self._left_panel, "Single-Crystal Centering Tools"), 0, wx.EXPAND)
+        self.centering_tabs = self._build_centering_tabs()
+        left_sizer.Add(self.centering_tabs, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        left_sizer.AddSpacer(8)
+        left_sizer.Add(collect_sep, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
         left_sizer.Add(self.collect, 0, wx.EXPAND)
         self._left_panel.SetSizer(left_sizer)
 
@@ -140,6 +146,32 @@ class MainView(wx.Frame):
 
     def bind_abort(self, callback: Callable[[], None]) -> None:
         self._abort_cb = callback
+
+    def _build_centering_tabs(self) -> DarkTabbedPanel:
+        tabs = DarkTabbedPanel(self._left_panel)
+        tabs.SetMinSize((-1, 180))
+
+        self.preview = PreviewView(tabs)
+
+        xrd_page = wx.Panel(tabs)
+        xrd_page.SetBackgroundColour(BG_CARD)
+        xrd_label = wx.StaticText(xrd_page, label="Coming soon")
+        xrd_label.SetForegroundColour(FG_SECONDARY)
+        xrd_label.SetBackgroundColour(BG_CARD)
+        xrd_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
+        xrd_sizer = wx.BoxSizer(wx.VERTICAL)
+        xrd_sizer.AddStretchSpacer(1)
+        xrd_row = wx.BoxSizer(wx.HORIZONTAL)
+        xrd_row.AddStretchSpacer(1)
+        xrd_row.Add(xrd_label, 0, wx.ALIGN_CENTER_VERTICAL)
+        xrd_row.AddStretchSpacer(1)
+        xrd_sizer.Add(xrd_row, 0, wx.EXPAND)
+        xrd_sizer.AddStretchSpacer(1)
+        xrd_page.SetSizer(xrd_sizer)
+
+        tabs.add_page("Preview", self.preview)
+        tabs.add_page("XRD centering", xrd_page)
+        return tabs
 
     def _build_menu_bar(self) -> DarkMenuBar | None:
         if sys.platform == "darwin":

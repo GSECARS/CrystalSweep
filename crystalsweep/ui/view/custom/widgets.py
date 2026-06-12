@@ -57,6 +57,7 @@ __all__ = [
     "DarkMenuBar",
     "DarkScrollBar",
     "DarkHScrollBar",
+    "DarkTabbedPanel",
     "DarkTextCtrl",
     "DarkToggle",
     "FlatButton",
@@ -64,6 +65,7 @@ __all__ = [
     "IconButton",
     "LiveToggle",
     "RadioDot",
+    "ReadbackBox",
     "SectionDivider",
     "ThemedSplitter",
 ]
@@ -377,7 +379,14 @@ class IconButton(wx.Panel):
 class DarkTextCtrl(wx.Panel):
     """Custom-painted editable text field, dark-styled with centered text."""
 
-    def __init__(self, parent: wx.Window, value: str = "", placeholder: str = "", parent_bg: wx.Colour | None = None) -> None:
+    def __init__(
+        self,
+        parent: wx.Window,
+        value: str = "",
+        placeholder: str = "",
+        parent_bg: wx.Colour | None = None,
+        centered: bool = False,
+    ) -> None:
         super().__init__(parent, style=wx.BORDER_NONE, size=wx.Size(80, 28))
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._parent_bg: wx.Colour = parent_bg if parent_bg is not None else BG_SURFACE
@@ -386,13 +395,17 @@ class DarkTextCtrl(wx.Panel):
         self._editing = False
         self._error = False
         self._disabled = False
+        self._centered = centered
         self._validator: Callable[[str], str] | None = None
         self._restrict_to_float = False
         self._callback_enter: Callable | None = None
         self._callback_kill: Callable | None = None
         self._font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
         self._placeholder_font = scaled_font(12, style=wx.FONTSTYLE_ITALIC)
-        self._ctrl = wx.TextCtrl(self, value=value, style=wx.TE_PROCESS_ENTER | wx.BORDER_NONE)
+        ctrl_style = wx.TE_PROCESS_ENTER | wx.BORDER_NONE
+        if centered:
+            ctrl_style |= wx.TE_CENTRE
+        self._ctrl = wx.TextCtrl(self, value=value, style=ctrl_style)
         self._ctrl.SetBackgroundColour(BG_ELEVATED)
         self._ctrl.SetForegroundColour(FG_PRIMARY)
         self._ctrl.SetFont(self._font)
@@ -585,12 +598,14 @@ class DarkTextCtrl(wx.Panel):
         x_pad = 6
         if self._value:
             gc.SetFont(self._font, fg)
-            _, th = gc.GetTextExtent(self._value)
-            gc.DrawText(self._value, x_pad, (h - th) / 2)
+            tw, th = gc.GetTextExtent(self._value)
+            tx = (w - tw) / 2 if self._centered else x_pad
+            gc.DrawText(self._value, tx, (h - th) / 2)
         elif self._placeholder and not self._disabled:
             gc.SetFont(self._placeholder_font, FG_SECONDARY)
-            _, th = gc.GetTextExtent(self._placeholder)
-            gc.DrawText(self._placeholder, x_pad, (h - th) / 2)
+            tw, th = gc.GetTextExtent(self._placeholder)
+            tx = (w - tw) / 2 if self._centered else x_pad
+            gc.DrawText(self._placeholder, tx, (h - th) / 2)
 
 
 class DarkToggle(wx.Panel):
@@ -1258,6 +1273,38 @@ class RadioDot(wx.Panel):
         event.Skip()
 
 
+class ReadbackBox(wx.Control):
+    """Dark-styled read-only value display with text centred on both axes."""
+
+    def __init__(self, parent: wx.Window, height: int = 28) -> None:
+        super().__init__(parent, size=wx.Size(-1, height), style=wx.BORDER_NONE)
+        self._text = ""
+        self._font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        super().Bind(wx.EVT_PAINT, self._on_paint)
+        super().Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
+
+    def set_text(self, text: str) -> None:
+        self._text = text
+        self.Refresh()
+
+    def get_text(self) -> str:
+        return self._text
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
+        w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(DISABLED_BG))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRoundedRectangle(0, 0, w, h, 3)
+        if not self._text:
+            return
+        gc.SetFont(self._font, DISABLED_FG)
+        tw, th = gc.GetTextExtent(self._text)
+        gc.DrawText(self._text, (w - tw) / 2, (h - th) / 2)
+
+
 _SB_W = 8
 _SB_TRACK = wx.Colour(28, 28, 32)
 _SB_THUMB = wx.Colour(70, 70, 80)
@@ -1673,3 +1720,162 @@ class DarkConfirmDialog(wx.Dialog):
             self.EndModal(wx.ID_NO)
         else:
             event.Skip()
+
+
+_TAB_BAR_H = 30
+_TAB_PAD_X = 14
+_TAB_BG = BG_CARD
+_TAB_INACTIVE_FG = FG_SECONDARY
+_TAB_ACTIVE_FG = FG_PRIMARY
+_TAB_HOVER_BG = wx.Colour(40, 40, 46)
+_TAB_ACTIVE_BG = BG_ELEVATED
+_TAB_UNDERLINE = ACCENT
+
+
+class _DarkTabBar(wx.Control):
+    """Header strip that renders tab labels for DarkTabbedPanel."""
+
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent, style=wx.BORDER_NONE)
+        self._labels: list[str] = []
+        self._selection: int = 0
+        self._hover: int = -1
+        self._on_select: Callable[[int], None] | None = None
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self.SetBackgroundColour(_TAB_BG)
+        self.SetMinSize((-1, _TAB_BAR_H))
+        super().Bind(wx.EVT_PAINT, self._on_paint)
+        super().Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
+        super().Bind(wx.EVT_MOTION, self._on_motion)
+        super().Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
+        super().Bind(wx.EVT_LEFT_UP, self._on_click)
+
+    def set_labels(self, labels: list[str]) -> None:
+        self._labels = list(labels)
+        self.Refresh()
+
+    def set_selection(self, idx: int) -> None:
+        if 0 <= idx < len(self._labels):
+            self._selection = idx
+            self.Refresh()
+
+    def set_on_select(self, callback: Callable[[int], None]) -> None:
+        self._on_select = callback
+
+    def _tab_rects(self) -> list[tuple[int, int, int, int]]:
+        dc = wx.ClientDC(self)
+        dc.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
+        _, h = self.GetClientSize()
+        rects: list[tuple[int, int, int, int]] = []
+        x = 0
+        for label in self._labels:
+            tw, _ = dc.GetTextExtent(label)
+            w = tw + _TAB_PAD_X * 2
+            rects.append((x, 0, w, h))
+            x += w
+        return rects
+
+    def _index_at(self, px: int, py: int) -> int:
+        for i, (x, y, w, h) in enumerate(self._tab_rects()):
+            if x <= px < x + w and y <= py < y + h:
+                return i
+        return -1
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
+        w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(_TAB_BG))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
+        for i, (tx, ty, tw, th) in enumerate(self._tab_rects()):
+            active = i == self._selection
+            hovered = i == self._hover
+            if active:
+                bg = _TAB_ACTIVE_BG
+            elif hovered:
+                bg = _TAB_HOVER_BG
+            else:
+                bg = _TAB_BG
+            gc.SetBrush(wx.Brush(bg))
+            gc.SetPen(wx.TRANSPARENT_PEN)
+            gc.DrawRectangle(tx, ty, tw, th)
+            fg = _TAB_ACTIVE_FG if active or hovered else _TAB_INACTIVE_FG
+            gc.SetFont(font, fg)
+            label = self._labels[i]
+            ltw, lth = gc.GetTextExtent(label)
+            gc.DrawText(label, tx + (tw - ltw) / 2, (th - lth) / 2)
+            if active:
+                gc.SetBrush(wx.Brush(_TAB_UNDERLINE))
+                gc.DrawRectangle(tx, th - 2, tw, 2)
+        gc.SetPen(wx.Pen(SEP_COLOUR, 1))
+        gc.StrokeLine(0, h - 1, w, h - 1)
+
+    def _on_motion(self, event: wx.MouseEvent) -> None:
+        idx = self._index_at(event.GetX(), event.GetY())
+        if idx != self._hover:
+            self._hover = idx
+            self.Refresh()
+        event.Skip()
+
+    def _on_leave(self, event: wx.MouseEvent) -> None:
+        if self._hover != -1:
+            self._hover = -1
+            self.Refresh()
+        event.Skip()
+
+    def _on_click(self, event: wx.MouseEvent) -> None:
+        idx = self._index_at(event.GetX(), event.GetY())
+        if idx >= 0 and idx != self._selection:
+            self._selection = idx
+            self.Refresh()
+            if self._on_select is not None:
+                self._on_select(idx)
+        event.Skip()
+
+
+class DarkTabbedPanel(wx.Panel):
+    """Dark-themed tabbed container. Pages are created via add_page()."""
+
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent, style=wx.BORDER_NONE)
+        self.SetBackgroundColour(BG_CARD)
+        self._tab_bar = _DarkTabBar(self)
+        self._tab_bar.set_on_select(self._on_tab_selected)
+        self._content = wx.Panel(self)
+        self._content.SetBackgroundColour(BG_CARD)
+        self._content_sizer = wx.BoxSizer(wx.VERTICAL)
+        self._content.SetSizer(self._content_sizer)
+        self._pages: list[tuple[str, wx.Window]] = []
+        self._selection: int = -1
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self._tab_bar, 0, wx.EXPAND)
+        sizer.Add(self._content, 1, wx.EXPAND)
+        self.SetSizer(sizer)
+
+    def add_page(self, label: str, page: wx.Window) -> None:
+        page.Reparent(self._content)
+        self._pages.append((label, page))
+        self._content_sizer.Add(page, 1, wx.EXPAND)
+        self._tab_bar.set_labels([lbl for lbl, _ in self._pages])
+        if self._selection == -1:
+            self.set_selection(0)
+        else:
+            page.Show(False)
+            self._content.Layout()
+
+    def set_selection(self, idx: int) -> None:
+        if not (0 <= idx < len(self._pages)) or idx == self._selection:
+            return
+        self._selection = idx
+        for i, (_, page) in enumerate(self._pages):
+            page.Show(i == idx)
+        self._tab_bar.set_selection(idx)
+        self._content.Layout()
+
+    def get_page(self, idx: int) -> wx.Window:
+        return self._pages[idx][1]
+
+    def _on_tab_selected(self, idx: int) -> None:
+        self.set_selection(idx)

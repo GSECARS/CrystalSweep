@@ -36,13 +36,14 @@ class ControllerConfig:
 
 @dataclass(frozen=True, slots=True)
 class MotorConfig:
-    """Single motor entry: shorthand, description, EPICS PV, decimal precision, mapping flag, and controller."""
+    """Single motor entry: shorthand, description, EPICS PV, decimal precision, mapping flag, centering flag, and controller."""
 
     shorthand: str
     description: str
     pv: str
     precision: int = 4
     mapping_enabled: bool = False
+    centering_enabled: bool = False
     controller: str = "epics"
     xps_group: str = ""
     xps_positioner: str = ""
@@ -266,6 +267,7 @@ class BeamlineConfigModel:
                 pv=str(m.get("pv", "")),
                 precision=max(0, int(m.get("precision", 4))),
                 mapping_enabled=bool(m.get("mapping_enabled", False)),
+                centering_enabled=bool(m.get("centering_enabled", False)),
                 controller=str(m.get("controller", "epics")),
                 xps_group=str(m.get("xps_group", "")),
                 xps_positioner=str(m.get("xps_positioner", "")),
@@ -281,6 +283,7 @@ class BeamlineConfigModel:
                 description=str(rm_data.get("description", rm_data.get("name", ""))),
                 pv=str(rm_data.get("pv", "")),
                 precision=max(0, int(rm_data.get("precision", 4))),
+                centering_enabled=bool(rm_data.get("centering_enabled", False)),
                 controller=str(rm_data.get("controller", "epics")),
                 xps_group=str(rm_data.get("xps_group", "")),
                 xps_positioner=str(rm_data.get("xps_positioner", "")),
@@ -328,6 +331,7 @@ class BeamlineConfigModel:
                     "description": config.rotation_motor.description,
                     "pv": config.rotation_motor.pv,
                     "precision": config.rotation_motor.precision,
+                    "centering_enabled": config.rotation_motor.centering_enabled,
                     "controller": config.rotation_motor.controller,
                     "xps_group": config.rotation_motor.xps_group,
                     "xps_positioner": config.rotation_motor.xps_positioner,
@@ -357,6 +361,7 @@ class BeamlineConfigModel:
                     "pv": m.pv,
                     "precision": m.precision,
                     "mapping_enabled": m.mapping_enabled,
+                    "centering_enabled": m.centering_enabled,
                     "controller": m.controller,
                     "xps_group": m.xps_group,
                     "xps_positioner": m.xps_positioner,

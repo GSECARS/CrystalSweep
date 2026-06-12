@@ -426,7 +426,7 @@ class _ControllerRow(_TableRow):
 
 
 class _RotationRow(_TableRow):
-    _PROPS = [3, 6, 10, 2, 3, 7]
+    _PROPS = [3, 6, 10, 2, 3, 2, 7]
 
     def __init__(self, parent: wx.Window, motor: MotorConfig | None) -> None:
         super().__init__(parent, BG_CARD, self._PROPS)
@@ -438,6 +438,9 @@ class _RotationRow(_TableRow):
         self.pv_ctrl = DarkTextCtrl(self, value=rm.pv if rm else "", placeholder=_PLACEHOLDER_ROTATION_PV)
         self.precision_ctrl = DarkTextCtrl(self, value=str(rm.precision) if rm else "4", placeholder=_PLACEHOLDER_MOTOR_PRECISION)
         self.beam_angle_ctrl = DarkTextCtrl(self, value=str(rm.beam_angle) if rm else "0.0", placeholder="0.0")
+        self.centering_toggle = DarkToggle(self, "")
+        self.centering_toggle.SetBackgroundColour(BG_CARD)
+        self.centering_toggle.SetValue(rm.centering_enabled if rm else False)
         self.controller_combo = DarkCombo(self, choices=["epics"], selection=0)
         self.controller_combo.Bind(wx.EVT_CHOICE, lambda _e: self._on_controller_changed())
 
@@ -465,8 +468,11 @@ class _RotationRow(_TableRow):
         ):
             self._place(ctrl, x, cw)
             x += cw
+        tw, th = self.centering_toggle.GetBestSize()
+        self.centering_toggle.SetSize(x + (widths[5] - tw) // 2, (_ROW_H - th) // 2, tw, th)
+        x += widths[5]
         xps = self._is_xps()
-        ctrl_w = widths[5]
+        ctrl_w = widths[6]
         if xps:
             third = ctrl_w // 3
             self._place(self.controller_combo, x, third)
@@ -490,7 +496,7 @@ class _RotationRow(_TableRow):
 
 
 class _MotorRow(_TableRow):
-    _PROPS = [3, 6, 10, 2, 2, 6, 2]
+    _PROPS = [3, 6, 10, 2, 2, 2, 6, 2]
 
     def __init__(
         self,
@@ -513,6 +519,10 @@ class _MotorRow(_TableRow):
         self.mapping_toggle = DarkToggle(self, "")
         self.mapping_toggle.SetBackgroundColour(bg)
         self.mapping_toggle.SetValue(motor.mapping_enabled)
+
+        self.centering_toggle = DarkToggle(self, "")
+        self.centering_toggle.SetBackgroundColour(bg)
+        self.centering_toggle.SetValue(motor.centering_enabled)
 
         controller_choices = ["epics"] + controller_names
         sel = controller_choices.index(motor.controller) if motor.controller in controller_choices else 0
@@ -549,8 +559,11 @@ class _MotorRow(_TableRow):
         tw, th = self.mapping_toggle.GetBestSize()
         self.mapping_toggle.SetSize(x + (widths[4] - tw) // 2, (_ROW_H - th) // 2, tw, th)
         x += widths[4]
+        ctw, cth = self.centering_toggle.GetBestSize()
+        self.centering_toggle.SetSize(x + (widths[5] - ctw) // 2, (_ROW_H - cth) // 2, ctw, cth)
+        x += widths[5]
         xps = self._is_xps()
-        ctrl_w = widths[5]
+        ctrl_w = widths[6]
         if xps:
             third = ctrl_w // 3
             self._place(self.controller_combo, x, third)
@@ -563,7 +576,7 @@ class _MotorRow(_TableRow):
             self.xps_group_ctrl.Hide()
             self.xps_positioner_ctrl.Hide()
         x += ctrl_w
-        self._place(self._remove_btn, x, widths[6])
+        self._place(self._remove_btn, x, widths[7])
 
     def update_controller_choices(self, controller_names: list[str], controller_types: dict[str, str] | None = None) -> None:
         if controller_types is not None:
@@ -587,6 +600,7 @@ class _MotorRow(_TableRow):
             pv=self.pv_ctrl.GetValue().strip(),
             precision=precision,
             mapping_enabled=self.mapping_toggle.GetValue(),
+            centering_enabled=self.centering_toggle.GetValue(),
             controller=self.controller_combo.GetStringSelection() or "epics",
             xps_group=self.xps_group_ctrl.GetValue().strip() if self._is_xps() else "",
             xps_positioner=self.xps_positioner_ctrl.GetValue().strip() if self._is_xps() else "",
@@ -1211,7 +1225,7 @@ class PositionersConfigView(wx.Panel):
     def _build_layout(self) -> None:
         self._rotation_section = _Section(self, "Rotation Stage")
         r_body = self._rotation_section.body
-        self._rot_header = _TableHeader(r_body, ["Short", "Description", "PV", "Prec", "Beam °", "Controller"], [3, 6, 10, 2, 3, 7])
+        self._rot_header = _TableHeader(r_body, ["Short", "Description", "PV", "Prec", "Beam °", "Center", "Controller"], [3, 6, 10, 2, 3, 2, 7])
         self._rotation_row = _RotationRow(r_body, None)
         r_sizer = wx.BoxSizer(wx.VERTICAL)
         r_sizer.Add(self._rot_header, 0, wx.EXPAND)
@@ -1220,7 +1234,7 @@ class PositionersConfigView(wx.Panel):
 
         self._motors_section = _Section(self, "Motors")
         m_body = self._motors_section.body
-        self._mot_header = _TableHeader(m_body, ["Short", "Description", "PV", "Prec", "Map", "Controller", ""], [3, 6, 10, 2, 2, 6, 2])
+        self._mot_header = _TableHeader(m_body, ["Short", "Description", "PV", "Prec", "Map", "Center", "Controller", ""], [3, 6, 10, 2, 2, 2, 6, 2])
         self._motor_rows_panel = _DarkScrolledPanel(m_body)
         self._motor_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_motor_btn = FlatButton(m_body, "+ Add motor")
@@ -1259,6 +1273,7 @@ class PositionersConfigView(wx.Panel):
         self._rotation_row.pv_ctrl.SetValue(rm.pv if rm else "")
         self._rotation_row.precision_ctrl.SetValue(str(rm.precision) if rm else "4")
         self._rotation_row.beam_angle_ctrl.SetValue(str(rm.beam_angle) if rm else "0.0")
+        self._rotation_row.centering_toggle.SetValue(rm.centering_enabled if rm else False)
         self._refresh_rotation_controller_choices(selected=rm.controller if rm else "epics")
 
         self._clear_motor_rows()
@@ -1286,6 +1301,7 @@ class PositionersConfigView(wx.Panel):
             description=self._rotation_row.description_ctrl.GetValue().strip(),
             pv=rot_pv,
             precision=rot_precision,
+            centering_enabled=self._rotation_row.centering_toggle.GetValue(),
             controller=self._rotation_row.controller_combo.GetStringSelection() or "epics",
             xps_group=self._rotation_row.xps_group_ctrl.GetValue().strip() if is_xps else "",
             xps_positioner=self._rotation_row.xps_positioner_ctrl.GetValue().strip() if is_xps else "",
