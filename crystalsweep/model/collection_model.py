@@ -72,7 +72,7 @@ class CollectionPoint:
             step = float(self.step)
             omega_start = float(self.rotation_start)
             omega_end = float(self.rotation_end)
-        except ValueError, ZeroDivisionError:
+        except (ValueError, ZeroDivisionError):
             return None
         if step <= 0 or omega_start == omega_end:
             return None

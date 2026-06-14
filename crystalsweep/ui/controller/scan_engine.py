@@ -300,6 +300,7 @@ class ScanEngine:
                     self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
                     if on_status:
                         on_status("collecting")
+                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
                     for frame_idx in range(n_frames):
                         if self._abort_event.is_set() or self._driver is None:
                             break
@@ -479,7 +480,6 @@ class ScanEngine:
         if rotation_cfg.xps_positioner:
             params["xps_positioner"] = rotation_cfg.xps_positioner
 
-        omega_range = abs(omega_end - omega_start)
         spec = ScanSpec(
             pv=rotation_cfg.pv,
             start=omega_start,
@@ -783,7 +783,7 @@ class ScanEngine:
             map_label = point.label.strip()
             try:
                 frame_number = int(map_label.rsplit("_", 1)[-1])
-            except ValueError, IndexError:
+            except (ValueError, IndexError):
                 frame_number = file_settings.frame_number
         else:
             disable_auto_increment = bool(label)

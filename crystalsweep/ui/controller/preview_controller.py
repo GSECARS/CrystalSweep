@@ -181,7 +181,7 @@ class PreviewController:
             return
         try:
             numeric: float | None = float(value) if value is not None else None
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             numeric = None
         wx.CallAfter(self._view.update_centering_value, setpoint, numeric)
         # Mirror the value into the Current Positions column when previewing.

@@ -23,9 +23,9 @@ import wx
 # Force vispy onto the PyOpenGL-backed bridge (`glplus`)
 vispy.use(app="wx", gl="glplus")
 
-from vispy import scene
+from vispy import scene  # noqa: E402
 
-from crystalsweep.ui.view.custom.colormaps import CUSTOM_COLORMAPS
+from crystalsweep.ui.view.custom.colormaps import CUSTOM_COLORMAPS  # noqa: E402
 
 __all__ = ["ImageCanvas"]
 

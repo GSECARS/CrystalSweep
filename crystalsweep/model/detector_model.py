@@ -23,7 +23,7 @@ from typing import Protocol, runtime_checkable
 
 from epics import caget, caput
 
-__all__ = ["DetectorModel", "ADEigerModel", "ADPilatusModel", "ADSpinnakerModel", "get_detector_model", "set_file_info"]
+__all__ = ["DetectorModel", "ADEigerModel", "ADPilatusModel", "ADSpinnakerModel", "get_detector_model"]
 
 _log = logging.getLogger(__name__)
 

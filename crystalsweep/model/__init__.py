@@ -57,4 +57,7 @@ __all__ = [
     "ScanDriver",
     "ScanSpec",
     "SCAN_TYPES",
+    "get_detector_model",
+    "get_driver",
+    "register_driver",
 ]

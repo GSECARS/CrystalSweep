@@ -63,7 +63,8 @@ class MainView(wx.Frame):
         self.collection_table = CollectionTableView(self._left_panel)
         self.collect = CollectView(self._left_panel)
 
-        _sep = lambda: wx.Panel(self._left_panel, size=(-1, 1))
+        def _sep() -> wx.Panel:
+            return wx.Panel(self._left_panel, size=(-1, 1))
 
         collect_sep = _sep()
         collect_sep.SetBackgroundColour(SEP_COLOUR)

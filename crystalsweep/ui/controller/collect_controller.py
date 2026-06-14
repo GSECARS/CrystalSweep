@@ -151,7 +151,7 @@ class CollectController:
                         continue
                     try:
                         pos = float(raw)
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         continue
                     motor_errors[motor_cfg.shorthand] = bool(check_soft_limits(motor_cfg.pv, pos))
 
@@ -162,13 +162,13 @@ class CollectController:
                         try:
                             pos = float(point.rotation_start)
                             rot_start_error = bool(check_soft_limits(rotation_cfg.pv, pos))
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             pass
                     if point.rotation_end:
                         try:
                             pos = float(point.rotation_end)
                             rot_end_error = bool(check_soft_limits(rotation_cfg.pv, pos))
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             pass
 
                 if any(motor_errors.values()) or rot_start_error or rot_end_error:
@@ -1032,7 +1032,7 @@ class CollectController:
             map_label = point.label.strip()
             try:
                 filenumber = int(map_label.rsplit("_", 1)[-1])
-            except ValueError, IndexError:
+            except (ValueError, IndexError):
                 filenumber = frame_number if frame_number is not None else fs.frame_number
             map_stem = "_".join(parts) if parts else base
             basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
@@ -1091,7 +1091,7 @@ class CollectController:
         map_label = ref.label.strip()
         try:
             filenumber = int(map_label.rsplit("_", 1)[-1])
-        except ValueError, IndexError:
+        except (ValueError, IndexError):
             filenumber = first_frame_number if first_frame_number is not None else fs.frame_number
         map_stem = "_".join(parts) if parts else base
         basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
@@ -1133,7 +1133,7 @@ class CollectController:
             map_label = point.label.strip()
             try:
                 filenumber = int(map_label.rsplit("_", 1)[-1])
-            except ValueError, IndexError:
+            except (ValueError, IndexError):
                 filenumber = frame_number if frame_number is not None else fs.frame_number
         else:
             parts = [p for p in [base, label] if p]
@@ -1306,9 +1306,7 @@ class CollectController:
             self._abort_event.set()
             return
 
-        exposure = params.exposure
         n_frames = params.n_frames
-        total_duration = exposure * n_frames
 
         frame_holder: list[tuple[int, int]] = [(0, n_frames)]
 

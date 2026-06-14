@@ -187,7 +187,7 @@ class _CenteringRow(wx.Panel):
         else:
             try:
                 text = f"{float(value):.{self._precision}f}"
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 text = "—"
         self._value_box.set_text(text)
 
@@ -588,7 +588,7 @@ class PreviewView(wx.Panel):
         prec = max(0, int(precision))
         try:
             return f"{float(value):.{prec}f}"
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return "—"
 
     def _build_currents_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
@@ -825,7 +825,7 @@ class PreviewView(wx.Panel):
             return "—"
         try:
             return f"{float(value):.4g}"
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return "—"
 
     def _build_placeholder_column(self) -> wx.BoxSizer:
