@@ -241,6 +241,8 @@ class ADViewerModel:
         self._frame: FrameModel | None = None
         self._stats = StreamStatsModel()
         self._observers: list[FrameObserver] = []
+        self._last_roi_max_intensity: float | None = None
+        self._max_intensity_observers: list[Callable[[float | None], None]] = []
 
     @property
     def pv_name(self) -> str:
@@ -265,6 +267,38 @@ class ADViewerModel:
         """A consistent snapshot of the current stream counters."""
         with self._lock:
             return self._stats.snapshot()
+
+    @property
+    def last_roi_max_intensity(self) -> float | None:
+        """The most recent ROI/integration max intensity, or None if unavailable."""
+        with self._lock:
+            return self._last_roi_max_intensity
+
+    def set_last_roi_max_intensity(self, value: float | None) -> None:
+        """Publish a new ROI/integration max intensity (callable from any thread)."""
+        with self._lock:
+            self._last_roi_max_intensity = value
+            observers = list(self._max_intensity_observers)
+        for cb in observers:
+            try:
+                cb(value)
+            except Exception:
+                pass
+
+    def clear_last_roi_max_intensity(self) -> None:
+        """Reset the ROI max snapshot to None (e.g. when ROI is cleared)."""
+        self.set_last_roi_max_intensity(None)
+
+    def add_max_intensity_observer(self, callback: Callable[[float | None], None]) -> None:
+        """Register *callback* to be invoked whenever the ROI max changes."""
+        with self._lock:
+            self._max_intensity_observers.append(callback)
+
+    def remove_max_intensity_observer(self, callback: Callable[[float | None], None]) -> None:
+        """Unregister a previously added max-intensity observer."""
+        with self._lock:
+            if callback in self._max_intensity_observers:
+                self._max_intensity_observers.remove(callback)
 
     def add_observer(self, callback: FrameObserver) -> None:
         """Register a callback fired after each successfully stored frame."""

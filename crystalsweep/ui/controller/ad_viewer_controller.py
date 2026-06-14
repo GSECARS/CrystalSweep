@@ -199,6 +199,7 @@ class ADViewerController:
 
         if x1 is None or y1 is None or x2 is None or y2 is None or current_frame is None:
             self._view.ad_viewer.clear_integration_plot()
+            self._model.ad_viewer.clear_last_roi_max_intensity()
             return
 
         if self._model.integration.is_calibrated:
@@ -213,6 +214,16 @@ class ADViewerController:
             return
         self._run_line_integration(current_frame, x1, y1, x2, y2)
 
+    def _publish_max(self, ys: np.ndarray | None) -> None:
+        """Mirror the value rendered as 'max:' on the integration plot to the model."""
+        if ys is None or len(ys) == 0:
+            self._model.ad_viewer.clear_last_roi_max_intensity()
+            return
+        try:
+            self._model.ad_viewer.set_last_roi_max_intensity(float(np.asarray(ys).max()))
+        except (TypeError, ValueError):
+            self._model.ad_viewer.clear_last_roi_max_intensity()
+
     def _run_roi_fallback(self, frame: np.ndarray, x1: int, y1: int, x2: int, y2: int) -> None:
         """Compute column-sum integration over the ROI and push results to the view."""
         h, w = frame.shape[:2]
@@ -226,6 +237,7 @@ class ADViewerController:
         ys = roi.sum(axis=0)
         xs = np.arange(x1c, x1c + len(ys), dtype=np.float64)
         self._view.ad_viewer.set_integration_data(xs, ys, "Pixel")
+        self._publish_max(ys)
 
     def _run_line_integration(self, frame: np.ndarray, x1: int, y1: int, x2: int, y2: int) -> None:
         """Extract line profile via the model and push results to the view."""
@@ -236,6 +248,7 @@ class ADViewerController:
             _log.exception("integrate1d_line failed")
             return
         self._view.ad_viewer.set_integration_data(xs, ys, x_label)
+        self._publish_max(ys)
 
     def _run_integration(self, frame: np.ndarray) -> None:
         """Execute pyFAI azimuthal integration or line profile and push results to the view."""
@@ -255,3 +268,4 @@ class ADViewerController:
             return
 
         self._view.ad_viewer.set_integration_data(xs, ys, x_label)
+        self._publish_max(ys)
