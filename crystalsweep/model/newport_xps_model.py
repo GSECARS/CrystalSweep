@@ -158,11 +158,13 @@ class NewportXPSModel:
             raise RuntimeError(f"define_array_trajectory failed — check positioner name '{axis_name}' against XPS group '{group_name}' axes.")
         _log.debug("NewportXPSModel array trajectory defined: %d positions, dtime=%.4f", len(xps_positions), exposure)
 
-    def run_array(self, on_point: Callable[[int, float], None], n_points: int) -> None:
+    def run_array(self, on_point: Callable[[int, float], None], n_points: int, on_at_start: Callable[[], None] | None = None) -> None:
         """Run the previously defined array trajectory."""
         if self._aborted:
             return
         self._xps.arm_trajectory(name="forward", move_to_start=True)
+        if on_at_start is not None:
+            on_at_start()
         self._xps.run_trajectory(name="forward", save=False, clean=True, move_to_start=False)
         _log.debug("NewportXPSModel array trajectory complete")
         if not self._aborted:
