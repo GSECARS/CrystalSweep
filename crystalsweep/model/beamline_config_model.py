@@ -132,6 +132,8 @@ class BeamlineConfig:
     abort_pvs: tuple[tuple[str, str], ...] = field(default_factory=tuple)
     restore_pvs: tuple[str, ...] = field(default_factory=tuple)
     crysalis_par_path: str = ""
+    crysalis_set_path: str = ""
+    crysalis_ccd_path: str = ""
     crysalis_load_on_startup: bool = False
     shutter_pv: str = ""
     shutter_open_value: str = ""
@@ -312,6 +314,8 @@ class BeamlineConfigModel:
             abort_pvs=abort_pvs,
             restore_pvs=restore_pvs,
             crysalis_par_path=str(data.get("crysalis_par_path", "")),
+            crysalis_set_path=str(data.get("crysalis_set_path", "")),
+            crysalis_ccd_path=str(data.get("crysalis_ccd_path", "")),
             crysalis_load_on_startup=bool(data.get("crysalis_load_on_startup", False)),
             shutter_pv=str(data.get("shutter_pv", "")),
             shutter_open_value=str(data.get("shutter_open_value", "")),
@@ -377,6 +381,8 @@ class BeamlineConfigModel:
             "abort_pvs": [{"pv": pv, "value": value} for pv, value in config.abort_pvs],
             "restore_pvs": [{"pv": pv} for pv in config.restore_pvs if pv],
             "crysalis_par_path": config.crysalis_par_path,
+            "crysalis_set_path": config.crysalis_set_path,
+            "crysalis_ccd_path": config.crysalis_ccd_path,
             "crysalis_load_on_startup": config.crysalis_load_on_startup,
             "shutter_pv": config.shutter_pv,
             "shutter_open_value": config.shutter_open_value,

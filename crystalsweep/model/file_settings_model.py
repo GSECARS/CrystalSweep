@@ -37,6 +37,8 @@ class FileSettingsModel:
 
     use_crysalis: bool = field(default=False)
     crysalis_calibration: Path | None = field(default=None)
+    crysalis_set_file: Path | None = field(default=None)
+    crysalis_ccd_file: Path | None = field(default=None)
 
     use_apex: bool = field(default=False)
     apex_calibration: Path | None = field(default=None)

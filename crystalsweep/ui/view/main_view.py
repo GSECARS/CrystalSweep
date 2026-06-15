@@ -41,6 +41,7 @@ class MainView(wx.Frame):
 
         self._version = version
         self._open_general_cb: Callable[[], None] | None = None
+        self._open_crysalis_cb: Callable[[], None] | None = None
         self._open_detectors_cb: Callable[[], None] | None = None
         self._open_controllers_cb: Callable[[], None] | None = None
         self._open_positioners_cb: Callable[[], None] | None = None
@@ -105,6 +106,9 @@ class MainView(wx.Frame):
 
     def bind_open_general(self, callback: Callable[[], None]) -> None:
         self._open_general_cb = callback
+
+    def bind_open_crysalis(self, callback: Callable[[], None]) -> None:
+        self._open_crysalis_cb = callback
 
     def bind_open_detectors(self, callback: Callable[[], None]) -> None:
         self._open_detectors_cb = callback
@@ -190,16 +194,20 @@ class MainView(wx.Frame):
             general_item = general_menu.Append(wx.ID_ANY, "General\tCtrl+1")
             menu_bar.Append(general_menu, "&General")
 
+            crysalis_menu = wx.Menu()
+            crysalis_item = crysalis_menu.Append(wx.ID_ANY, "CrysAlis\tCtrl+2")
+            menu_bar.Append(crysalis_menu, "&CrysAlis")
+
             detectors_menu = wx.Menu()
-            detectors_item = detectors_menu.Append(wx.ID_ANY, "Detectors\tCtrl+2")
+            detectors_item = detectors_menu.Append(wx.ID_ANY, "Detectors\tCtrl+3")
             menu_bar.Append(detectors_menu, "&Detectors")
 
             controllers_menu = wx.Menu()
-            controllers_item = controllers_menu.Append(wx.ID_ANY, "Controllers\tCtrl+3")
+            controllers_item = controllers_menu.Append(wx.ID_ANY, "Controllers\tCtrl+4")
             menu_bar.Append(controllers_menu, "C&ontrollers")
 
             positioners_menu = wx.Menu()
-            positioners_item = positioners_menu.Append(wx.ID_ANY, "Positioners\tCtrl+4")
+            positioners_item = positioners_menu.Append(wx.ID_ANY, "Positioners\tCtrl+5")
             menu_bar.Append(positioners_menu, "&Positioners")
 
             self.SetMenuBar(menu_bar)
@@ -208,6 +216,7 @@ class MainView(wx.Frame):
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._save_config_as_cb), save_as_item)
             self.Bind(wx.EVT_MENU, lambda _e: self.Close(), exit_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_general_cb), general_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_crysalis_cb), crysalis_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_detectors_cb), detectors_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_controllers_cb), controllers_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_positioners_cb), positioners_item)
@@ -227,6 +236,7 @@ class MainView(wx.Frame):
             ],
         )
         bar.append_action("General", lambda: self._fire(self._open_general_cb))
+        bar.append_action("CrysAlis", lambda: self._fire(self._open_crysalis_cb))
         bar.append_action("Detectors", lambda: self._fire(self._open_detectors_cb))
         bar.append_action("Controllers", lambda: self._fire(self._open_controllers_cb))
         bar.append_action("Positioners", lambda: self._fire(self._open_positioners_cb))

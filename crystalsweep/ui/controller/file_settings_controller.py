@@ -75,6 +75,10 @@ class FileSettingsController:
         self._model.file_settings.use_crysalis = True
         self._view.file_settings.set_crysalis_calibration_label(path)
         self._view.file_settings.set_crysalis(True)
+        if cfg.crysalis_set_path:
+            self._model.file_settings.crysalis_set_file = Path(cfg.crysalis_set_path)
+        if cfg.crysalis_ccd_path:
+            self._model.file_settings.crysalis_ccd_file = Path(cfg.crysalis_ccd_path)
         _log.debug("apply_crysalis_from_config: loaded %s", path)
 
     def _sync_format_from_detector(self) -> None:

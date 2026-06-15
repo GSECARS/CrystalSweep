@@ -16,7 +16,9 @@
 #     "filepath":    "<local directory containing the data files>",
 #     "basename":    "<filename stem WITHOUT frame number, e.g. t1_pos1>",
 #     "filenumber":  1,
-#     "par_file":    "<path to .par calibration file; .ccd and .set are siblings>",
+#     "par_file":    "<path to .par calibration file>",
+#     "set_file":    "<explicit path to .set file; if empty, derived from par_file path>",
+#     "ccd_file":    "<explicit path to .ccd file; if empty, derived from par_file path>",
 #     "scan_info":   {<esperanto_scan_info dict>},
 #     "file_format": "hdf5" | "cbf"
 #   }
@@ -47,10 +49,15 @@ def _make_directory(filepath: str, basename: str, output_dir: str | None = None)
     return new_directory
 
 
-def _copy_set_ccd(new_directory: str, basename: str, par_file: str) -> None:
+def _copy_set_ccd(new_directory: str, basename: str, par_file: str, set_file: str = "", ccd_file: str = "") -> None:
     par_path = Path(par_file)
+    explicit = {".set": set_file, ".ccd": ccd_file}
     for ext in (".set", ".ccd"):
-        src = par_path.with_suffix(ext)
+        explicit_path = explicit[ext]
+        if explicit_path:
+            src = Path(explicit_path)
+        else:
+            src = par_path.with_suffix(ext)
         if not src.is_file():
             _log.warning("Companion %s file not found: %s", ext, src)
             continue
@@ -172,6 +179,8 @@ def run_conversion(args: dict) -> None:
     basename = args["basename"]
     filenumber = int(args.get("filenumber", 1))
     par_file = args.get("par_file", "")
+    set_file = args.get("set_file", "")
+    ccd_file = args.get("ccd_file", "")
     scan_info = args.get("scan_info", {})
     file_format = args.get("file_format", "hdf5")
     output_dir = args.get("output_dir") or None
@@ -183,7 +192,7 @@ def run_conversion(args: dict) -> None:
 
     if par_file and os.path.isfile(par_file):
         _create_par_file(new_directory, full_basename, par_file)
-        _copy_set_ccd(new_directory, full_basename, par_file)
+        _copy_set_ccd(new_directory, full_basename, par_file, set_file=set_file, ccd_file=ccd_file)
     else:
         _log.warning("Par file not found: %s", par_file)
 

@@ -1203,6 +1203,8 @@ class CollectController:
             "basename": basename,
             "filenumber": filenumber,
             "par_file": str(fs.crysalis_calibration),
+            "set_file": str(fs.crysalis_set_file) if fs.crysalis_set_file is not None else "",
+            "ccd_file": str(fs.crysalis_ccd_file) if fs.crysalis_ccd_file is not None else "",
             "scan_info": scan_info,
             "file_format": file_format,
             "output_dir": crysalis_output_dir,
