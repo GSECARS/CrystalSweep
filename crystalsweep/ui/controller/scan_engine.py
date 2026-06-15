@@ -714,14 +714,19 @@ class ScanEngine:
                     if self._abort_event.is_set():
                         on_done()
                         return
-                    _open_shutter_at_start = lambda: (self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config))
+
+                    def _open_shutter_at_start() -> None:
+                        if keep_shutter_open:
+                            self._open_shutter_once(config)
+                        else:
+                            self._open_shutter(config)
+
                     driver.run_array(lambda i, pos: on_frame(i + 1, n_points), n_points, on_at_start=_open_shutter_at_start)
                 else:
                     driver.prepare(spec)
                     if self._abort_event.is_set():
                         on_done()
                         return
-                    _open_shutter_at_start = lambda: (self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config))
                     driver.run(spec, lambda i, pos: on_frame(i + 1, n_points), on_at_start=_open_shutter_at_start)
                 while caget(acquire_pv) and not self._abort_event.is_set():
                     time.sleep(0.05)
