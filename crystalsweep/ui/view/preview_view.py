@@ -478,11 +478,17 @@ class PreviewView(wx.Panel):
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
+        header_row = wx.BoxSizer(wx.HORIZONTAL)
         header = wx.StaticText(panel, label="Original Positions")
         header.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
         header.SetForegroundColour(FG_SECONDARY)
         header.SetBackgroundColour(BG_CARD)
-        sizer.Add(header, 0, wx.BOTTOM, 6)
+        self._originals_go_btn = FlatButton(panel, "Go")
+        self._originals_go_btn.SetMinSize((36, 22))
+        self._originals_go_btn.Enable(False)
+        header_row.Add(header, 0, wx.ALIGN_CENTER_VERTICAL)
+        header_row.Add(self._originals_go_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
+        sizer.Add(header_row, 0, wx.BOTTOM, 6)
 
         empty_label = wx.StaticText(panel, label="No preview snapshot yet.")
         empty_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
@@ -506,25 +512,27 @@ class PreviewView(wx.Panel):
 
         if not positions and max_intensity is None:
             self._originals_empty_label.Show()
+            self._originals_go_btn.Enable(False)
             self._originals_panel.Layout()
             return
 
         self._originals_empty_label.Hide()
+        on_go_all = self._make_go_invoker("original", None)
+        self._originals_go_btn.set_action(on_go_all)
+        self._originals_go_btn.Enable(True)
 
         for key, label_text, value, precision in positions:
-            on_go = self._make_go_invoker("original", key)
             row, _, _ = self._make_snapshot_row(
                 self._originals_panel,
                 label_text,
                 self._format_original_position(value, precision),
-                on_go,
+                None,
             )
             self._originals_sizer.Add(row, 0, wx.EXPAND | wx.BOTTOM, 2)
             self._original_rows.append(row)
 
         if max_intensity is not None:
-            on_go = self._make_go_invoker("original", None)
-            row, _, _ = self._make_snapshot_row(self._originals_panel, "Max intensity", f"{max_intensity:.4g}", on_go)
+            row, _, _ = self._make_snapshot_row(self._originals_panel, "Max intensity", f"{max_intensity:.4g}", None)
             self._originals_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
             self._original_rows.append(row)
 
@@ -573,11 +581,6 @@ class PreviewView(wx.Panel):
         s.Add(label, 0, wx.ALIGN_CENTER_VERTICAL)
         s.AddStretchSpacer(1)
         s.Add(value, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
-        if on_go is not None:
-            go_btn = FlatButton(row, "Go")
-            go_btn.SetMinSize((36, 22))
-            go_btn.set_action(on_go)
-            s.Add(go_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 6)
         row.SetSizer(s)
         return row, value, go_btn
 
@@ -592,22 +595,29 @@ class PreviewView(wx.Panel):
             return "—"
 
     def _build_currents_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
-        return self._build_snapshot_column("Current Positions")
+        return self._build_snapshot_column("Current Positions", "_currents_go_btn")
 
     def _build_bests_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
-        return self._build_snapshot_column("Best Positions")
+        return self._build_snapshot_column("Best Positions", "_bests_go_btn")
 
-    def _build_snapshot_column(self, title: str) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
+    def _build_snapshot_column(self, title: str, go_btn_attr: str) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
         panel = wx.Panel(self, style=wx.BORDER_NONE)
         panel.SetBackgroundColour(BG_CARD)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
+        header_row = wx.BoxSizer(wx.HORIZONTAL)
         header = wx.StaticText(panel, label=title)
         header.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
         header.SetForegroundColour(FG_SECONDARY)
         header.SetBackgroundColour(BG_CARD)
-        sizer.Add(header, 0, wx.BOTTOM, 6)
+        go_btn = FlatButton(panel, "Go")
+        go_btn.SetMinSize((36, 22))
+        go_btn.Enable(False)
+        setattr(self, go_btn_attr, go_btn)
+        header_row.Add(header, 0, wx.ALIGN_CENTER_VERTICAL)
+        header_row.Add(go_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
+        sizer.Add(header_row, 0, wx.BOTTOM, 6)
 
         empty_label = wx.StaticText(panel, label="No preview snapshot yet.")
         empty_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
@@ -677,22 +687,24 @@ class PreviewView(wx.Panel):
 
         if not positions and original_max_intensity is None:
             self._currents_empty_label.Show()
+            self._currents_go_btn.Enable(False)
             self._currents_panel.Layout()
             return
 
         self._currents_empty_label.Hide()
+        on_go_all = self._make_go_invoker("current", None)
+        self._currents_go_btn.set_action(on_go_all)
+        self._currents_go_btn.Enable(True)
 
         for key, label_text, value, precision in positions:
             value_text = self._format_original_position(value, precision)
-            on_go = self._make_go_invoker("current", key)
-            row, value_label, _ = self._make_snapshot_row(self._currents_panel, label_text, value_text, on_go)
+            row, value_label, _ = self._make_snapshot_row(self._currents_panel, label_text, value_text, None)
             self._currents_sizer.Add(row, 0, wx.EXPAND | wx.BOTTOM, 2)
             self._current_motor_rows[key] = (row, value_label, precision)
 
         if original_max_intensity is not None:
             max_text = self._format_max(max_intensity)
-            on_go = self._make_go_invoker("current", None)
-            row, value_label, _ = self._make_snapshot_row(self._currents_panel, "Max intensity", max_text, on_go)
+            row, value_label, _ = self._make_snapshot_row(self._currents_panel, "Max intensity", max_text, None)
             self._currents_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
             self._current_max_row = row
             self._current_max_value = value_label
@@ -746,21 +758,23 @@ class PreviewView(wx.Panel):
 
         if not positions and max_intensity is None:
             self._bests_empty_label.Show()
+            self._bests_go_btn.Enable(False)
             self._bests_panel.Layout()
             return
 
         self._bests_empty_label.Hide()
+        on_go_all = self._make_go_invoker("best", None)
+        self._bests_go_btn.set_action(on_go_all)
+        self._bests_go_btn.Enable(True)
 
         for key, label_text, value, precision in positions:
             value_text = self._format_original_position(value, precision)
-            on_go = self._make_go_invoker("best", key)
-            row, value_label, _ = self._make_snapshot_row(self._bests_panel, label_text, value_text, on_go)
+            row, value_label, _ = self._make_snapshot_row(self._bests_panel, label_text, value_text, None)
             self._bests_sizer.Add(row, 0, wx.EXPAND | wx.BOTTOM, 2)
             self._best_motor_rows[key] = (row, value_label, precision)
 
         if max_intensity is not None:
-            on_go = self._make_go_invoker("best", None)
-            row, value_label, _ = self._make_snapshot_row(self._bests_panel, "Max intensity", self._format_max(max_intensity), on_go)
+            row, value_label, _ = self._make_snapshot_row(self._bests_panel, "Max intensity", self._format_max(max_intensity), None)
             self._bests_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
             self._best_max_row = row
             self._best_max_value = value_label
