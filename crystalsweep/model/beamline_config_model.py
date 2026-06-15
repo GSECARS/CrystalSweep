@@ -135,6 +135,13 @@ class BeamlineConfig:
     crysalis_set_path: str = ""
     crysalis_ccd_path: str = ""
     crysalis_load_on_startup: bool = False
+    crysalis_wavelength: float = 0.2952
+    crysalis_distance: float = 200.0
+    crysalis_center_x: float = 0.0
+    crysalis_center_y: float = 0.0
+    crysalis_alpha: float = 50.0
+    crysalis_polarization: float = 0.99
+    crysalis_pixel_size: float = 0.075
     shutter_pv: str = ""
     shutter_open_value: str = ""
     shutter_close_value: str = ""
@@ -317,6 +324,13 @@ class BeamlineConfigModel:
             crysalis_set_path=str(data.get("crysalis_set_path", "")),
             crysalis_ccd_path=str(data.get("crysalis_ccd_path", "")),
             crysalis_load_on_startup=bool(data.get("crysalis_load_on_startup", False)),
+            crysalis_wavelength=float(data.get("crysalis_wavelength", 0.2952)),
+            crysalis_distance=float(data.get("crysalis_distance", 200.0)),
+            crysalis_center_x=float(data.get("crysalis_center_x", 0.0)),
+            crysalis_center_y=float(data.get("crysalis_center_y", 0.0)),
+            crysalis_alpha=float(data.get("crysalis_alpha", 50.0)),
+            crysalis_polarization=float(data.get("crysalis_polarization", 0.99)),
+            crysalis_pixel_size=float(data.get("crysalis_pixel_size", 0.075)),
             shutter_pv=str(data.get("shutter_pv", "")),
             shutter_open_value=str(data.get("shutter_open_value", "")),
             shutter_close_value=str(data.get("shutter_close_value", "")),
@@ -384,6 +398,13 @@ class BeamlineConfigModel:
             "crysalis_set_path": config.crysalis_set_path,
             "crysalis_ccd_path": config.crysalis_ccd_path,
             "crysalis_load_on_startup": config.crysalis_load_on_startup,
+            "crysalis_wavelength": config.crysalis_wavelength,
+            "crysalis_distance": config.crysalis_distance,
+            "crysalis_center_x": config.crysalis_center_x,
+            "crysalis_center_y": config.crysalis_center_y,
+            "crysalis_alpha": config.crysalis_alpha,
+            "crysalis_polarization": config.crysalis_polarization,
+            "crysalis_pixel_size": config.crysalis_pixel_size,
             "shutter_pv": config.shutter_pv,
             "shutter_open_value": config.shutter_open_value,
             "shutter_close_value": config.shutter_close_value,

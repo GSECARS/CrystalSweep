@@ -1035,10 +1035,55 @@ class CrysalisConfigView(wx.Panel):
         c_sizer.Add(self._crysalis_startup_chk, 0)
         c_body.SetSizer(c_sizer)
 
+        self._geometry_section = _Section(self, "Geometry")
+        g_body = self._geometry_section.body
+
+        self._wavelength_ctrl = DarkTextCtrl(g_body, value="0.2952", placeholder="e.g. 0.2952")
+        self._wavelength_ctrl.set_restrict_to_float(True)
+        self._wavelength_ctrl.SetMinSize((-1, 28))
+        self._distance_ctrl = DarkTextCtrl(g_body, value="200.0", placeholder="e.g. 200.0")
+        self._distance_ctrl.set_restrict_to_float(True)
+        self._distance_ctrl.SetMinSize((-1, 28))
+        self._center_x_ctrl = DarkTextCtrl(g_body, value="0.0", placeholder="e.g. 1556.0")
+        self._center_x_ctrl.set_restrict_to_float(True)
+        self._center_x_ctrl.SetMinSize((-1, 28))
+        self._center_y_ctrl = DarkTextCtrl(g_body, value="0.0", placeholder="e.g. 1634.0")
+        self._center_y_ctrl.set_restrict_to_float(True)
+        self._center_y_ctrl.SetMinSize((-1, 28))
+        self._alpha_ctrl = DarkTextCtrl(g_body, value="50.0", placeholder="e.g. 50.0")
+        self._alpha_ctrl.set_restrict_to_float(True)
+        self._alpha_ctrl.SetMinSize((-1, 28))
+        self._polarization_ctrl = DarkTextCtrl(g_body, value="0.99", placeholder="e.g. 0.99")
+        self._polarization_ctrl.set_restrict_to_float(True)
+        self._polarization_ctrl.SetMinSize((-1, 28))
+        self._pixel_size_ctrl = DarkTextCtrl(g_body, value="0.075", placeholder="e.g. 0.075")
+        self._pixel_size_ctrl.set_restrict_to_float(True)
+        self._pixel_size_ctrl.SetMinSize((-1, 28))
+
+        g_grid = wx.FlexGridSizer(rows=7, cols=2, vgap=6, hgap=8)
+        g_grid.AddGrowableCol(1, 1)
+        for label_text, ctrl in (
+            ("Wavelength (Å)", self._wavelength_ctrl),
+            ("Distance (mm)", self._distance_ctrl),
+            ("Beam center X (px)", self._center_x_ctrl),
+            ("Beam center Y (px)", self._center_y_ctrl),
+            ("Alpha (°)", self._alpha_ctrl),
+            ("Polarization", self._polarization_ctrl),
+            ("Pixel size (mm)", self._pixel_size_ctrl),
+        ):
+            lbl = wx.StaticText(g_body, label=label_text)
+            lbl.SetForegroundColour(FG_SECONDARY)
+            lbl.SetBackgroundColour(g_body.GetBackgroundColour())
+            lbl.SetFont(scaled_font(11))
+            g_grid.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+            g_grid.Add(ctrl, 0, wx.EXPAND)
+        g_body.SetSizer(g_grid)
+
         self._status_label = _status_label(self)
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(self._crysalis_section, 0, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._geometry_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
         self.SetMinSize((400, -1))
@@ -1051,6 +1096,13 @@ class CrysalisConfigView(wx.Panel):
         self._crysalis_set_ctrl.SetValue(config.crysalis_set_path)
         self._crysalis_ccd_ctrl.SetValue(config.crysalis_ccd_path)
         self._crysalis_startup_chk.SetValue(config.crysalis_load_on_startup)
+        self._wavelength_ctrl.SetValue(f"{config.crysalis_wavelength:g}")
+        self._distance_ctrl.SetValue(f"{config.crysalis_distance:g}")
+        self._center_x_ctrl.SetValue(f"{config.crysalis_center_x:g}")
+        self._center_y_ctrl.SetValue(f"{config.crysalis_center_y:g}")
+        self._alpha_ctrl.SetValue(f"{config.crysalis_alpha:g}")
+        self._polarization_ctrl.SetValue(f"{config.crysalis_polarization:g}")
+        self._pixel_size_ctrl.SetValue(f"{config.crysalis_pixel_size:g}")
         self.set_status("")
 
     def crysalis_par_path(self) -> str:
@@ -1064,6 +1116,33 @@ class CrysalisConfigView(wx.Panel):
 
     def crysalis_load_on_startup(self) -> bool:
         return self._crysalis_startup_chk.GetValue()
+
+    def _float_val(self, ctrl: DarkTextCtrl, default: float) -> float:
+        try:
+            return float(ctrl.GetValue().strip())
+        except ValueError:
+            return default
+
+    def crysalis_wavelength(self) -> float:
+        return self._float_val(self._wavelength_ctrl, 0.2952)
+
+    def crysalis_distance(self) -> float:
+        return self._float_val(self._distance_ctrl, 200.0)
+
+    def crysalis_center_x(self) -> float:
+        return self._float_val(self._center_x_ctrl, 0.0)
+
+    def crysalis_center_y(self) -> float:
+        return self._float_val(self._center_y_ctrl, 0.0)
+
+    def crysalis_alpha(self) -> float:
+        return self._float_val(self._alpha_ctrl, 50.0)
+
+    def crysalis_polarization(self) -> float:
+        return self._float_val(self._polarization_ctrl, 0.99)
+
+    def crysalis_pixel_size(self) -> float:
+        return self._float_val(self._pixel_size_ctrl, 0.075)
 
     def set_status(self, text: str, error: bool = False) -> None:
         self._status_label.SetForegroundColour(DANGER if error else FG_SECONDARY)
@@ -1568,7 +1647,7 @@ class GeneralConfigDialog(_ConfigDialog):
 
 class CrysalisConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "CrysAlis configuration", size=(660, 380))
+        super().__init__(parent, "CrysAlis configuration", size=(660, 620))
 
     def _make_panel(self, viewport: wx.Panel) -> CrysalisConfigView:
         return CrysalisConfigView(viewport)

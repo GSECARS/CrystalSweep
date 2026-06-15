@@ -210,6 +210,13 @@ class BeamlineConfigController:
         crysalis_set_path = self._crysalis_dlg.config_panel.crysalis_set_path() if self._crysalis_dlg else base.crysalis_set_path
         crysalis_ccd_path = self._crysalis_dlg.config_panel.crysalis_ccd_path() if self._crysalis_dlg else base.crysalis_ccd_path
         crysalis_load_on_startup = self._crysalis_dlg.config_panel.crysalis_load_on_startup() if self._crysalis_dlg else base.crysalis_load_on_startup
+        crysalis_wavelength = self._crysalis_dlg.config_panel.crysalis_wavelength() if self._crysalis_dlg else base.crysalis_wavelength
+        crysalis_distance = self._crysalis_dlg.config_panel.crysalis_distance() if self._crysalis_dlg else base.crysalis_distance
+        crysalis_center_x = self._crysalis_dlg.config_panel.crysalis_center_x() if self._crysalis_dlg else base.crysalis_center_x
+        crysalis_center_y = self._crysalis_dlg.config_panel.crysalis_center_y() if self._crysalis_dlg else base.crysalis_center_y
+        crysalis_alpha = self._crysalis_dlg.config_panel.crysalis_alpha() if self._crysalis_dlg else base.crysalis_alpha
+        crysalis_polarization = self._crysalis_dlg.config_panel.crysalis_polarization() if self._crysalis_dlg else base.crysalis_polarization
+        crysalis_pixel_size = self._crysalis_dlg.config_panel.crysalis_pixel_size() if self._crysalis_dlg else base.crysalis_pixel_size
         shutter_pv = self._general_dlg.config_panel.shutter_pv() if self._general_dlg else base.shutter_pv
         shutter_open_value = self._general_dlg.config_panel.shutter_open_value() if self._general_dlg else base.shutter_open_value
         shutter_close_value = self._general_dlg.config_panel.shutter_close_value() if self._general_dlg else base.shutter_close_value
@@ -246,6 +253,13 @@ class BeamlineConfigController:
             crysalis_set_path=crysalis_set_path,
             crysalis_ccd_path=crysalis_ccd_path,
             crysalis_load_on_startup=crysalis_load_on_startup,
+            crysalis_wavelength=crysalis_wavelength,
+            crysalis_distance=crysalis_distance,
+            crysalis_center_x=crysalis_center_x,
+            crysalis_center_y=crysalis_center_y,
+            crysalis_alpha=crysalis_alpha,
+            crysalis_polarization=crysalis_polarization,
+            crysalis_pixel_size=crysalis_pixel_size,
             shutter_pv=shutter_pv,
             shutter_open_value=shutter_open_value,
             shutter_close_value=shutter_close_value,

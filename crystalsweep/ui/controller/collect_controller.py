@@ -1172,6 +1172,7 @@ class CollectController:
             step = 0.0
             count = 1
 
+        wavelength = config.crysalis_wavelength
         scan_info = {
             "omega_start": omega_start,
             "omega_end": omega_end,
@@ -1180,21 +1181,21 @@ class CollectController:
             "kappa": 0.0,
             "theta": 0.0,
             "phi": 0.0,
-            "alpha": 50.0,
-            "dist": 200.0,
-            "center_x": 0.0,
-            "center_y": 0.0,
-            "mono": 0.99,
-            "wavelength": 0.2952,
+            "alpha": config.crysalis_alpha,
+            "dist": config.crysalis_distance,
+            "center_x": config.crysalis_center_x,
+            "center_y": config.crysalis_center_y,
+            "mono": config.crysalis_polarization,
+            "wavelength": wavelength,
             "dtheta": 0.0,
             "dkappa": 0.0,
             "dphi": 0.0,
             "Exposure_time": exposure_time,
-            "pixel_size": 0.075,
-            "l1": 0.2952,
-            "l2": 0.2952,
-            "l12": 0.2952,
-            "b": 0.2952,
+            "pixel_size": config.crysalis_pixel_size,
+            "l1": wavelength,
+            "l2": wavelength,
+            "l12": wavelength,
+            "b": wavelength,
             "monotype": "SYNCHROTRON",
         }
 
