@@ -29,7 +29,7 @@ _log = logging.getLogger(__name__)
 
 _PLUGIN_MAP: dict[str, str] = {
     "hdf5": "HDF1",
-    "cbf": "CBF1",
+    "cbf": "TIFF1",
     "tif": "TIFF1",
 }
 
@@ -139,8 +139,8 @@ class ADEigerModel:
 
     def save_cbf(self) -> None:
         p = self._prefix
-        caput(f"{p}CBF1:NumCapture", 1)
-        caput(f"{p}CBF1:Capture", 1)
+        caput(f"{p}TIFF1:NumCapture", 1)
+        caput(f"{p}TIFF1:Capture", 1)
 
     def fetch_file_info(self) -> tuple[str, str, int]:
         p = self._prefix
@@ -191,8 +191,8 @@ class ADEigerModel:
             caput(f"{p}TIFF1:NumCapture", n_frames)
             caput(f"{p}TIFF1:Capture", 1)
         else:
-            caput(f"{p}CBF1:NumCapture", n_frames)
-            caput(f"{p}CBF1:Capture", 1)
+            caput(f"{p}TIFF1:NumCapture", n_frames)
+            caput(f"{p}TIFF1:Capture", 1)
         _log.debug("ADEigerModel arm_plugin: %s plugin=%s n_frames=%d", p, plugin, n_frames)
 
     def collect_frame(self, exposure: float) -> None:
@@ -311,8 +311,8 @@ class ADPilatusModel:
 
     def save_cbf(self) -> None:
         p = self._prefix
-        caput(f"{p}CBF1:NumCapture", 1)
-        caput(f"{p}CBF1:Capture", 1)
+        caput(f"{p}TIFF1:NumCapture", 1)
+        caput(f"{p}TIFF1:Capture", 1)
 
     def fetch_file_info(self) -> tuple[str, str, int]:
         p = self._prefix
@@ -363,8 +363,8 @@ class ADPilatusModel:
             caput(f"{p}TIFF1:NumCapture", n_frames)
             caput(f"{p}TIFF1:Capture", 1)
         else:
-            caput(f"{p}CBF1:NumCapture", n_frames)
-            caput(f"{p}CBF1:Capture", 1)
+            caput(f"{p}TIFF1:NumCapture", n_frames)
+            caput(f"{p}TIFF1:Capture", 1)
         _log.debug("ADPilatusModel arm_plugin: %s plugin=%s n_frames=%d", p, plugin, n_frames)
 
     def collect_frame(self, exposure: float) -> None:
@@ -483,8 +483,8 @@ class ADSpinnakerModel:
 
     def save_cbf(self) -> None:
         p = self._prefix
-        caput(f"{p}CBF1:NumCapture", 1)
-        caput(f"{p}CBF1:Capture", 1)
+        caput(f"{p}TIFF1:NumCapture", 1)
+        caput(f"{p}TIFF1:Capture", 1)
 
     def fetch_file_info(self) -> tuple[str, str, int]:
         p = self._prefix
@@ -535,8 +535,8 @@ class ADSpinnakerModel:
             caput(f"{p}TIFF1:NumCapture", n_frames)
             caput(f"{p}TIFF1:Capture", 1)
         else:
-            caput(f"{p}CBF1:NumCapture", n_frames)
-            caput(f"{p}CBF1:Capture", 1)
+            caput(f"{p}TIFF1:NumCapture", n_frames)
+            caput(f"{p}TIFF1:Capture", 1)
         _log.debug("ADSpinnakerModel arm_plugin: %s plugin=%s n_frames=%d", p, plugin, n_frames)
 
     def collect_frame(self, exposure: float) -> None:

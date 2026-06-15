@@ -333,7 +333,7 @@ class ScanEngine:
             self._thread.start()
 
         else:
-            _PLUGIN_MAP = {"hdf5": "HDF1", "cbf": "CBF1", "tif": "TIFF1"}
+            _PLUGIN_MAP = {"hdf5": "HDF1", "cbf": "TIFF1", "tif": "TIFF1"}
             plugin = _PLUGIN_MAP.get(det.file_format, "HDF1")
             capture_pv = f"{prefix}{plugin}:Capture_RBV"
 
