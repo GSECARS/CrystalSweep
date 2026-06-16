@@ -54,6 +54,7 @@ __all__ = [
     "DarkAbortingDialog",
     "DarkCombo",
     "DarkConfirmDialog",
+    "DarkMessageDialog",
     "DarkMenuBar",
     "DarkScrollBar",
     "DarkHScrollBar",
@@ -1673,6 +1674,46 @@ class DarkAbortingDialog(wx.Dialog):
             self._status_label.SetLabel("\nCleanup complete.")
             self._ok_btn.Enable(True)
             self._ok_btn.SetFocus()
+
+
+class DarkMessageDialog(wx.Dialog):
+    """Dark-themed single-button message dialog (OK only)."""
+
+    def __init__(self, parent: wx.Window, message: str, title: str) -> None:
+        super().__init__(parent, title=title, style=wx.DEFAULT_DIALOG_STYLE)
+        self.SetBackgroundColour(BG_SURFACE)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        msg_label = wx.StaticText(self, label=message)
+        msg_label.SetForegroundColour(FG_PRIMARY)
+        msg_label.SetBackgroundColour(BG_SURFACE)
+        msg_label.SetFont(scaled_font(12))
+        msg_label.Wrap(380)
+        outer.Add(msg_label, 0, wx.ALL, 20)
+
+        sep = wx.Panel(self, size=(-1, 1))
+        sep.SetBackgroundColour(SEP_COLOUR)
+        outer.Add(sep, 0, wx.EXPAND)
+
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        btn_sizer.AddStretchSpacer()
+        btn_ok = FlatButton(self, "OK")
+        btn_ok.SetMinSize((80, 28))
+        btn_ok.set_action(lambda: self.EndModal(wx.ID_OK))
+        btn_sizer.Add(btn_ok, 0, wx.ALL, 8)
+        outer.Add(btn_sizer, 0, wx.EXPAND)
+
+        self.SetSizer(outer)
+        self.Fit()
+        self.CentreOnParent()
+        self.Bind(wx.EVT_CHAR_HOOK, self._on_key)
+
+    def _on_key(self, event: wx.KeyEvent) -> None:
+        if event.GetKeyCode() in (wx.WXK_RETURN, wx.WXK_ESCAPE):
+            self.EndModal(wx.ID_OK)
+        else:
+            event.Skip()
 
 
 class DarkConfirmDialog(wx.Dialog):

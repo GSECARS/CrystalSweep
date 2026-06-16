@@ -24,6 +24,7 @@ from epics import caget, camonitor, camonitor_clear, caput
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.beamline_config_model import BeamlineConfig, DetectorConfig, MotorConfig
+from crystalsweep.ui.view.custom.widgets import DarkMessageDialog
 from crystalsweep.ui.view.preview_view import CenteringMotorSpec, PreviewView
 
 __all__ = ["PreviewController"]
@@ -228,11 +229,11 @@ class PreviewController:
         if self._previewing:
             return
         if not self._model.ad_viewer.has_roi:
-            wx.MessageBox(
+            DarkMessageDialog(
+                self._view,
                 "Please select an ROI on the image canvas before starting the preview.",
                 "No ROI Selected",
-                wx.OK | wx.ICON_WARNING,
-            )
+            ).ShowModal()
             return
         cfg = self._model.beamline.active
         detector = cfg.active_detector_config if cfg is not None else None
@@ -442,11 +443,11 @@ class PreviewController:
             return
 
         if not self._model.ad_viewer.has_roi:
-            wx.MessageBox(
+            DarkMessageDialog(
+                self._view,
                 "Please select an ROI on the image canvas before running Auto Optimize.",
                 "No ROI Selected",
-                wx.OK | wx.ICON_WARNING,
-            )
+            ).ShowModal()
             return
 
         range_value = self._view.auto_optimize_range
