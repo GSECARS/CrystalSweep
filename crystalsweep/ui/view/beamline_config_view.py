@@ -1489,6 +1489,8 @@ class PositionersConfigView(wx.Panel):
         self._rotation_row.precision_ctrl.SetValue(str(rm.precision) if rm else "4")
         self._rotation_row.beam_angle_ctrl.SetValue(str(rm.beam_angle) if rm else "0.0")
         self._rotation_row.centering_toggle.SetValue(rm.centering_enabled if rm else False)
+        self._rotation_row.xps_group_ctrl.SetValue(rm.xps_group if rm else "")
+        self._rotation_row.xps_positioner_ctrl.SetValue(rm.xps_positioner if rm else "")
         self._refresh_rotation_controller_choices(selected=rm.controller if rm else "epics")
 
         self._clear_motor_rows()
