@@ -470,7 +470,7 @@ class PreviewController:
 
         self._auto_optimize_running = True
         self._auto_optimize_cancel.clear()
-        wx.CallAfter(self._view.set_auto_optimize_enabled, False)
+        wx.CallAfter(self._view.set_auto_optimize_running, True)
 
         def _launch() -> None:
             threading.Thread(
@@ -494,9 +494,12 @@ class PreviewController:
         settle: float,
     ) -> None:
         cancel = self._auto_optimize_cancel
+        aborted = False
+        touched_pvs: list[str] = []
         try:
             for spec in specs:
                 if cancel.is_set() or not self._previewing:
+                    aborted = True
                     return
                 setpoint = _val_pv(spec.pv)
                 readback = _rbv_pv(spec.pv)
@@ -515,22 +518,22 @@ class PreviewController:
                 # Build the 1D grid centred on the start position.
                 half = sweep_range / 2.0
                 n_steps = max(1, int(round(sweep_range / sweep_step)))
-                # Endpoints inclusive; n_steps intervals => n_steps + 1 points.
                 positions = [start - half + i * sweep_step for i in range(n_steps + 1)]
 
                 best_value: float | None = None
                 best_position = start
+                touched_pvs.append(spec.pv)
                 for target in positions:
                     if cancel.is_set() or not self._previewing:
-                        # Abort: leave motor where it currently is.
+                        aborted = True
                         return
                     try:
                         caput(setpoint, target, wait=True)
                     except Exception as exc:
                         _log.warning("Auto optimize: caput %s -> %g failed: %s", spec.pv, target, exc)
                         continue
-                    # Wait for an integration to land for this position.
                     if cancel.wait(settle):
+                        aborted = True
                         return
                     sample = self._model.ad_viewer.last_roi_max_intensity
                     if sample is None:
@@ -541,6 +544,7 @@ class PreviewController:
 
                 # Move motor to its best position before continuing to next motor.
                 if cancel.is_set() or not self._previewing:
+                    aborted = True
                     return
                 try:
                     caput(setpoint, best_position, wait=True)
@@ -552,7 +556,16 @@ class PreviewController:
                         exc,
                     )
         finally:
+            if aborted and touched_pvs:
+                for pv in touched_pvs:
+                    original = self._original_snapshot.get(pv)
+                    if original is not None:
+                        try:
+                            caput(_val_pv(pv), original, wait=True)
+                        except Exception as exc:
+                            _log.warning("Auto optimize: failed to restore %s to %g: %s", pv, original, exc)
             self._auto_optimize_running = False
+            wx.CallAfter(self._view.set_auto_optimize_running, False)
             if self._previewing:
                 wx.CallAfter(self._stop_preview, True)
             else:

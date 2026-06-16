@@ -312,6 +312,23 @@ class PreviewView(wx.Panel):
     def set_auto_optimize_enabled(self, enabled: bool) -> None:
         self._auto_optimize_btn.Enable(enabled)
 
+    def set_auto_optimize_running(self, running: bool) -> None:
+        if running:
+            self._auto_optimize_btn.SetLabel("Stop Optimize")
+            self._auto_optimize_btn._idle_bg = _STOP_SCHEME[0]
+            self._auto_optimize_btn._hover_bg = _STOP_SCHEME[1]
+            self._auto_optimize_btn._press_bg = _STOP_SCHEME[2]
+            self._auto_optimize_btn._idle_fg = _STOP_SCHEME[3]
+            self._auto_optimize_btn._hover_fg = _STOP_SCHEME[4]
+        else:
+            self._auto_optimize_btn.SetLabel("Auto Optimize")
+            self._auto_optimize_btn._idle_bg = _START_SCHEME[0]
+            self._auto_optimize_btn._hover_bg = _START_SCHEME[1]
+            self._auto_optimize_btn._press_bg = _START_SCHEME[2]
+            self._auto_optimize_btn._idle_fg = _START_SCHEME[3]
+            self._auto_optimize_btn._hover_fg = _START_SCHEME[4]
+        self._auto_optimize_btn.Refresh()
+
     @staticmethod
     def _parse_positive_float(raw: str) -> float | None:
         raw = (raw or "").strip()
