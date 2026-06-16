@@ -20,6 +20,8 @@ from pathlib import Path
 
 import tomli_w
 
+from crystalsweep.paths import user_config_dir
+
 __all__ = ["BeamlineConfig", "BeamlineConfigModel", "ControllerConfig", "DetectorConfig", "MotorConfig"]
 
 _ACTIVE_FILE_NAME = ".active"
@@ -168,8 +170,8 @@ class BeamlineConfig:
 class BeamlineConfigModel:
     """Loads, lists, and saves beamline configuration files (TOML) under a directory."""
 
-    def __init__(self, directory: Path | str = "configs") -> None:
-        self._directory = Path(directory)
+    def __init__(self, directory: Path | str | None = None) -> None:
+        self._directory = Path(directory) if directory is not None else user_config_dir()
         self._directory.mkdir(parents=True, exist_ok=True)
         self._active: BeamlineConfig = BeamlineConfig()
 
