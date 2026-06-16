@@ -101,6 +101,9 @@ class PreviewController:
             # Stop any in-flight preview before tearing down state.
             self._stop_preview(restore=True)
         self._clear_monitors()
+        self._view.clear_original_positions()
+        self._view.clear_current_positions()
+        self._view.clear_best_positions()
         specs = self._collect_specs(cfg)
         self._current_specs = specs
         self._view.set_centering_motors(specs)
@@ -352,9 +355,6 @@ class PreviewController:
 
         self._previewing = False
         self._view.set_previewing(False)
-        self._view.clear_original_positions()
-        self._view.clear_current_positions()
-        self._view.clear_best_positions()
         self._view.set_auto_optimize_enabled(bool(self._current_specs))
 
         # Cancel any auto-optimize worker.
