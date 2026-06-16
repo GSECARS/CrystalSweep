@@ -49,7 +49,7 @@ class CollectController:
         self._model = model
         self._view = view
         self._abort_event = threading.Event()
-        self._engine = ScanEngine(script_model=model.scripts)
+        self._engine = ScanEngine(script_model=model.scripts, controllers=model.controllers)
         self._engine._abort_event = self._abort_event
         self._thread: threading.Thread | None = None
         self._start_time: float = 0.0

@@ -41,12 +41,23 @@ class ScanEngine:
     still  — trigger one detector frame without moving the rotation motor.
     """
 
-    def __init__(self, script_model: ScriptModel | None = None) -> None:
+    def __init__(self, script_model: ScriptModel | None = None, controllers=None) -> None:
         self._driver = None
         self._thread: threading.Thread | None = None
         self._scripts = script_model
+        self._controllers = controllers
         self._shutter_open = False
         self._abort_event: threading.Event = threading.Event()
+
+    def _inject_shared_connection(self, params: dict, controller_name: str) -> None:
+        if self._controllers is None or not controller_name:
+            return
+        try:
+            conn = self._controllers.get(controller_name)
+        except Exception:
+            conn = None
+        if conn is not None:
+            params["_connection"] = conn
 
     @staticmethod
     def _open_shutter(config: BeamlineConfig) -> None:
@@ -250,6 +261,7 @@ class ScanEngine:
             params["xps_group"] = rotation_cfg.xps_group
         if rotation_cfg.xps_positioner:
             params["xps_positioner"] = rotation_cfg.xps_positioner
+        self._inject_shared_connection(params, rotation_cfg.controller)
 
         controller_type = controller_cfg.type if controller_cfg else rotation_cfg.controller
 
@@ -479,6 +491,7 @@ class ScanEngine:
             params["xps_group"] = rotation_cfg.xps_group
         if rotation_cfg.xps_positioner:
             params["xps_positioner"] = rotation_cfg.xps_positioner
+        self._inject_shared_connection(params, rotation_cfg.controller)
 
         spec = ScanSpec(
             pv=rotation_cfg.pv,
@@ -608,6 +621,7 @@ class ScanEngine:
             params["xps_group"] = motor_cfg.xps_group
         if motor_cfg.xps_positioner:
             params["xps_positioner"] = motor_cfg.xps_positioner
+        self._inject_shared_connection(params, motor_cfg.controller)
 
         spec = ScanSpec(
             pv=motor_cfg.pv,
@@ -676,6 +690,7 @@ class ScanEngine:
 
         controller_cfg = next((c for c in config.controllers if c.name == motor_cfg.controller), None)
         params = dict(controller_cfg.params) if controller_cfg else {}
+        self._inject_shared_connection(params, motor_cfg.controller)
         controller_type = controller_cfg.type if controller_cfg else motor_cfg.controller
 
         detector = get_detector_model(det.type, det.pv_prefix, det.file_format)

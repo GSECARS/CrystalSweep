@@ -70,24 +70,27 @@ class AerotechA1Model:
             raise ValueError(f"exposure must be > 0, got {spec.exposure}.")
 
         p = spec.controller_params
-        for key in ("ip", "axis_name", "counts_per_unit"):
-            if not p.get(key):
-                raise ValueError(f"AerotechA1Model requires controller_params['{key}'].")
-
-        axis = AutomationAxis(
-            name=p["axis_name"],
-            counts_per_unit=float(p["counts_per_unit"]),
-        )
-        self._automation = PyAutomation(
-            ip=p["ip"],
-            axis=[axis],
-            verbose=bool(p.get("verbose", False)),
-            pso_distance_input=getattr(PsoDistanceInput, p.get("pso_distance_input", "iXC4ePrimaryFeedback")),
-            pso_window_input=getattr(PsoWindowInput, p.get("pso_window_input", "iXC4ePrimaryFeedback")),
-            pso_output_pin=getattr(PsoOutputPin, p.get("pso_output_pin", "iXC4eAuxiliaryMarkerDifferential")),
-        )
-        self._automation.enable_controller()
-        _log.debug("AerotechA1Model connected and enabled (%s, axis=%s)", p["ip"], p["axis_name"])
+        shared = p.get("_connection")
+        if isinstance(shared, PyAutomation):
+            self._automation = shared
+        else:
+            for key in ("ip", "axis_name", "counts_per_unit"):
+                if not p.get(key):
+                    raise ValueError(f"AerotechA1Model requires controller_params['{key}'].")
+            axis = AutomationAxis(
+                name=p["axis_name"],
+                counts_per_unit=float(p["counts_per_unit"]),
+            )
+            self._automation = PyAutomation(
+                ip=p["ip"],
+                axis=[axis],
+                verbose=bool(p.get("verbose", False)),
+                pso_distance_input=getattr(PsoDistanceInput, p.get("pso_distance_input", "iXC4ePrimaryFeedback")),
+                pso_window_input=getattr(PsoWindowInput, p.get("pso_window_input", "iXC4ePrimaryFeedback")),
+                pso_output_pin=getattr(PsoOutputPin, p.get("pso_output_pin", "iXC4eAuxiliaryMarkerDifferential")),
+            )
+            self._automation.enable_controller()
+            _log.debug("AerotechA1Model opened connection to %s (axis=%s)", p["ip"], p["axis_name"])
 
         travel_direction = int(p.get("travel_direction", 1))
         trajectory = Trajectory(

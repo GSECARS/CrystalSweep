@@ -416,9 +416,9 @@ class ADPilatusModel:
     def collect_wide(self, exposure: float) -> None:
         p = self._prefix
         plugin = self._plugin
-        acq_time = max(0.001, exposure - 0.001)
+        acq_time = max(0.001, exposure * 0.999 - 0.001)
 
-        caput(f"{p}cam1:TriggerMode", 0, wait=True)
+        caput(f"{p}cam1:TriggerMode", 2, wait=True)
         caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
         caput(f"{p}cam1:NumImages", 1, wait=True)
 
