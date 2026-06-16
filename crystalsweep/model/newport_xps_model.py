@@ -65,31 +65,29 @@ class NewportXPSModel:
 
         group = p.get("xps_group")
         positioner = p.get("xps_positioner")
-        omega_range = abs(spec.end - spec.start)
 
-        if group and positioner and spec.points == 1:
-            self._xps.define_line_trajectories_general(
-                stop_values=[[0, 0, 0, omega_range]],
-                scan_time=spec.exposure,
-                pulse_time=0.1,
-                accel_values=None,
-            )
-            _log.debug("NewportXPSModel wide trajectory defined (range=%.4f exposure=%.4f)", omega_range, spec.exposure)
+        if not group or not positioner:
+            # No XPS axis info — caller will fall through to per-point caputs
+            # in run(); nothing to define on the controller.
+            _log.info("NewportXPSModel prepare: no xps_group/xps_positioner; skipping trajectory definition")
+            return
 
-        elif group and positioner and spec.points > 1:
-            total_time = spec.exposure * spec.points
-            self._xps.define_line_trajectories_general(
-                stop_values=[[0, 0, 0, omega_range]],
-                scan_time=total_time,
-                pulse_time=spec.exposure,
-                accel_values=None,
-            )
-            _log.debug(
-                "NewportXPSModel step trajectory defined (range=%.4f exposure=%.4f points=%d)",
-                omega_range,
-                spec.exposure,
-                spec.points,
-            )
+        # Wide (points == 1) and step (points > 1) both run as array
+        # trajectories, mirroring prepare_array/run_array which is the only
+        # path known to work against the newportxps library.
+        if spec.points == 1:
+            epics_positions = [spec.start, spec.end]
+        else:
+            epics_positions = list(spec.positions())
+
+        self._define_axis_trajectory(spec.pv, epics_positions, spec.exposure, positioner, group)
+        _log.debug(
+            "NewportXPSModel prepare: trajectory defined (group=%s positioner=%s points=%d exposure=%.4f)",
+            group,
+            positioner,
+            len(epics_positions),
+            spec.exposure,
+        )
 
     def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
         if self._aborted:
@@ -100,18 +98,19 @@ class NewportXPSModel:
         group = p.get("xps_group")
         positioner = p.get("xps_positioner")
 
-        if group and positioner and spec.points == 1:
-            if not self._aborted:
-                self._xps.run_line_trajectory_general()
-                _log.debug("NewportXPSModel wide trajectory complete")
-            if not self._aborted:
-                on_point(0, spec.end)
-            return
-
-        if group and positioner and spec.points > 1:
-            if not self._aborted:
-                self._xps.run_line_trajectory_general()
-                _log.debug("NewportXPSModel step trajectory complete (points=%d)", spec.points)
+        if group and positioner:
+            if self._xps is None:
+                raise RuntimeError("XPS not connected. Call prepare() first.")
+            self._xps.arm_trajectory(name="forward", move_to_start=True)
+            if self._aborted:
+                return
+            self._xps.run_trajectory(name="forward", save=False, clean=True, move_to_start=False)
+            _log.debug(
+                "NewportXPSModel trajectory complete (group=%s positioner=%s points=%d)",
+                group,
+                positioner,
+                spec.points,
+            )
             if not self._aborted:
                 on_point(spec.points - 1, spec.end)
             return
@@ -123,10 +122,18 @@ class NewportXPSModel:
             on_point(i, pos)
             _log.debug("NewportXPSModel point %d/%d pos=%.4f", i + 1, spec.points, pos)
 
-    def prepare_array(self, motor_pv: str, epics_positions: list[float], exposure: float, positioner_name: str, group_name: str) -> None:
-        """Prepare an array trajectory for a linear map motor using define_array_trajectory."""
+    def _define_axis_trajectory(
+        self,
+        motor_pv: str,
+        epics_positions: list[float],
+        exposure: float,
+        positioner_name: str,
+        group_name: str,
+    ) -> None:
+        """Select the XPS group, convert EPICS user coords to XPS dial coords,
+        and call define_array_trajectory under the named axis."""
         if self._xps is None:
-            raise RuntimeError("XPS not connected. Call prepare() first.")
+            raise RuntimeError("XPS not connected.")
 
         pv_base = motor_pv.removesuffix(".VAL")
         try:
@@ -145,7 +152,7 @@ class NewportXPSModel:
 
         axis_name = positioner_name
         if axis_name.startswith(group_name):
-            axis_name = axis_name[len(group_name) :].lstrip("-.")
+            axis_name = axis_name[len(group_name):].lstrip("-.")
 
         self._xps.set_trajectory_group(group_name)
         result = self._xps.define_array_trajectory(
@@ -155,8 +162,16 @@ class NewportXPSModel:
             verbose=False,
         )
         if result is None:
-            raise RuntimeError(f"define_array_trajectory failed — check positioner name '{axis_name}' against XPS group '{group_name}' axes.")
-        _log.debug("NewportXPSModel array trajectory defined: %d positions, dtime=%.4f", len(xps_positions), exposure)
+            raise RuntimeError(
+                f"define_array_trajectory failed — check positioner name '{axis_name}' against XPS group '{group_name}' axes."
+            )
+
+    def prepare_array(self, motor_pv: str, epics_positions: list[float], exposure: float, positioner_name: str, group_name: str) -> None:
+        """Prepare an array trajectory for a linear map motor using define_array_trajectory."""
+        if self._xps is None:
+            raise RuntimeError("XPS not connected. Call prepare() first.")
+        self._define_axis_trajectory(motor_pv, epics_positions, exposure, positioner_name, group_name)
+        _log.debug("NewportXPSModel array trajectory defined: %d positions, dtime=%.4f", len(epics_positions), exposure)
 
     def run_array(self, on_point: Callable[[int, float], None], n_points: int, on_at_start: Callable[[], None] | None = None) -> None:
         """Run the previously defined array trajectory."""
