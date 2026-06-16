@@ -283,25 +283,6 @@ class BeamlineConfigController:
             len(config.motors),
         )
 
-        if not config.detectors:
-            msg = "At least one detector is required."
-            self._set_status_all(msg, error=True)
-            wx.MessageBox(msg, "Cannot save configuration", wx.OK | wx.ICON_WARNING)
-            return
-
-        if config.rotation_motor is None or not config.rotation_motor.pv.strip():
-            msg = "Rotation stage PV is required."
-            self._set_status_all(msg, error=True)
-            wx.MessageBox(msg, "Cannot save configuration", wx.OK | wx.ICON_WARNING)
-            return
-
-        shorthands = [m.shorthand for m in config.motors if m.shorthand]
-        if len(shorthands) != len(set(shorthands)):
-            msg = "Motor shorthands must be unique."
-            self._set_status_all(msg, error=True)
-            wx.MessageBox(msg, "Cannot save configuration", wx.OK | wx.ICON_WARNING)
-            return
-
         all_motors = [config.rotation_motor] + list(config.motors) if config.rotation_motor else list(config.motors)
         pvs = [m.pv.strip() for m in all_motors if m.pv.strip()]
 
@@ -310,7 +291,8 @@ class BeamlineConfigController:
             if offline:
                 wx.CallAfter(self._set_status_all, f"Warning: PV(s) unreachable: {', '.join(offline)}", True)
 
-        threading.Thread(target=_check_pvs, daemon=True).start()
+        if pvs:
+            threading.Thread(target=_check_pvs, daemon=True).start()
 
         try:
             path = self._model.beamline.save(config)

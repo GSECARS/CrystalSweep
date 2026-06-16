@@ -87,6 +87,28 @@ class CollectController:
         if config.rotation_motor and config.rotation_motor.pv.strip():
             pvs.append(config.rotation_motor.pv)
         self._monitored_limit_pvs = subscribe_limit_monitors(pvs, lambda **_: wx.CallAfter(self.validate_limits))
+        # Refresh button state for the new config so missing detectors/rotation
+        # motor / duplicate shorthands gate the Collect button immediately.
+        self.validate_limits()
+
+    def _config_readiness_error(self) -> str | None:
+        """Return a user-facing reason the active config is not ready for collection, or None."""
+        if not self._model.beamline.has_active:
+            return "No active beamline config."
+
+        config = self._model.beamline.active
+        if not config.detectors:
+            return "No detectors configured."
+        if config.active_detector_config is None:
+            return "No active detector selected."
+        if config.rotation_motor is None or not config.rotation_motor.pv.strip():
+            return "Rotation stage PV is required."
+
+        shorthands = [m.shorthand for m in config.motors if m.shorthand]
+        if len(shorthands) != len(set(shorthands)):
+            return "Motor shorthands must be unique."
+
+        return None
 
     def _on_collect(self) -> None:
         focused = self._view.FindFocus()
@@ -102,8 +124,9 @@ class CollectController:
             self._view.collect.set_status("No points selected.", wx.Colour(220, 160, 40))
             return
 
-        if not self._model.beamline.has_active:
-            self._view.collect.set_status("No active beamline config.", wx.Colour(220, 80, 40))
+        reason = self._config_readiness_error()
+        if reason is not None:
+            self._view.collect.set_status(reason, wx.Colour(220, 80, 40))
             return
 
         self._abort_event.clear()
@@ -128,8 +151,11 @@ class CollectController:
 
         Marks rows with red outlines and disables the Collect button when violations
         are found.  Clears all markers and re-enables the button when everything is OK.
+        Also gates the Collect button on overall config readiness so an incomplete
+        beamline config (no detector, no rotation stage, etc.) keeps Collect disabled.
         """
-        if not self._model.beamline.has_active:
+        if self._config_readiness_error() is not None:
+            self._view.collect.set_collect_enabled(False)
             return
 
         all_points = self._model.collection.points
@@ -185,7 +211,8 @@ class CollectController:
             self._view.collection_table.set_row_limit_error(idx, in_violation)
             motor_errors, rot_start_error, rot_end_error = field_errors.get(idx, ({}, False, False))
             self._view.collection_table.set_row_field_limit_errors(idx, motor_errors, rot_start_error, rot_end_error)
-        self._view.collect.set_collect_enabled(not violations)
+        ready = self._config_readiness_error() is None
+        self._view.collect.set_collect_enabled(ready and not violations)
 
     @staticmethod
     def _point_frame_weight(point: CollectionPoint) -> int:
