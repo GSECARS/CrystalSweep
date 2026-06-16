@@ -295,9 +295,30 @@ class ADPilatusModel:
             prefix += ":"
         self._prefix = prefix
         self._plugin = _file_plugin(file_format)
+        # ArrayCounter is cumulative across acquisitions, so we baseline it
+        # at the start of each Acquire and report frames-since-start.
+        self._array_counter_baseline: int = 0
+
+    def _snapshot_array_counter(self) -> None:
+        try:
+            self._array_counter_baseline = int(caget(f"{self._prefix}cam1:ArrayCounter_RBV") or 0)
+        except Exception as exc:
+            _log.warning("ADPilatusModel: could not read ArrayCounter_RBV: %s", exc)
+            self._array_counter_baseline = 0
 
     def frames_captured(self) -> int:
-        return int(caget(f"{self._prefix}cam1:NumImagesCounter_RBV") or 0)
+        """Frames captured in the current Acquire window.
+
+        Pilatus increments cam1:ArrayCounter_RBV once per readout (mid-series),
+        while NumImagesCounter_RBV only updates at the end of a multi-image
+        acquisition. Subtract the baseline taken at Acquire start so the value
+        is a per-acquisition frame count starting from 0.
+        """
+        try:
+            current = int(caget(f"{self._prefix}cam1:ArrayCounter_RBV") or 0)
+        except Exception:
+            return 0
+        return max(0, current - self._array_counter_baseline)
 
     def save_hdf5(self) -> None:
         p = self._prefix
@@ -373,6 +394,7 @@ class ADPilatusModel:
         caput(f"{p}cam1:TriggerMode", 0, wait=True)
         caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
         caput(f"{p}cam1:NumImages", 1, wait=True)
+        self._snapshot_array_counter()
         caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
         _log.debug("ADPilatusModel collect_frame: %s exposure=%.4f done", p, exposure)
 
@@ -387,6 +409,7 @@ class ADPilatusModel:
 
         self.arm_plugin(n_frames)
 
+        self._snapshot_array_counter()
         caput(f"{p}cam1:Acquire", 1)
         _log.debug("ADPilatusModel step: %s plugin=%s exposure=%.4f n_frames=%d armed", p, plugin, exposure, n_frames)
 
@@ -406,6 +429,7 @@ class ADPilatusModel:
         else:
             self.save_cbf()
 
+        self._snapshot_array_counter()
         caput(f"{p}cam1:Acquire", 1)
         _log.debug("ADPilatusModel wide: %s plugin=%s exposure=%.4f armed", p, plugin, exposure)
 
@@ -425,6 +449,7 @@ class ADPilatusModel:
         else:
             self.save_cbf()
 
+        self._snapshot_array_counter()
         caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
 
         print(f"[detector] Pilatus {p} ({plugin}): still done (exposure={exposure:.4f}s)")
