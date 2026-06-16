@@ -258,10 +258,12 @@ class PreviewView(wx.Panel):
         self.SetSizer(cols)
 
         self._original_rows: list[wx.Window] = []
+        self._current_pair_rows: list[wx.Window] = []
         self._current_motor_rows: dict[str, tuple[wx.Panel, wx.StaticText, int]] = {}
         self._current_max_row: wx.Panel | None = None
         self._current_max_value: wx.StaticText | None = None
         self._original_max_intensity: float | None = None
+        self._best_pair_rows: list[wx.Window] = []
         self._best_motor_rows: dict[str, tuple[wx.Panel, wx.StaticText, int]] = {}
         self._best_max_row: wx.Panel | None = None
         self._best_max_value: wx.StaticText | None = None
@@ -510,10 +512,11 @@ class PreviewView(wx.Panel):
             row.Destroy()
         self._original_rows.clear()
 
-        if not positions and max_intensity is None:
+        if not positions:
             self._originals_empty_label.Show()
             self._originals_go_btn.Enable(False)
             self._originals_panel.Layout()
+            self.Layout()
             return
 
         self._originals_empty_label.Hide()
@@ -521,22 +524,17 @@ class PreviewView(wx.Panel):
         self._originals_go_btn.set_action(on_go_all)
         self._originals_go_btn.Enable(True)
 
-        for key, label_text, value, precision in positions:
-            row, _, _ = self._make_snapshot_row(
-                self._originals_panel,
-                label_text,
-                self._format_original_position(value, precision),
-                None,
-            )
-            self._originals_sizer.Add(row, 0, wx.EXPAND | wx.BOTTOM, 2)
-            self._original_rows.append(row)
+        self._add_motor_pair_rows(
+            self._originals_panel, self._originals_sizer, positions, self._original_rows, None
+        )
 
-        if max_intensity is not None:
-            row, _, _ = self._make_snapshot_row(self._originals_panel, "Max intensity", f"{max_intensity:.4g}", None)
-            self._originals_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
-            self._original_rows.append(row)
+        max_text = f"{max_intensity:.4g}" if max_intensity is not None else "—"
+        row, _, _ = self._make_snapshot_row(self._originals_panel, "Max intensity", max_text, None)
+        self._originals_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
+        self._original_rows.append(row)
 
         self._originals_panel.Layout()
+        self.Layout()
 
     def _make_go_invoker(self, column: str, key: str | None) -> Callable[[], None]:
         def _invoke() -> None:
@@ -583,6 +581,46 @@ class PreviewView(wx.Panel):
         s.Add(value, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
         row.SetSizer(s)
         return row, value, go_btn
+
+    def _add_motor_pair_rows(
+        self,
+        parent: wx.Panel,
+        sizer: wx.BoxSizer,
+        items: list[tuple[str, str, float | None, int]],
+        container_list: list[wx.Window],
+        key_map: dict[str, tuple[wx.Panel, wx.StaticText, int]] | None,
+    ) -> None:
+        """Add motor items to *sizer* two per line. Pair containers go into *container_list*.
+        If *key_map* is provided, maps each item key → (cell_panel, value_label, precision)."""
+        it = iter(items)
+        for left in it:
+            right = next(it, None)
+
+            pair = wx.Panel(parent, style=wx.BORDER_NONE)
+            pair.SetBackgroundColour(BG_CARD)
+            pair_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+            l_key, l_label, l_value, l_prec = left
+            l_cell, l_val_lbl, _ = self._make_snapshot_row(
+                pair, l_label, self._format_original_position(l_value, l_prec), None
+            )
+            pair_sizer.Add(l_cell, 1, wx.EXPAND)
+            if key_map is not None:
+                key_map[l_key] = (l_cell, l_val_lbl, l_prec)
+
+            if right is not None:
+                r_key, r_label, r_value, r_prec = right
+                r_cell, r_val_lbl, _ = self._make_snapshot_row(
+                    pair, r_label, self._format_original_position(r_value, r_prec), None
+                )
+                pair_sizer.AddSpacer(12)
+                pair_sizer.Add(r_cell, 1, wx.EXPAND)
+                if key_map is not None:
+                    key_map[r_key] = (r_cell, r_val_lbl, r_prec)
+
+            pair.SetSizer(pair_sizer)
+            sizer.Add(pair, 0, wx.EXPAND | wx.BOTTOM, 2)
+            container_list.append(pair)
 
     @staticmethod
     def _format_original_position(value: float | None, precision: int) -> str:
@@ -674,10 +712,10 @@ class PreviewView(wx.Panel):
         """Replace the Current Positions list."""
         self._original_max_intensity = original_max_intensity
 
-        for entry in self._current_motor_rows.values():
-            row = entry[0]
-            self._currents_sizer.Detach(row)
-            row.Destroy()
+        for pair in self._current_pair_rows:
+            self._currents_sizer.Detach(pair)
+            pair.Destroy()
+        self._current_pair_rows.clear()
         self._current_motor_rows.clear()
         if self._current_max_row is not None:
             self._currents_sizer.Detach(self._current_max_row)
@@ -685,10 +723,11 @@ class PreviewView(wx.Panel):
             self._current_max_row = None
             self._current_max_value = None
 
-        if not positions and original_max_intensity is None:
+        if not positions:
             self._currents_empty_label.Show()
             self._currents_go_btn.Enable(False)
             self._currents_panel.Layout()
+            self.Layout()
             return
 
         self._currents_empty_label.Hide()
@@ -696,21 +735,20 @@ class PreviewView(wx.Panel):
         self._currents_go_btn.set_action(on_go_all)
         self._currents_go_btn.Enable(True)
 
-        for key, label_text, value, precision in positions:
-            value_text = self._format_original_position(value, precision)
-            row, value_label, _ = self._make_snapshot_row(self._currents_panel, label_text, value_text, None)
-            self._currents_sizer.Add(row, 0, wx.EXPAND | wx.BOTTOM, 2)
-            self._current_motor_rows[key] = (row, value_label, precision)
+        self._add_motor_pair_rows(
+            self._currents_panel, self._currents_sizer, positions,
+            self._current_pair_rows, self._current_motor_rows,
+        )
 
-        if original_max_intensity is not None:
-            max_text = self._format_max(max_intensity)
-            row, value_label, _ = self._make_snapshot_row(self._currents_panel, "Max intensity", max_text, None)
-            self._currents_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
-            self._current_max_row = row
-            self._current_max_value = value_label
-            self._apply_max_colour(max_intensity)
+        max_text = self._format_max(max_intensity)
+        row, value_label, _ = self._make_snapshot_row(self._currents_panel, "Max intensity", max_text, None)
+        self._currents_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
+        self._current_max_row = row
+        self._current_max_value = value_label
+        self._apply_max_colour(max_intensity)
 
         self._currents_panel.Layout()
+        self.Layout()
 
     def clear_current_positions(self) -> None:
         self.set_current_positions([], None, None)
@@ -745,10 +783,10 @@ class PreviewView(wx.Panel):
         max_intensity: float | None,
     ) -> None:
         """Replace the Best Positions list. *max_intensity* is the running best ROI max."""
-        for entry in self._best_motor_rows.values():
-            row = entry[0]
-            self._bests_sizer.Detach(row)
-            row.Destroy()
+        for pair in self._best_pair_rows:
+            self._bests_sizer.Detach(pair)
+            pair.Destroy()
+        self._best_pair_rows.clear()
         self._best_motor_rows.clear()
         if self._best_max_row is not None:
             self._bests_sizer.Detach(self._best_max_row)
@@ -756,10 +794,11 @@ class PreviewView(wx.Panel):
             self._best_max_row = None
             self._best_max_value = None
 
-        if not positions and max_intensity is None:
+        if not positions:
             self._bests_empty_label.Show()
             self._bests_go_btn.Enable(False)
             self._bests_panel.Layout()
+            self.Layout()
             return
 
         self._bests_empty_label.Hide()
@@ -767,20 +806,19 @@ class PreviewView(wx.Panel):
         self._bests_go_btn.set_action(on_go_all)
         self._bests_go_btn.Enable(True)
 
-        for key, label_text, value, precision in positions:
-            value_text = self._format_original_position(value, precision)
-            row, value_label, _ = self._make_snapshot_row(self._bests_panel, label_text, value_text, None)
-            self._bests_sizer.Add(row, 0, wx.EXPAND | wx.BOTTOM, 2)
-            self._best_motor_rows[key] = (row, value_label, precision)
+        self._add_motor_pair_rows(
+            self._bests_panel, self._bests_sizer, positions,
+            self._best_pair_rows, self._best_motor_rows,
+        )
 
-        if max_intensity is not None:
-            row, value_label, _ = self._make_snapshot_row(self._bests_panel, "Max intensity", self._format_max(max_intensity), None)
-            self._bests_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
-            self._best_max_row = row
-            self._best_max_value = value_label
-            self._colour_max_label(self._best_max_value, max_intensity)
+        row, value_label, _ = self._make_snapshot_row(self._bests_panel, "Max intensity", self._format_max(max_intensity), None)
+        self._bests_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
+        self._best_max_row = row
+        self._best_max_value = value_label
+        self._colour_max_label(self._best_max_value, max_intensity)
 
         self._bests_panel.Layout()
+        self.Layout()
 
     def clear_best_positions(self) -> None:
         self.set_best_positions([], None)

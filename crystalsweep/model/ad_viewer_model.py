@@ -242,6 +242,7 @@ class ADViewerModel:
         self._stats = StreamStatsModel()
         self._observers: list[FrameObserver] = []
         self._last_roi_max_intensity: float | None = None
+        self._has_roi: bool = False
         self._max_intensity_observers: list[Callable[[float | None], None]] = []
 
     @property
@@ -274,10 +275,17 @@ class ADViewerModel:
         with self._lock:
             return self._last_roi_max_intensity
 
+    @property
+    def has_roi(self) -> bool:
+        """Whether an ROI is currently drawn on the image canvas."""
+        with self._lock:
+            return self._has_roi
+
     def set_last_roi_max_intensity(self, value: float | None) -> None:
         """Publish a new ROI/integration max intensity (callable from any thread)."""
         with self._lock:
             self._last_roi_max_intensity = value
+            self._has_roi = True
             observers = list(self._max_intensity_observers)
         for cb in observers:
             try:
@@ -287,7 +295,15 @@ class ADViewerModel:
 
     def clear_last_roi_max_intensity(self) -> None:
         """Reset the ROI max snapshot to None (e.g. when ROI is cleared)."""
-        self.set_last_roi_max_intensity(None)
+        with self._lock:
+            self._last_roi_max_intensity = None
+            self._has_roi = False
+            observers = list(self._max_intensity_observers)
+        for cb in observers:
+            try:
+                cb(None)
+            except Exception:
+                pass
 
     def add_max_intensity_observer(self, callback: Callable[[float | None], None]) -> None:
         """Register *callback* to be invoked whenever the ROI max changes."""

@@ -17,6 +17,7 @@
 
 import logging
 import threading
+from typing import Callable
 
 import wx
 from epics import caget, camonitor, camonitor_clear, caput
@@ -76,9 +77,11 @@ class PreviewController:
         # Auto-optimize state.
         self._auto_optimize_running = False
         self._auto_optimize_cancel = threading.Event()
+        self._post_start_cb: Callable[[], None] | None = None
         self._original_snapshot: dict[str, float] = {}
         self._current_snapshot: dict[str, float] = {}
         self._best_snapshot: dict[str, float] = {}
+        self._current_specs: list[CenteringMotorSpec] = []
 
         self._view.bind_jog_minus(self._on_jog_minus)
         self._view.bind_jog_plus(self._on_jog_plus)
@@ -97,9 +100,10 @@ class PreviewController:
             # Stop any in-flight preview before tearing down state.
             self._stop_preview(restore=True)
         self._clear_monitors()
-        self._view.set_auto_optimize_enabled(False)
         specs = self._collect_specs(cfg)
+        self._current_specs = specs
         self._view.set_centering_motors(specs)
+        self._view.set_auto_optimize_enabled(bool(specs))
         if not specs:
             return
         self._subscribe_monitors(specs)
@@ -223,6 +227,13 @@ class PreviewController:
     def _on_start_preview(self) -> None:
         if self._previewing:
             return
+        if not self._model.ad_viewer.has_roi:
+            wx.MessageBox(
+                "Please select an ROI on the image canvas before starting the preview.",
+                "No ROI Selected",
+                wx.OK | wx.ICON_WARNING,
+            )
+            return
         cfg = self._model.beamline.active
         detector = cfg.active_detector_config if cfg is not None else None
         if detector is None or not detector.pv_prefix.strip():
@@ -241,9 +252,8 @@ class PreviewController:
 
         self._previewing = True
         self._view.set_previewing(True)
-        self._view.set_auto_optimize_enabled(True)
 
-        specs = list(self._view.centering_specs())
+        specs = list(self._current_specs)
         max_intensity = self._model.ad_viewer.last_roi_max_intensity
         self._original_max_intensity = max_intensity
         self._best_max_intensity = max_intensity
@@ -304,12 +314,18 @@ class PreviewController:
             except Exception as exc:
                 _log.warning("Failed to start preview acquisition: %s", exc)
                 wx.CallAfter(self._stop_preview, True)
+                self._post_start_cb = None
                 return
 
             if timeout > 0:
                 self._timeout_timer = threading.Timer(timeout, lambda: wx.CallAfter(self._on_timeout_expired))
                 self._timeout_timer.daemon = True
                 self._timeout_timer.start()
+
+            cb = self._post_start_cb
+            self._post_start_cb = None
+            if cb is not None:
+                cb()
 
         threading.Thread(target=_worker, daemon=True, name="preview-start").start()
 
@@ -338,7 +354,7 @@ class PreviewController:
         self._view.clear_original_positions()
         self._view.clear_current_positions()
         self._view.clear_best_positions()
-        self._view.set_auto_optimize_enabled(False)
+        self._view.set_auto_optimize_enabled(bool(self._current_specs))
 
         # Cancel any auto-optimize worker.
         self._auto_optimize_cancel.set()
@@ -396,7 +412,7 @@ class PreviewController:
         self._best_max_intensity = value
         self._best_capture_token += 1
         token = self._best_capture_token
-        specs = list(self._view.centering_specs())
+        specs = list(self._current_specs)
 
         def _worker() -> None:
             best_positions: list[tuple[str, str, float | None, int]] = []
@@ -422,11 +438,15 @@ class PreviewController:
 
     def _on_auto_optimize_clicked(self) -> None:
         if self._auto_optimize_running:
-            # Re-clicking the button cancels the in-flight sweep.
             self._auto_optimize_cancel.set()
             return
-        if not self._previewing:
-            _log.warning("Auto optimize requires Start Preview to be active.")
+
+        if not self._model.ad_viewer.has_roi:
+            wx.MessageBox(
+                "Please select an ROI on the image canvas before running Auto Optimize.",
+                "No ROI Selected",
+                wx.OK | wx.ICON_WARNING,
+            )
             return
 
         range_value = self._view.auto_optimize_range
@@ -438,7 +458,7 @@ class PreviewController:
             _log.warning("Auto optimize: step must be <= range.")
             return
 
-        specs = list(self._view.centering_specs())
+        specs = list(self._current_specs)
         if not specs:
             _log.warning("Auto optimize: no centering motors available.")
             return
@@ -451,12 +471,19 @@ class PreviewController:
         self._auto_optimize_cancel.clear()
         wx.CallAfter(self._view.set_auto_optimize_enabled, False)
 
-        threading.Thread(
-            target=self._auto_optimize_worker,
-            args=(specs, range_value, step_value, settle),
-            daemon=True,
-            name="preview-auto-optimize",
-        ).start()
+        def _launch() -> None:
+            threading.Thread(
+                target=self._auto_optimize_worker,
+                args=(specs, range_value, step_value, settle),
+                daemon=True,
+                name="preview-auto-optimize",
+            ).start()
+
+        if self._previewing:
+            _launch()
+        else:
+            self._post_start_cb = _launch
+            self._on_start_preview()
 
     def _auto_optimize_worker(
         self,
@@ -526,7 +553,9 @@ class PreviewController:
         finally:
             self._auto_optimize_running = False
             if self._previewing:
-                wx.CallAfter(self._view.set_auto_optimize_enabled, True)
+                wx.CallAfter(self._stop_preview, True)
+            else:
+                wx.CallAfter(self._view.set_auto_optimize_enabled, bool(self._current_specs))
 
     def _on_go_original(self, key: str | None) -> None:
         self._dispatch_go(self._original_snapshot, key, "original")
