@@ -52,6 +52,11 @@ class MainController:
 
         self._file_settings_controller = FileSettingsController(model=self._model, view=self._view)
         self._collection_settings_controller = CollectionSettingsController(model=self._model, view=self._view)
+        # When the HDF5 file-settings toggle flips, the still-map combine
+        # toggle should appear/disappear accordingly.
+        self._file_settings_controller.add_hdf5_changed_listener(
+            lambda _v: self._collection_settings_controller.refresh_dependent_toggles()
+        )
         self._collection_controller = CollectionTableController(model=self._model, view=self._view.collection_table)
         self._collect_controller = CollectController(model=self._model, view=self._view)
         self._collect_controller.bind_collecting_changed(self._on_collecting_changed)

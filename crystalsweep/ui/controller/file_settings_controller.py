@@ -35,6 +35,7 @@ class FileSettingsController:
     def __init__(self, model: MainModel, view: MainView) -> None:
         self._model = model
         self._view = view
+        self._on_hdf5_changed_listeners: list = []
 
         fs = self._view.file_settings
         fs.bind_filename_changed(self._on_filename_changed)
@@ -211,8 +212,13 @@ class FileSettingsController:
         self._model.file_settings.map_ext = value
         _log.debug("file_settings.map_ext = %r", value)
 
+    def add_hdf5_changed_listener(self, callback) -> None:
+        self._on_hdf5_changed_listeners.append(callback)
+
     def _on_hdf5_changed(self, value: bool) -> None:
         self._model.file_settings.use_hdf5 = value
+        for cb in self._on_hdf5_changed_listeners:
+            cb(value)
         _log.debug("file_settings.use_hdf5 = %s", value)
 
     def _on_cbf_changed(self, value: bool) -> None:

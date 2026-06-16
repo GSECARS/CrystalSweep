@@ -822,9 +822,12 @@ class CollectionTableView(wx.Panel):
     def set_map_mode(self, is_map: bool) -> None:
         self._is_map = is_map
         self._header.set_map_mode(is_map)
-        self._snake_combine_toggle.Show(is_map)
         self.Layout()
         self._repopulate_visible()
+
+    def set_snake_combine_visible(self, visible: bool) -> None:
+        self._snake_combine_toggle.Show(visible)
+        self.Layout()
 
     def bind_use_ext_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_use_ext_changed_cb = callback
