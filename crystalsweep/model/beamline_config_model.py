@@ -75,27 +75,44 @@ class DetectorConfig:
         return 4
 
     def translate_path(self, local_path: str) -> str:
-        """Return *local_path* with the local prefix replaced by the remote prefix.
+        """Return *local_path* rewritten so the IOC receives a remote path.
 
-        If either prefix is empty the path is returned unchanged.
+        Behaviour:
+          * If the remote prefix is empty, the path is returned unchanged
+            (no remote root is known, nothing to translate).
+          * If the local prefix is set and *local_path* starts with it, the
+            local prefix is swapped for the remote prefix.
+          * Otherwise the path is anchored under the remote prefix using its
+            tail component, so a detector that only writes to a Linux remote
+            directory still gets a remote-style path instead of the raw
+            Windows path the user typed.
         """
         loc = self.path_prefix_local.strip()
         rem = self.path_prefix_remote.strip()
-        if not loc or not rem:
+        if not rem:
             return local_path
+
         norm = local_path.replace("\\", "/")
-        loc_norm = loc.replace("\\", "/").rstrip("/")
         rem_norm = rem.rstrip("/")
-        if norm.lower().startswith(loc_norm.lower()):
-            remainder = norm[len(loc_norm) :]
-            return rem_norm + remainder
-        return local_path
+
+        if loc:
+            loc_norm = loc.replace("\\", "/").rstrip("/")
+            if norm.lower().startswith(loc_norm.lower()):
+                return rem_norm + norm[len(loc_norm):]
+
+        # No local mapping (or it doesn't match): anchor the user-picked
+        # folder under the remote root. We keep only the trailing path
+        # component so the IOC writes inside the configured remote dir.
+        tail = norm.rsplit("/", 1)[-1] if "/" in norm else norm
+        tail = tail.strip("/")
+        return f"{rem_norm}/{tail}" if tail else rem_norm
 
     def translate_path_reverse(self, remote_path: str) -> str:
         """Return *remote_path* with the remote prefix replaced by the local prefix.
 
-        Restores the Windows path from what the IOC reports back.
-        If either prefix is empty the path is returned unchanged.
+        Restores the Windows path from what the IOC reports back. If the
+        remote prefix is empty or the path doesn't sit under it, the value
+        is returned unchanged so the user sees what the IOC actually has.
         """
         loc = self.path_prefix_local.strip()
         rem = self.path_prefix_remote.strip()
