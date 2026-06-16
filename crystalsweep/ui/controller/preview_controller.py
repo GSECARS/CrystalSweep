@@ -24,6 +24,7 @@ from epics import caget, camonitor, camonitor_clear, caput
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.beamline_config_model import BeamlineConfig, DetectorConfig, MotorConfig
+from crystalsweep.model.motor_limits import check_soft_limits
 from crystalsweep.ui.view.custom.widgets import DarkMessageDialog
 from crystalsweep.ui.view.preview_view import CenteringMotorSpec, PreviewView
 
@@ -220,6 +221,10 @@ class PreviewController:
                 if current is None:
                     return
                 target = float(current) + delta
+                err = check_soft_limits(setpoint, target)
+                if err:
+                    wx.CallAfter(self._show_limit_error, err)
+                    return
                 caput(setpoint, target)
             except Exception as exc:
                 _log.warning("Jog failed for %s: %s", spec.pv, exc)
@@ -515,8 +520,16 @@ class PreviewController:
                     _log.warning("Auto optimize: failed to read %s: %s", spec.pv, exc)
                     continue
 
-                # Build the 1D grid centred on the start position.
+                # Check soft limits cover the full sweep range before moving.
                 half = sweep_range / 2.0
+                for endpoint in (start - half, start + half):
+                    err = check_soft_limits(setpoint, endpoint)
+                    if err:
+                        wx.CallAfter(self._show_limit_error, err)
+                        aborted = True
+                        return
+
+                # Build the 1D grid centred on the start position.
                 n_steps = max(1, int(round(sweep_range / sweep_step)))
                 positions = [start - half + i * sweep_step for i in range(n_steps + 1)]
 
@@ -571,6 +584,9 @@ class PreviewController:
             else:
                 wx.CallAfter(self._view.set_auto_optimize_enabled, bool(self._current_specs))
 
+    def _show_limit_error(self, err: str) -> None:
+        DarkMessageDialog(self._view, f"Soft limit violation — {err}", "Soft Limit Violation").ShowModal()
+
     def _on_go_original(self, key: str | None) -> None:
         self._dispatch_go(self._original_snapshot, key, "original")
 
@@ -596,6 +612,10 @@ class PreviewController:
 
         def _worker() -> None:
             for pv, position in targets:
+                err = check_soft_limits(_val_pv(pv), position)
+                if err:
+                    wx.CallAfter(self._show_limit_error, err)
+                    return
                 try:
                     caput(_val_pv(pv), position, wait=True)
                 except Exception as exc:
