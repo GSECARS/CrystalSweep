@@ -89,7 +89,12 @@ class NewportXPSModel:
             spec.exposure,
         )
 
-    def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
+    def run(
+        self,
+        spec: ScanSpec,
+        on_point: Callable[[int, float], None],
+        on_at_start: Callable[[], None] | None = None,
+    ) -> None:
         if self._aborted:
             _log.info("NewportXPSModel aborted before run()")
             return
@@ -102,6 +107,8 @@ class NewportXPSModel:
             if self._xps is None:
                 raise RuntimeError("XPS not connected. Call prepare() first.")
             self._xps.arm_trajectory(name="forward", move_to_start=True)
+            if on_at_start is not None and not self._aborted:
+                on_at_start()
             if self._aborted:
                 return
             self._xps.run_trajectory(name="forward", save=False, clean=True, move_to_start=False)
@@ -115,6 +122,8 @@ class NewportXPSModel:
                 on_point(spec.points - 1, spec.end)
             return
 
+        if on_at_start is not None:
+            on_at_start()
         for i, pos in enumerate(spec.positions()):
             if self._aborted:
                 _log.info("NewportXPSModel aborted at point %d", i)

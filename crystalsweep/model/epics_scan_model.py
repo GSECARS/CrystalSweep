@@ -54,13 +54,20 @@ class EpicsScanModel:
         if spec.points == 1 and spec.start != spec.end:
             self._prepare_wide_slew(spec)
 
-    def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
+    def run(
+        self,
+        spec: ScanSpec,
+        on_point: Callable[[int, float], None],
+        on_at_start: Callable[[], None] | None = None,
+    ) -> None:
         self._abort = False
 
         if spec.points == 1 and spec.start != spec.end:
-            self._run_wide_slew(spec, on_point)
+            self._run_wide_slew(spec, on_point, on_at_start)
             return
 
+        if on_at_start is not None:
+            on_at_start()
         settle = float(spec.controller_params.get("settle_time", 0.05))
         for i, pos in enumerate(spec.positions()):
             if self._abort:
@@ -101,8 +108,15 @@ class EpicsScanModel:
         self._wide_velo_pv = velo_pv
         self._wide_saved_velocity = saved
 
-    def _run_wide_slew(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None:
+    def _run_wide_slew(
+        self,
+        spec: ScanSpec,
+        on_point: Callable[[int, float], None],
+        on_at_start: Callable[[], None] | None = None,
+    ) -> None:
         try:
+            if on_at_start is not None and not self._abort:
+                on_at_start()
             if self._abort:
                 _log.info("EpicsScanModel wide aborted before slew")
                 return
