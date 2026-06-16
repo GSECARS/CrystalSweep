@@ -695,7 +695,7 @@ class PreviewView(wx.Panel):
         range_lbl.SetFont(scaled_font(12))
         range_lbl.SetForegroundColour(FG_SECONDARY)
         range_lbl.SetBackgroundColour(BG_CARD)
-        self._auto_range_ctrl = DarkTextCtrl(panel, value="", placeholder="", parent_bg=BG_CARD, centered=True)
+        self._auto_range_ctrl = DarkTextCtrl(panel, value="0.005", placeholder="", parent_bg=BG_CARD, centered=True)
         self._auto_range_ctrl.set_restrict_to_float(True)
         self._auto_range_ctrl.SetMinSize((70, 28))
 
@@ -703,7 +703,7 @@ class PreviewView(wx.Panel):
         step_lbl.SetFont(scaled_font(12))
         step_lbl.SetForegroundColour(FG_SECONDARY)
         step_lbl.SetBackgroundColour(BG_CARD)
-        self._auto_step_ctrl = DarkTextCtrl(panel, value="", placeholder="", parent_bg=BG_CARD, centered=True)
+        self._auto_step_ctrl = DarkTextCtrl(panel, value="0.001", placeholder="", parent_bg=BG_CARD, centered=True)
         self._auto_step_ctrl.set_restrict_to_float(True)
         self._auto_step_ctrl.SetMinSize((70, 28))
 
