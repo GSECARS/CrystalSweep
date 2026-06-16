@@ -521,18 +521,28 @@ class ScanEngine:
                 if self._abort_event.is_set():
                     on_done()
                     return
-                if on_status:
-                    on_status("preparing")
-                driver.prepare(spec)
-                if self._abort_event.is_set():
-                    on_done()
-                    return
+                # 1. Move to omega_start at the motor's current (fast) velocity,
+                #    BEFORE driver.prepare applies the slew velocity for the
+                #    exposure-controlled sweep.
                 if on_status:
                     on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
                 if self._abort_event.is_set():
                     on_done()
                     return
+
+                # 2. Prepare the driver — for EpicsScanModel this sets the
+                #    motor velocity so the slew start→end takes exactly
+                #    `exposure` seconds. The original velocity is restored by
+                #    driver.run / driver.abort.
+                if on_status:
+                    on_status("preparing")
+                driver.prepare(spec)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
+
+                # 3. Open the shutter, then arm the detector, then slew.
                 self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
                 if self._abort_event.is_set():
                     on_done()
@@ -549,6 +559,13 @@ class ScanEngine:
                 _log.exception("ScanEngine wide-scan error")
                 on_error(exc)
             finally:
+                # Make sure the driver tears down any state it applied during
+                # prepare (e.g. EpicsScanModel's slew velocity) even if the
+                # scan errored or was aborted mid-flight.
+                try:
+                    driver.abort()
+                except Exception:
+                    _log.debug("ScanEngine wide: driver.abort during cleanup raised", exc_info=True)
                 if not keep_shutter_open:
                     self._close_shutter(config)
                 if disable_inc:
