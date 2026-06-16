@@ -87,17 +87,21 @@ class BeamlineConfigController:
 
     def save_config(self) -> None:
         cfg = self._model.beamline.active
+        _log.info("save_config invoked (active name=%r)", cfg.name)
         if not cfg.name:
             self.save_config_as()
             return
         self._save(self._build_updated_config(cfg.name))
 
     def save_config_as(self) -> None:
+        _log.info("save_config_as invoked")
         with wx.TextEntryDialog(self._view, "Configuration name (e.g. 2026-2):", "Save configuration as") as dlg:
             if dlg.ShowModal() != wx.ID_OK:
+                _log.info("save_config_as cancelled by user")
                 return
             name = dlg.GetValue().strip()
         if not name:
+            _log.info("save_config_as aborted: empty name")
             return
         self._save(self._build_updated_config(name))
 
@@ -270,17 +274,32 @@ class BeamlineConfigController:
         )
 
     def _save(self, config: BeamlineConfig) -> None:
+        _log.info(
+            "Save requested: name=%r dir=%s detectors=%d rotation_motor=%s motors=%d",
+            config.name,
+            self._model.beamline.directory,
+            len(config.detectors),
+            (config.rotation_motor.pv if config.rotation_motor else None),
+            len(config.motors),
+        )
+
         if not config.detectors:
-            self._set_status_all("At least one detector is required.", error=True)
+            msg = "At least one detector is required."
+            self._set_status_all(msg, error=True)
+            wx.MessageBox(msg, "Cannot save configuration", wx.OK | wx.ICON_WARNING)
             return
 
         if config.rotation_motor is None or not config.rotation_motor.pv.strip():
-            self._set_status_all("Rotation stage PV is required.", error=True)
+            msg = "Rotation stage PV is required."
+            self._set_status_all(msg, error=True)
+            wx.MessageBox(msg, "Cannot save configuration", wx.OK | wx.ICON_WARNING)
             return
 
         shorthands = [m.shorthand for m in config.motors if m.shorthand]
         if len(shorthands) != len(set(shorthands)):
-            self._set_status_all("Motor shorthands must be unique.", error=True)
+            msg = "Motor shorthands must be unique."
+            self._set_status_all(msg, error=True)
+            wx.MessageBox(msg, "Cannot save configuration", wx.OK | wx.ICON_WARNING)
             return
 
         all_motors = [config.rotation_motor] + list(config.motors) if config.rotation_motor else list(config.motors)
@@ -298,7 +317,10 @@ class BeamlineConfigController:
         except Exception as exc:
             _log.exception("Failed to save beamline config %s", config.name)
             self._set_status_all(f"Save failed: {exc}", error=True)
+            wx.MessageBox(f"Save failed: {exc}", "Save error", wx.OK | wx.ICON_ERROR)
             return
+
+        _log.info("Save succeeded: %s", path)
 
         if config.controllers:
             self._model.controllers.apply_config(config.controllers)
