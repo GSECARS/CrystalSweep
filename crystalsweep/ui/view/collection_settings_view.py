@@ -28,7 +28,9 @@ from crystalsweep.ui.view.custom.theme import (
     FG_SECONDARY,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle, FlatButton, MUTED_SCHEME
+from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, MUTED_SCHEME
+from wxutils import FlatButton
 
 __all__ = ["CollectionSettingsView"]
 
@@ -328,12 +330,12 @@ class CollectionSettingsView(wx.Panel):
         outer.AddSpacer(8)
 
         btn_row = wx.BoxSizer(wx.HORIZONTAL)
-        self._add_btn = FlatButton(self, "+ Add point")
+        self._add_btn = FlatButton(self, "+ Add point", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_btn.SetMinSize((-1, 28))
-        self._add_btn.set_action(self._on_add_clicked)
-        self._update_selected_btn = FlatButton(self, "Update selected", color_scheme=MUTED_SCHEME)
+        self._add_btn.SetAction(self._on_add_clicked)
+        self._update_selected_btn = FlatButton(self, "Update selected", color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._update_selected_btn.SetMinSize((-1, 28))
-        self._update_selected_btn.set_action(self._on_update_selected_clicked)
+        self._update_selected_btn.SetAction(self._on_update_selected_clicked)
         btn_row.Add(self._add_btn, 1, wx.EXPAND | wx.RIGHT, 4)
         btn_row.Add(self._update_selected_btn, 1, wx.EXPAND)
         outer.Add(btn_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
@@ -443,9 +445,9 @@ class CollectionSettingsView(wx.Panel):
         for size_um, step_um in _MAP_PRESETS:
             pts = size_um // step_um + 1
             label = f"{size_um}×{size_um} / {step_um}µm"
-            btn = FlatButton(self._map_presets_panel, label, color_scheme=MUTED_SCHEME)
+            btn = FlatButton(self._map_presets_panel, label, color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
             btn.SetMinSize((-1, 22))
-            btn.set_action(lambda s=size_um, st=step_um, p=pts: self._apply_map_preset(s, st, p))
+            btn.SetAction(lambda _e, s=size_um, st=step_um, p=pts: self._apply_map_preset(s, st, p))
             row.Add(btn, 1, wx.EXPAND | wx.RIGHT, 4)
         self._map_presets_panel.SetSizer(row)
         return self._map_presets_panel
@@ -793,11 +795,11 @@ class CollectionSettingsView(wx.Panel):
         self._fire_float(self._map_table.row2.step_ctrl, self._on_map2_step_changed_cb)
         event.Skip()
 
-    def _on_add_clicked(self) -> None:
+    def _on_add_clicked(self, _e=None) -> None:
         if self._on_add_point_cb is not None:
             self._on_add_point_cb()
 
-    def _on_update_selected_clicked(self) -> None:
+    def _on_update_selected_clicked(self, _e=None) -> None:
         if self._on_update_selected_cb is not None:
             self._on_update_selected_cb()
 

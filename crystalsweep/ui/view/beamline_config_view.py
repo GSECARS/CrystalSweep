@@ -20,8 +20,9 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.icons import draw_folder
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, DANGER, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton, IconButton, RadioDot
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
+from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, IconButton, RadioDot
+from wxutils import FlatButton
 
 __all__ = [
     "GeneralConfigView",
@@ -242,7 +243,7 @@ class _DetectorRow(_TableRow):
         self._on_remove = on_remove
 
         self.active_dot = RadioDot(self, value=active, tooltip="Set as active detector")
-        self.active_dot.set_action(lambda: on_make_active(self))
+        self.active_dot.SetAction(lambda _e: on_make_active(self))
         self.name_ctrl = DarkTextCtrl(self, value=detector.name, placeholder=_PLACEHOLDER_DETECTOR_NAME)
         det_display = _DET_TYPE_TO_LABEL.get(detector.type, _DETECTOR_DISPLAY_NAMES[0])
         det_sel = _DETECTOR_DISPLAY_NAMES.index(det_display) if det_display in _DETECTOR_DISPLAY_NAMES else 0
@@ -251,8 +252,8 @@ class _DetectorRow(_TableRow):
         fmt_sel = _FILE_FORMAT_DISPLAY_NAMES.index(fmt_display) if fmt_display in _FILE_FORMAT_DISPLAY_NAMES else 0
         self.format_combo = DarkCombo(self, choices=_FILE_FORMAT_DISPLAY_NAMES, selection=fmt_sel)
         self.prefix_ctrl = DarkTextCtrl(self, value=detector.pv_prefix, placeholder=_PLACEHOLDER_DETECTOR_PREFIX)
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
 
         self._template_lbl = wx.StaticText(self, label="File template")
         self._template_lbl.SetForegroundColour(FG_SECONDARY)
@@ -372,8 +373,8 @@ class _ControllerRow(_TableRow):
         self._param_ctrls: dict[str, DarkTextCtrl] = {}
         self._build_params(controller.type, controller.params)
 
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
         self._reposition()
 
     def _reposition(self) -> None:
@@ -537,8 +538,8 @@ class _MotorRow(_TableRow):
         self.xps_group_ctrl = DarkTextCtrl(self, value=motor.xps_group, placeholder=_PLACEHOLDER_XPS_GROUP)
         self.xps_positioner_ctrl = DarkTextCtrl(self, value=motor.xps_positioner, placeholder=_PLACEHOLDER_XPS_POSITIONER)
 
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
         self._reposition()
 
     def _is_xps(self) -> bool:
@@ -732,8 +733,8 @@ class _AbortPvRow(_TableRow):
         self._on_remove = on_remove
         self.pv_ctrl = DarkTextCtrl(self, value=pv, placeholder="e.g. 13IDD:STOP")
         self.value_ctrl = DarkTextCtrl(self, value=value, placeholder="e.g. 1")
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
         self._reposition()
 
     def _reposition(self) -> None:
@@ -766,8 +767,8 @@ class _RestorePvRow(_TableRow):
         super().__init__(parent, bg, self._PROPS)
         self._on_remove = on_remove
         self.pv_ctrl = DarkTextCtrl(self, value=pv, placeholder="e.g. 13IDD:SomePV.VAL")
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
         self._reposition()
 
     def _reposition(self) -> None:
@@ -838,9 +839,9 @@ class GeneralConfigView(wx.Panel):
         self._abort_header = _TableHeader(a_body, ["PV", "Value", ""], [6, 3, 1])
         self._abort_rows_panel = _DarkScrolledPanel(a_body)
         self._abort_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_abort_btn = FlatButton(a_body, "+ Add abort PV")
+        self._add_abort_btn = FlatButton(a_body, "+ Add abort PV", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_abort_btn.SetMinSize((-1, 26))
-        self._add_abort_btn.set_action(self._on_add_abort_pv_clicked)
+        self._add_abort_btn.SetAction(self._on_add_abort_pv_clicked)
         a_sizer = wx.BoxSizer(wx.VERTICAL)
         a_sizer.Add(self._abort_header, 0, wx.EXPAND)
         a_sizer.Add(self._abort_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
@@ -852,9 +853,9 @@ class GeneralConfigView(wx.Panel):
         self._restore_header = _TableHeader(r_body, ["PV", ""], [9, 1])
         self._restore_rows_panel = _DarkScrolledPanel(r_body)
         self._restore_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_restore_btn = FlatButton(r_body, "+ Add restore PV")
+        self._add_restore_btn = FlatButton(r_body, "+ Add restore PV", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_restore_btn.SetMinSize((-1, 26))
-        self._add_restore_btn.set_action(self._on_add_restore_pv_clicked)
+        self._add_restore_btn.SetAction(self._on_add_restore_pv_clicked)
         r_sizer = wx.BoxSizer(wx.VERTICAL)
         r_sizer.Add(self._restore_header, 0, wx.EXPAND)
         r_sizer.Add(self._restore_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
@@ -941,7 +942,7 @@ class GeneralConfigView(wx.Panel):
         self._abort_pv_rows.append(row)
         self._abort_rows_panel.add_row(row)
 
-    def _on_add_abort_pv_clicked(self) -> None:
+    def _on_add_abort_pv_clicked(self, _e=None) -> None:
         self._append_abort_pv_row()
 
     def _on_remove_abort_pv(self, row: _AbortPvRow) -> None:
@@ -970,7 +971,7 @@ class GeneralConfigView(wx.Panel):
         self._restore_pv_rows.append(row)
         self._restore_rows_panel.add_row(row)
 
-    def _on_add_restore_pv_clicked(self) -> None:
+    def _on_add_restore_pv_clicked(self, _e=None) -> None:
         self._append_restore_pv_row()
 
     def _on_remove_restore_pv(self, row: _RestorePvRow) -> None:
@@ -1204,9 +1205,9 @@ class DetectorsConfigView(wx.Panel):
         self._det_header = _TableHeader(d_body, ["", "Name", "Type", "Format", "PV prefix", ""], [2, 7, 3, 3, 11, 2])
         self._detector_rows_panel = _DarkScrolledPanel(d_body)
         self._detector_rows_panel.SetMinSize((-1, _DET_ROW_H * 3))
-        self._add_detector_btn = FlatButton(d_body, "+ Add detector")
+        self._add_detector_btn = FlatButton(d_body, "+ Add detector", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_detector_btn.SetMinSize((-1, 26))
-        self._add_detector_btn.set_action(self._on_add_detector_clicked)
+        self._add_detector_btn.SetAction(self._on_add_detector_clicked)
         d_sizer = wx.BoxSizer(wx.VERTICAL)
         d_sizer.Add(self._det_header, 0, wx.EXPAND)
         d_sizer.Add(self._detector_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
@@ -1316,7 +1317,7 @@ class DetectorsConfigView(wx.Panel):
         self._detector_rows.append(row)
         self._detector_rows_panel.add_row(row)
 
-    def _on_add_detector_clicked(self) -> None:
+    def _on_add_detector_clicked(self, _e=None) -> None:
         self._append_detector_row(DetectorConfig(), active=not self._detector_rows)
 
     def _on_make_detector_active(self, row: _DetectorRow) -> None:
@@ -1352,9 +1353,9 @@ class ControllersConfigView(wx.Panel):
         self._ctrl_header = _TableHeader(ctrl_body, ["Name", "Type", "Connection params", ""], [5, 5, 18, 2])
         self._controller_rows_panel = _DarkScrolledPanel(ctrl_body)
         self._controller_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_controller_btn = FlatButton(ctrl_body, "+ Add controller")
+        self._add_controller_btn = FlatButton(ctrl_body, "+ Add controller", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_controller_btn.SetMinSize((-1, 26))
-        self._add_controller_btn.set_action(self._on_add_controller_clicked)
+        self._add_controller_btn.SetAction(self._on_add_controller_clicked)
         ctrl_sizer = wx.BoxSizer(wx.VERTICAL)
         ctrl_sizer.Add(self._ctrl_header, 0, wx.EXPAND)
         ctrl_sizer.Add(self._controller_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
@@ -1412,7 +1413,7 @@ class ControllersConfigView(wx.Panel):
         self._controller_rows.append(row)
         self._controller_rows_panel.add_row(row)
 
-    def _on_add_controller_clicked(self) -> None:
+    def _on_add_controller_clicked(self, _e=None) -> None:
         self._append_controller_row(ControllerConfig(name="", type=_CONTROLLER_TYPES[0]))
 
     def _on_remove_controller(self, row: _ControllerRow) -> None:
@@ -1452,9 +1453,9 @@ class PositionersConfigView(wx.Panel):
         self._mot_header = _TableHeader(m_body, ["Short", "Description", "PV", "Prec", "Map", "Center", "Controller", ""], [3, 6, 10, 2, 2, 2, 6, 2])
         self._motor_rows_panel = _DarkScrolledPanel(m_body)
         self._motor_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_motor_btn = FlatButton(m_body, "+ Add motor")
+        self._add_motor_btn = FlatButton(m_body, "+ Add motor", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_motor_btn.SetMinSize((-1, 26))
-        self._add_motor_btn.set_action(self._on_add_motor_clicked)
+        self._add_motor_btn.SetAction(self._on_add_motor_clicked)
         m_sizer = wx.BoxSizer(wx.VERTICAL)
         m_sizer.Add(self._mot_header, 0, wx.EXPAND)
         m_sizer.Add(self._motor_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
@@ -1550,7 +1551,7 @@ class PositionersConfigView(wx.Panel):
         self._motor_rows.append(row)
         self._motor_rows_panel.add_row(row)
 
-    def _on_add_motor_clicked(self) -> None:
+    def _on_add_motor_clicked(self, _e=None) -> None:
         self._append_motor_row(MotorConfig(shorthand="", description="", pv=""))
 
     def _on_remove_motor(self, row: _MotorRow) -> None:

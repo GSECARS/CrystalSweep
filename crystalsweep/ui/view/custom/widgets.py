@@ -16,17 +16,22 @@ from typing import Callable
 
 import wx
 
+from wxutils import FlatButton
 from crystalsweep.ui.view.custom.theme import (
     ACCENT,
     ACCENT_HOVER,
     BG_CARD,
     BG_ELEVATED,
     BG_SURFACE,
+    BTN_DISABLED,
+    btn_font,
     BTN_HOVER_BG,
     BTN_PRESS_BG,
     DANGER,
     DANGER_HOVER,
     DANGER_PRESS,
+    DANGER_SCHEME,
+    DEFAULT_SCHEME,
     DISABLED_BG,
     DISABLED_FG,
     FG_PRIMARY,
@@ -48,9 +53,6 @@ from crystalsweep.ui.view.custom.theme import (
 )
 
 __all__ = [
-    "DANGER_SCHEME",
-    "DEFAULT_SCHEME",
-    "MUTED_SCHEME",
     "DarkAbortingDialog",
     "DarkCombo",
     "DarkConfirmDialog",
@@ -61,7 +63,6 @@ __all__ = [
     "DarkTabbedPanel",
     "DarkTextCtrl",
     "DarkToggle",
-    "FlatButton",
     "FrameLabel",
     "IconButton",
     "LiveToggle",
@@ -70,110 +71,6 @@ __all__ = [
     "SectionDivider",
     "ThemedSplitter",
 ]
-
-
-# Colour palettes for FlatButton: (idle, hover, press, idle_fg, hover_fg).
-DEFAULT_SCHEME = (POPUP_BTN_BG, POPUP_BTN_HOVER, POPUP_BTN_PRESS, FG_PRIMARY, FG_PRIMARY)
-DANGER_SCHEME = (POPUP_BTN_BG, DANGER_HOVER, DANGER_PRESS, wx.Colour(230, 90, 90), FG_PRIMARY)
-MUTED_SCHEME = (wx.Colour(38, 38, 44), wx.Colour(55, 60, 75), wx.Colour(30, 35, 55), wx.Colour(120, 150, 190), wx.Colour(120, 150, 190))
-
-
-class FlatButton(wx.Control):
-    """Flat dark button with hover/press states, used inside popups."""
-
-    def __init__(
-        self,
-        parent: wx.Window,
-        label: str,
-        color_scheme: tuple[wx.Colour, wx.Colour, wx.Colour, wx.Colour, wx.Colour] = DEFAULT_SCHEME,
-    ) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE | wx.WANTS_CHARS)
-        self._label = label
-        self._hovered = False
-        self._pressed = False
-        self._action: Callable[[], None] | None = None
-        self._idle_bg, self._hover_bg, self._press_bg, self._idle_fg, self._hover_fg = color_scheme
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.SetMinSize((-1, 26))
-        super().Bind(wx.EVT_PAINT, self._on_paint)
-        super().Bind(wx.EVT_SIZE, self._on_size)
-        super().Bind(wx.EVT_ENTER_WINDOW, self._on_enter)
-        super().Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
-        super().Bind(wx.EVT_LEFT_DOWN, self._on_press)
-        super().Bind(wx.EVT_LEFT_UP, self._on_release)
-
-    def set_action(self, callback: Callable[[], None]) -> None:
-        self._action = callback
-
-    def SetLabel(self, label: str) -> None:
-        self._label = label
-        self.Refresh()
-
-    def Enable(self, enable: bool = True) -> bool:
-        result = super().Enable(enable)
-        self.Refresh()
-        return result
-
-    def _on_size(self, event: wx.SizeEvent) -> None:
-        self.Refresh()
-        event.Skip()
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        enabled = self.IsEnabled()
-        if not enabled:
-            bg = DISABLED_BG
-        elif self._pressed:
-            bg = self._press_bg
-        elif self._hovered:
-            bg = self._hover_bg
-        else:
-            bg = self._idle_bg
-        gc.SetBrush(wx.Brush(self.GetParent().GetBackgroundColour()))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        gc.SetBrush(wx.Brush(bg))
-        gc.DrawRoundedRectangle(0, 0, w, h, 4)
-        font = scaled_font(12)
-        if not enabled:
-            fg = DISABLED_FG
-        elif self._hovered or self._pressed:
-            fg = self._hover_fg
-        else:
-            fg = self._idle_fg
-        gc.SetFont(font, fg)
-        tw, th = gc.GetTextExtent(self._label)
-        gc.DrawText(self._label, (w - tw) / 2, (h - th) / 2)
-
-    def _on_enter(self, event: wx.MouseEvent) -> None:
-        self._hovered = True
-        self.Refresh()
-        event.Skip()
-
-    def _on_leave(self, event: wx.MouseEvent) -> None:
-        self._hovered = False
-        self._pressed = False
-        self.Refresh()
-        event.Skip()
-
-    def _on_press(self, event: wx.MouseEvent) -> None:
-        if not self.IsEnabled():
-            return
-        self._pressed = True
-        self.Refresh()
-        event.Skip()
-
-    def _on_release(self, event: wx.MouseEvent) -> None:
-        if not self.IsEnabled():
-            return
-        was_pressed = self._pressed
-        self._pressed = False
-        self.Refresh()
-        event.Skip()
-        if was_pressed and self._action is not None:
-            wx.CallAfter(self._action)
 
 
 class FrameLabel(wx.Control):
@@ -1640,10 +1537,10 @@ class DarkAbortingDialog(wx.Dialog):
 
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
         btn_sizer.AddStretchSpacer()
-        self._ok_btn = FlatButton(self, "OK")
+        self._ok_btn = FlatButton(self, "OK", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._ok_btn.SetMinSize((80, 28))
         self._ok_btn.Enable(False)
-        self._ok_btn.set_action(self._on_ok)
+        self._ok_btn.SetAction(self._on_ok)
         btn_sizer.Add(self._ok_btn, 0, wx.ALL, 8)
         outer.Add(btn_sizer, 0, wx.EXPAND)
 
@@ -1655,7 +1552,7 @@ class DarkAbortingDialog(wx.Dialog):
         if parent:
             parent.Enable(False)
 
-    def _on_ok(self) -> None:
+    def _on_ok(self, _e=None) -> None:
         parent = self.GetParent()
         if parent:
             parent.Enable(True)
@@ -1698,9 +1595,9 @@ class DarkMessageDialog(wx.Dialog):
 
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
         btn_sizer.AddStretchSpacer()
-        btn_ok = FlatButton(self, "OK")
+        btn_ok = FlatButton(self, "OK", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         btn_ok.SetMinSize((80, 28))
-        btn_ok.set_action(lambda: self.EndModal(wx.ID_OK))
+        btn_ok.SetAction(lambda _e: self.EndModal(wx.ID_OK))
         btn_sizer.Add(btn_ok, 0, wx.ALL, 8)
         outer.Add(btn_sizer, 0, wx.EXPAND)
 
@@ -1739,12 +1636,12 @@ class DarkConfirmDialog(wx.Dialog):
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
         btn_sizer.AddStretchSpacer()
 
-        btn_yes = FlatButton(self, "Yes", DANGER_SCHEME)
-        btn_yes.set_action(lambda: self.EndModal(wx.ID_YES))
+        btn_yes = FlatButton(self, "Yes", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        btn_yes.SetAction(lambda _e: self.EndModal(wx.ID_YES))
         btn_yes.SetMinSize((80, 28))
 
-        btn_no = FlatButton(self, "No")
-        btn_no.set_action(lambda: self.EndModal(wx.ID_NO))
+        btn_no = FlatButton(self, "No", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        btn_no.SetAction(lambda _e: self.EndModal(wx.ID_NO))
         btn_no.SetMinSize((80, 28))
 
         btn_sizer.Add(btn_yes, 0, wx.ALL, 8)

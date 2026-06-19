@@ -25,7 +25,9 @@ from crystalsweep.ui.view.custom.theme import (
     SEP_COLOUR,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DarkHScrollBar, DarkScrollBar, FlatButton
+from crystalsweep.ui.view.custom.widgets import DarkHScrollBar, DarkScrollBar
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME
+from wxutils import FlatButton
 
 _SB_W = 8
 _SB_TRACK = wx.Colour(28, 28, 32)
@@ -146,9 +148,9 @@ class ScriptEditorDialog(wx.Dialog):
         self._status_label.SetForegroundColour(FG_SECONDARY)
         self._status_label.SetBackgroundColour(_SB_TRACK)
 
-        self._save_btn = FlatButton(self, "Save")
+        self._save_btn = FlatButton(self, "Save", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._save_btn.SetMinSize((90, 28))
-        self._save_btn.set_action(self._on_save_clicked)
+        self._save_btn.SetAction(self._on_save_clicked)
 
         container_sizer = wx.BoxSizer(wx.VERTICAL)
         container_sizer.Add(editor_row, 1, wx.EXPAND)
@@ -292,7 +294,7 @@ class ScriptEditorDialog(wx.Dialog):
         self._status_label.SetForegroundColour(DANGER if error else PONI_LOADED if text else FG_SECONDARY)
         self._status_label.Refresh()
 
-    def _on_save_clicked(self) -> None:
+    def _on_save_clicked(self, _e=None) -> None:
         if self._on_save_cb is not None:
             self._on_save_cb(self._editor.GetValue())
 

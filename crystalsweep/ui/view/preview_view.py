@@ -34,7 +34,9 @@ from crystalsweep.ui.view.custom.theme import (
     SEP_COLOUR,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DEFAULT_SCHEME, DarkTextCtrl, FlatButton, IconButton, ReadbackBox
+from crystalsweep.ui.view.custom.widgets import DarkTextCtrl, IconButton, ReadbackBox
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME
+from wxutils import FlatButton
 
 __all__ = ["CenteringMotorSpec", "PreviewView"]
 
@@ -342,7 +344,7 @@ class PreviewView(wx.Panel):
             return None
         return value
 
-    def _on_auto_optimize_clicked(self) -> None:
+    def _on_auto_optimize_clicked(self, _e=None) -> None:
         if self._on_auto_optimize_cb is not None:
             self._on_auto_optimize_cb()
 
@@ -428,10 +430,10 @@ class PreviewView(wx.Panel):
         num_presets = len(_PREDEFINED_STEPS_UM)
         presets_total_w = preset_btn_size * num_presets + preset_gap * (num_presets - 1)
 
-        self._toggle_btn = FlatButton(self, "Start Preview", color_scheme=_START_SCHEME)
+        self._toggle_btn = FlatButton(self, "Start Preview", color_scheme=_START_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._toggle_btn.SetMinSize((presets_total_w, 36))
         self._toggle_btn.SetMaxSize((presets_total_w, -1))
-        self._toggle_btn.set_action(self._on_toggle_clicked)
+        self._toggle_btn.SetAction(self._on_toggle_clicked)
         col.Add(self._toggle_btn, 1, wx.EXPAND | wx.BOTTOM, 10)
 
         sep = wx.Panel(self, size=(presets_total_w, 1))
@@ -502,7 +504,7 @@ class PreviewView(wx.Panel):
         header.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
         header.SetForegroundColour(FG_SECONDARY)
         header.SetBackgroundColour(BG_CARD)
-        self._originals_go_btn = FlatButton(panel, "Go")
+        self._originals_go_btn = FlatButton(panel, "Go", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._originals_go_btn.SetMinSize((36, 22))
         self._originals_go_btn.Enable(False)
         header_row.Add(header, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -538,7 +540,7 @@ class PreviewView(wx.Panel):
 
         self._originals_empty_label.Hide()
         on_go_all = self._make_go_invoker("original", None)
-        self._originals_go_btn.set_action(on_go_all)
+        self._originals_go_btn.SetAction(lambda _e: on_go_all())
         self._originals_go_btn.Enable(True)
 
         self._add_motor_pair_rows(
@@ -666,7 +668,7 @@ class PreviewView(wx.Panel):
         header.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
         header.SetForegroundColour(FG_SECONDARY)
         header.SetBackgroundColour(BG_CARD)
-        go_btn = FlatButton(panel, "Go")
+        go_btn = FlatButton(panel, "Go", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         go_btn.SetMinSize((36, 22))
         go_btn.Enable(False)
         setattr(self, go_btn_attr, go_btn)
@@ -687,9 +689,9 @@ class PreviewView(wx.Panel):
         panel = wx.Panel(self, style=wx.BORDER_NONE)
         panel.SetBackgroundColour(BG_CARD)
 
-        self._auto_optimize_btn = FlatButton(panel, "Auto Optimize")
+        self._auto_optimize_btn = FlatButton(panel, "Auto Optimize", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._auto_optimize_btn.SetMinSize((-1, 30))
-        self._auto_optimize_btn.set_action(self._on_auto_optimize_clicked)
+        self._auto_optimize_btn.SetAction(self._on_auto_optimize_clicked)
 
         range_lbl = wx.StaticText(panel, label="Range")
         range_lbl.SetFont(scaled_font(12))
@@ -749,7 +751,7 @@ class PreviewView(wx.Panel):
 
         self._currents_empty_label.Hide()
         on_go_all = self._make_go_invoker("current", None)
-        self._currents_go_btn.set_action(on_go_all)
+        self._currents_go_btn.SetAction(lambda _e: on_go_all())
         self._currents_go_btn.Enable(True)
 
         self._add_motor_pair_rows(
@@ -820,7 +822,7 @@ class PreviewView(wx.Panel):
 
         self._bests_empty_label.Hide()
         on_go_all = self._make_go_invoker("best", None)
-        self._bests_go_btn.set_action(on_go_all)
+        self._bests_go_btn.SetAction(lambda _e: on_go_all())
         self._bests_go_btn.Enable(True)
 
         self._add_motor_pair_rows(
@@ -935,7 +937,7 @@ class PreviewView(wx.Panel):
         if self._on_step_changed_cb is not None:
             self._on_step_changed_cb(value)
 
-    def _on_toggle_clicked(self) -> None:
+    def _on_toggle_clicked(self, _e=None) -> None:
         if self._previewing:
             if self._on_stop_cb is not None:
                 self._on_stop_cb()

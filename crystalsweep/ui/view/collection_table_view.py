@@ -26,8 +26,9 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, DANGER, FG_SECONDARY, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, MUTED_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, MUTED_SCHEME, FG_SECONDARY, SEP_COLOUR, scaled_font
+from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle
+from wxutils import FlatButton
 
 __all__ = ["CollectionTableView"]
 
@@ -269,14 +270,14 @@ class _CollectionRow(wx.Panel):
         self._get_btn: FlatButton | None = None
         self._move_btn: FlatButton | None = None
         if motor_shorthands:
-            self._get_btn = FlatButton(self, "Get", color_scheme=MUTED_SCHEME)
+            self._get_btn = FlatButton(self, "Get", color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
             self._get_btn.SetMinSize((-1, inner_h))
             self._get_btn.SetToolTip("Get current motor positions")
-            self._get_btn.set_action(self._dispatch_get)
-            self._move_btn = FlatButton(self, "Move", color_scheme=MUTED_SCHEME)
+            self._get_btn.SetAction(self._dispatch_get)
+            self._move_btn = FlatButton(self, "Move", color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
             self._move_btn.SetMinSize((-1, inner_h))
             self._move_btn.SetToolTip("Move motors to stored positions")
-            self._move_btn.set_action(self._dispatch_move)
+            self._move_btn.SetAction(self._dispatch_move)
 
         self._type_combo = DarkCombo(self, choices=list(SCAN_TYPES), choice_colours=_TYPE_COLOURS)
         self._type_combo.SetMinSize((-1, inner_h))
@@ -302,10 +303,10 @@ class _CollectionRow(wx.Panel):
         self._remove_btn_panel.SetBackgroundColour(BG_CARD)
         self._remove_btn_panel.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._remove_btn_panel.Bind(wx.EVT_PAINT, self._on_remove_panel_paint)
-        self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=DANGER_SCHEME)
+        self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._remove_btn.SetMinSize((inner_h, inner_h))
         self._remove_btn.SetToolTip("Remove row")
-        self._remove_btn.set_action(self._dispatch_remove)
+        self._remove_btn.SetAction(self._dispatch_remove)
         _btn_sizer = wx.BoxSizer(wx.VERTICAL)
         _btn_sizer.AddStretchSpacer()
         _btn_sizer.Add(self._remove_btn, 0, wx.ALIGN_CENTER_HORIZONTAL)
@@ -408,15 +409,15 @@ class _CollectionRow(wx.Panel):
         if self._data_idx >= 0 and self._dispatcher.on_selection is not None:
             self._dispatcher.on_selection(self._data_idx, selected)
 
-    def _dispatch_remove(self) -> None:
+    def _dispatch_remove(self, _e=None) -> None:
         if self._data_idx >= 0 and self._dispatcher.on_remove is not None:
             self._dispatcher.on_remove(self._data_idx)
 
-    def _dispatch_get(self) -> None:
+    def _dispatch_get(self, _e=None) -> None:
         if self._data_idx >= 0 and self._dispatcher.on_get is not None:
             self._dispatcher.on_get(self._data_idx)
 
-    def _dispatch_move(self) -> None:
+    def _dispatch_move(self, _e=None) -> None:
         if self._data_idx >= 0 and self._dispatcher.on_move is not None:
             self._dispatcher.on_move(self._data_idx)
 
@@ -892,13 +893,13 @@ class CollectionTableView(wx.Panel):
         return [_CHECK_W, ext_w] + [_MOTOR_W] * n_motor + motor_action_cols + [_TYPE_W, _ROT_W, _ROT_W, _STEP_W, _TIME_W, _REMOVE_W]
 
     def _build_layout(self) -> None:
-        self._delete_selected_btn = FlatButton(self, "Delete selected", color_scheme=DANGER_SCHEME)
+        self._delete_selected_btn = FlatButton(self, "Delete selected", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._delete_selected_btn.SetMinSize((100, 22))
-        self._delete_selected_btn.set_action(self._on_delete_selected_clicked)
+        self._delete_selected_btn.SetAction(self._on_delete_selected_clicked)
 
-        self._clear_btn = FlatButton(self, "Clear all", color_scheme=DANGER_SCHEME)
+        self._clear_btn = FlatButton(self, "Clear all", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._clear_btn.SetMinSize((70, 22))
-        self._clear_btn.set_action(self._on_clear_clicked)
+        self._clear_btn.SetAction(self._on_clear_clicked)
 
         self._slew_scan_toggle = DarkToggle(self, "Trajectory scanning")
         self._slew_scan_toggle.SetBackgroundColour(BG_CARD)
@@ -1164,11 +1165,11 @@ class CollectionTableView(wx.Panel):
         if self._on_add_cb is not None:
             self._on_add_cb()
 
-    def _on_clear_clicked(self) -> None:
+    def _on_clear_clicked(self, _e=None) -> None:
         if self._on_clear_cb is not None:
             self._on_clear_cb()
 
-    def _on_delete_selected_clicked(self) -> None:
+    def _on_delete_selected_clicked(self, _e=None) -> None:
         if self._on_delete_selected_cb is not None:
             self._on_delete_selected_cb()
 

@@ -18,7 +18,9 @@ import wx
 
 from crystalsweep.ui.view.custom.colormaps import COLORMAP_NAMES
 from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle, FlatButton
+from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME
+from wxutils import FlatButton
 
 __all__ = ["ImageSettingsPopup"]
 
@@ -156,8 +158,8 @@ class ImageSettingsPopup(wx.Frame):
         bin_row.Add(self._bin_choice, 1, wx.EXPAND)
         sizer.Add(bin_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
-        reset_btn = FlatButton(parent, label="Reset View")
-        reset_btn.set_action(self._evt_reset_view)
+        reset_btn = FlatButton(parent, label="Reset View", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        reset_btn.SetAction(self._evt_reset_view)
         sizer.Add(reset_btn, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
     def _evt_colormap(self, colormap: str) -> None:
@@ -190,7 +192,7 @@ class ImageSettingsPopup(wx.Frame):
             pass
         event.Skip()
 
-    def _evt_reset_view(self) -> None:
+    def _evt_reset_view(self, _e=None) -> None:
         self._on_reset_view()
         self.Hide()
         self.Destroy()

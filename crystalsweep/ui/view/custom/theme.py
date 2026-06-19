@@ -68,3 +68,13 @@ LIVE_OFF = wx.Colour(90, 90, 95)
 LIVE_ON = wx.Colour(180, 40, 40)
 LIVE_ON_HOVER = wx.Colour(210, 55, 55)
 LIVE_OFF_HOVER = wx.Colour(120, 120, 125)
+
+def btn_font() -> wx.Font:
+    """Return the standard FlatButton font. Call after wx.App is created."""
+    return scaled_font(12)
+
+BTN_DISABLED = (DISABLED_BG, DISABLED_FG)
+
+DEFAULT_SCHEME = (POPUP_BTN_BG, POPUP_BTN_HOVER, POPUP_BTN_PRESS, FG_PRIMARY, FG_PRIMARY)
+DANGER_SCHEME  = (POPUP_BTN_BG, DANGER_HOVER, DANGER_PRESS, wx.Colour(230, 90, 90), FG_PRIMARY)
+MUTED_SCHEME   = (wx.Colour(38, 38, 44), wx.Colour(55, 60, 75), wx.Colour(30, 35, 55), wx.Colour(120, 150, 190), wx.Colour(120, 150, 190))

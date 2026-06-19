@@ -29,7 +29,9 @@ from crystalsweep.ui.view.custom.theme import (
     PONI_LOADED,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DarkToggle, FlatButton
+from crystalsweep.ui.view.custom.widgets import DarkToggle
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME
+from wxutils import FlatButton
 
 __all__ = ["CollectView"]
 
@@ -157,9 +159,9 @@ class CollectView(wx.Panel):
 
         self._progress_bar = _ProgressBar(self)
 
-        self._collect_btn = FlatButton(self, "Collect", color_scheme=_COLLECT_SCHEME)
+        self._collect_btn = FlatButton(self, "Collect", color_scheme=_COLLECT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._collect_btn.SetMinSize((120, 42))
-        self._collect_btn.set_action(self._on_btn_clicked)
+        self._collect_btn.SetAction(self._on_btn_clicked)
 
         self._test_mode_toggle = DarkToggle(self, "Test mode")
         self._test_mode_toggle.SetBackgroundColour(BG_CARD)
@@ -271,7 +273,7 @@ class CollectView(wx.Panel):
         self.set_status(message, DANGER)
         self.set_collecting(False)
 
-    def _on_btn_clicked(self) -> None:
+    def _on_btn_clicked(self, _e=None) -> None:
         if self._collecting:
             if self._on_abort_cb is not None:
                 self._on_abort_cb()
