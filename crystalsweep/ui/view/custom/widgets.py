@@ -62,7 +62,6 @@ __all__ = [
     "DarkHScrollBar",
     "DarkTabbedPanel",
     "DarkTextCtrl",
-    "DarkToggle",
     "FrameLabel",
     "IconButton",
     "LiveToggle",
@@ -504,107 +503,6 @@ class DarkTextCtrl(wx.Panel):
             tw, th = gc.GetTextExtent(self._placeholder)
             tx = (w - tw) / 2 if self._centered else x_pad
             gc.DrawText(self._placeholder, tx, (h - th) / 2)
-
-
-class DarkToggle(wx.Panel):
-    """Custom-painted checkbox, dark-styled."""
-
-    _BOX_W, _BOX_H, _R = 13, 13, 2
-
-    def __init__(self, parent: wx.Window, label: str, value: bool = False) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
-        self._label = label
-        self._value = value
-        self._hovered = False
-        self._locked = False
-        self._callback: Callable[[bool], None] | None = None
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.SetBackgroundColour(POPUP_BG)
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_LEFT_UP, self._on_click)
-        self.Bind(wx.EVT_ENTER_WINDOW, self._on_enter)
-        self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave_toggle)
-        self.Bind(wx.EVT_SIZE, self._on_size)
-
-    def _on_enter(self, event: wx.MouseEvent) -> None:
-        self._hovered = True
-        self.Refresh()
-        event.Skip()
-
-    def _on_leave_toggle(self, event: wx.MouseEvent) -> None:
-        self._hovered = False
-        self.Refresh()
-        event.Skip()
-
-    def _on_size(self, event: wx.SizeEvent) -> None:
-        self.Refresh()
-        event.Skip()
-
-    def DoGetBestSize(self) -> wx.Size:
-        dc = wx.ClientDC(self)
-        dc.SetFont(scaled_font(12))
-        tw, th = dc.GetTextExtent(self._label)
-        return wx.Size(self._BOX_W + 8 + tw + 8, max(26, self._BOX_H + 8))
-
-    def GetValue(self) -> bool:
-        return self._value
-
-    def SetValue(self, value: bool) -> None:
-        self._value = value
-        self.Refresh()
-
-    def SetLocked(self, locked: bool) -> None:
-        self._locked = locked
-        self.Refresh()
-
-    def Bind(self, event, handler, source=None, id=wx.ID_ANY, id2=wx.ID_ANY):
-        if event == wx.EVT_CHECKBOX:
-            self._callback = handler
-        else:
-            super().Bind(event, handler, source, id, id2)
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(POPUP_BG))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        cy = h / 2
-        bx, by = 4, cy - self._BOX_H / 2
-        if self._locked:
-            gc.SetBrush(wx.Brush(DISABLED_BG))
-            gc.SetPen(wx.Pen(DISABLED_FG, 1))
-        elif self._value:
-            gc.SetBrush(wx.Brush(PONI_LOADED))
-            gc.SetPen(wx.Pen(PONI_LOADED, 1))
-        else:
-            gc.SetBrush(wx.Brush(BG_ELEVATED))
-            gc.SetPen(wx.Pen(SEP_COLOUR, 1))
-        gc.DrawRoundedRectangle(bx, by, self._BOX_W, self._BOX_H, self._R)
-        if self._value:
-            pen_colour = DISABLED_FG if self._locked else BG_SURFACE
-            gc.SetPen(wx.Pen(pen_colour, 2))
-            gc.SetBrush(wx.TRANSPARENT_BRUSH)
-            path = gc.CreatePath()
-            path.MoveToPoint(bx + 3, by + self._BOX_H / 2)
-            path.AddLineToPoint(bx + self._BOX_W * 0.42, by + self._BOX_H - 3.5)
-            path.AddLineToPoint(bx + self._BOX_W - 3, by + 3)
-            gc.StrokePath(path)
-        font = scaled_font(12)
-        text_colour = DISABLED_FG if self._locked else FG_SECONDARY
-        gc.SetFont(font, text_colour)
-        _, th = gc.GetTextExtent(self._label)
-        gc.DrawText(self._label, bx + self._BOX_W + 8, cy - th / 2)
-
-    def _on_click(self, event: wx.MouseEvent) -> None:
-        if self._locked:
-            return
-        self._value = not self._value
-        self.Refresh()
-        if self._callback is not None:
-            self._callback(self._value)
-        event.Skip()
 
 
 class DarkCombo(wx.Panel):

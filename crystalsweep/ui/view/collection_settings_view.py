@@ -28,9 +28,9 @@ from crystalsweep.ui.view.custom.theme import (
     FG_SECONDARY,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, MUTED_SCHEME
-from wxutils import FlatButton
+from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, MUTED_SCHEME, TOGGLE_SCHEME
+from wxutils import FlatButton, FlatCheckBox
 
 __all__ = ["CollectionSettingsView"]
 
@@ -418,15 +418,15 @@ class CollectionSettingsView(wx.Panel):
         row.Add(self._step_ctrl, 2, wx.EXPAND)
         row.AddSpacer(8)
 
-        self._flip_toggle = DarkToggle(self, "Flip", value=True)
+        self._flip_toggle = FlatCheckBox(self, "Flip", value=True, check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._flip_toggle.SetBackgroundColour(BG_CARD)
-        self._flip_toggle.Bind(wx.EVT_CHECKBOX, self._on_flip_toggle_changed)
+        self._flip_toggle.SetAction(lambda v: self._on_flip_toggle_changed(v))
         row.Add(self._flip_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(8)
 
-        self._map_toggle = DarkToggle(self, "Map")
+        self._map_toggle = FlatCheckBox(self, "Map", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._map_toggle.SetBackgroundColour(BG_CARD)
-        self._map_toggle.Bind(wx.EVT_CHECKBOX, self._on_map_toggle_changed)
+        self._map_toggle.SetAction(lambda v: self._on_map_toggle_changed(v))
         row.Add(self._map_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
 
         self._scan_row = row
@@ -557,8 +557,8 @@ class CollectionSettingsView(wx.Panel):
             self._update_selected_btn,
         ):
             ctrl.Enable(enabled)
-        self._map_toggle.SetLocked(not enabled)
-        self._flip_toggle.SetLocked(not enabled)
+        self._map_toggle.Enable(enabled)
+        self._flip_toggle.Enable(enabled)
         lbl_colour = FG_SECONDARY if enabled else DISABLED_FG
         for lbl in (self._type_lbl, self._exp_lbl, self._rot_start_lbl, self._rot_end_lbl, self._rot_range_lbl, self._step_lbl):
             lbl.SetForegroundColour(lbl_colour)

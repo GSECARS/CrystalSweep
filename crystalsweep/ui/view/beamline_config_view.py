@@ -20,9 +20,9 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.icons import draw_folder
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, IconButton, RadioDot
-from wxutils import FlatButton
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font, TOGGLE_SCHEME
+from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar, DarkTextCtrl, IconButton, RadioDot
+from wxutils import FlatButton, FlatCheckBox
 
 __all__ = [
     "GeneralConfigView",
@@ -444,7 +444,7 @@ class _RotationRow(_TableRow):
         self.pv_ctrl = DarkTextCtrl(self, value=rm.pv if rm else "", placeholder=_PLACEHOLDER_ROTATION_PV)
         self.precision_ctrl = DarkTextCtrl(self, value=str(rm.precision) if rm else "4", placeholder=_PLACEHOLDER_MOTOR_PRECISION)
         self.beam_angle_ctrl = DarkTextCtrl(self, value=str(rm.beam_angle) if rm else "0.0", placeholder="0.0")
-        self.centering_toggle = DarkToggle(self, "")
+        self.centering_toggle = FlatCheckBox(self, "", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self.centering_toggle.SetBackgroundColour(BG_CARD)
         self.centering_toggle.SetValue(rm.centering_enabled if rm else False)
         self.controller_combo = DarkCombo(self, choices=["epics"], selection=0)
@@ -522,11 +522,11 @@ class _MotorRow(_TableRow):
         self.pv_ctrl = DarkTextCtrl(self, value=motor.pv, placeholder=_PLACEHOLDER_MOTOR_PV)
         self.precision_ctrl = DarkTextCtrl(self, value=str(motor.precision), placeholder=_PLACEHOLDER_MOTOR_PRECISION)
 
-        self.mapping_toggle = DarkToggle(self, "")
+        self.mapping_toggle = FlatCheckBox(self, "", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self.mapping_toggle.SetBackgroundColour(bg)
         self.mapping_toggle.SetValue(motor.mapping_enabled)
 
-        self.centering_toggle = DarkToggle(self, "")
+        self.centering_toggle = FlatCheckBox(self, "", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self.centering_toggle.SetBackgroundColour(bg)
         self.centering_toggle.SetValue(motor.centering_enabled)
 
@@ -1024,7 +1024,7 @@ class CrysalisConfigView(wx.Panel):
         ccd_row.AddSpacer(4)
         ccd_row.Add(self._crysalis_ccd_btn, 0, wx.ALIGN_CENTER_VERTICAL)
 
-        self._crysalis_startup_chk = DarkToggle(c_body, "Load on startup")
+        self._crysalis_startup_chk = FlatCheckBox(c_body, "Load on startup", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
 
         c_sizer = wx.BoxSizer(wx.VERTICAL)
         c_sizer.Add(_label(c_body, "PAR file", secondary=True), 0, wx.BOTTOM, 4)

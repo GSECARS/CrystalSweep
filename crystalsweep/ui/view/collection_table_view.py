@@ -26,9 +26,9 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, MUTED_SCHEME, FG_SECONDARY, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle
-from wxutils import FlatButton
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, MUTED_SCHEME, FG_SECONDARY, SEP_COLOUR, scaled_font, TOGGLE_SCHEME
+from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar, DarkTextCtrl
+from wxutils import FlatButton, FlatCheckBox
 
 __all__ = ["CollectionTableView"]
 
@@ -791,10 +791,10 @@ class CollectionTableView(wx.Panel):
         self._collecting = collecting
         self._delete_selected_btn.Enable(not collecting)
         self._clear_btn.Enable(not collecting)
-        self._slew_scan_toggle.SetLocked(collecting)
-        self._use_ext_toggle.SetLocked(collecting)
-        self._keep_shutter_open_toggle.SetLocked(collecting)
-        self._snake_combine_toggle.SetLocked(collecting)
+        self._slew_scan_toggle.Enable(not collecting)
+        self._use_ext_toggle.Enable(not collecting)
+        self._keep_shutter_open_toggle.Enable(not collecting)
+        self._snake_combine_toggle.Enable(not collecting)
         self._header.set_collecting(collecting)
         if not collecting:
             self._active_index = None
@@ -901,25 +901,25 @@ class CollectionTableView(wx.Panel):
         self._clear_btn.SetMinSize((70, 22))
         self._clear_btn.SetAction(self._on_clear_clicked)
 
-        self._slew_scan_toggle = DarkToggle(self, "Trajectory scanning")
+        self._slew_scan_toggle = FlatCheckBox(self, "Trajectory scanning", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._slew_scan_toggle.SetBackgroundColour(BG_CARD)
         self._slew_scan_toggle.SetValue(True)
         self._slew_scan_toggle.Hide()
-        self._slew_scan_toggle.Bind(wx.EVT_CHECKBOX, self._on_trajectory_toggled)
+        self._slew_scan_toggle.SetAction(lambda v: self._on_trajectory_toggled(v))
 
-        self._use_ext_toggle = DarkToggle(self, "Use Ext.")
+        self._use_ext_toggle = FlatCheckBox(self, "Use Ext.", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._use_ext_toggle.SetBackgroundColour(BG_CARD)
         self._use_ext_toggle.SetValue(True)
-        self._use_ext_toggle.Bind(wx.EVT_CHECKBOX, self._on_use_ext_toggled)
+        self._use_ext_toggle.SetAction(lambda v: self._on_use_ext_toggled(v))
 
-        self._keep_shutter_open_toggle = DarkToggle(self, "Keep shutter open")
+        self._keep_shutter_open_toggle = FlatCheckBox(self, "Keep shutter open", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._keep_shutter_open_toggle.SetBackgroundColour(BG_CARD)
-        self._keep_shutter_open_toggle.Bind(wx.EVT_CHECKBOX, self._on_keep_shutter_open_toggled)
+        self._keep_shutter_open_toggle.SetAction(lambda v: self._on_keep_shutter_open_toggled(v))
         self._keep_shutter_open_toggle.Hide()
 
-        self._snake_combine_toggle = DarkToggle(self, "Combine map")
+        self._snake_combine_toggle = FlatCheckBox(self, "Combine map", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._snake_combine_toggle.SetBackgroundColour(BG_CARD)
-        self._snake_combine_toggle.Bind(wx.EVT_CHECKBOX, self._on_snake_combine_toggled)
+        self._snake_combine_toggle.SetAction(lambda v: self._on_snake_combine_toggled(v))
         self._snake_combine_toggle.Hide()
 
         title_row = wx.BoxSizer(wx.HORIZONTAL)

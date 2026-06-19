@@ -24,13 +24,16 @@ import wx
 from crystalsweep.ui.view.custom.icons import draw_folder, draw_folder_open, draw_refresh, draw_update
 from crystalsweep.ui.view.custom.theme import (
     BG_CARD,
+    BTN_DISABLED,
     DISABLED_FG,
     FG_SECONDARY,
     PONI_LOADED,
     SEP_COLOUR,
     scaled_font,
+    TOGGLE_SCHEME,
 )
-from crystalsweep.ui.view.custom.widgets import DarkTextCtrl, DarkToggle, IconButton
+from crystalsweep.ui.view.custom.widgets import DarkTextCtrl, IconButton
+from wxutils import FlatCheckBox
 
 __all__ = ["FileSettingsView"]
 
@@ -166,15 +169,15 @@ class FileSettingsView(wx.Panel):
         self._path_status_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
         self._path_status_label.SetBackgroundColour(BG_CARD)
         self._path_status_label.SetForegroundColour(FG_SECONDARY)
-        self._hdf5_toggle = DarkToggle(self, "HDF5")
+        self._hdf5_toggle = FlatCheckBox(self, "HDF5", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._hdf5_toggle.SetBackgroundColour(BG_CARD)
-        self._hdf5_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_hdf5_changed_cb, v))
-        self._cbf_toggle = DarkToggle(self, "CBF")
+        self._hdf5_toggle.SetAction(lambda v: self._fire(self._on_hdf5_changed_cb, v))
+        self._cbf_toggle = FlatCheckBox(self, "CBF", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._cbf_toggle.SetBackgroundColour(BG_CARD)
-        self._cbf_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_cbf_changed_cb, v))
-        self._tif_toggle = DarkToggle(self, "TIF")
+        self._cbf_toggle.SetAction(lambda v: self._fire(self._on_cbf_changed_cb, v))
+        self._tif_toggle = FlatCheckBox(self, "TIF", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._tif_toggle.SetBackgroundColour(BG_CARD)
-        self._tif_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_tif_changed_cb, v))
+        self._tif_toggle.SetAction(lambda v: self._fire(self._on_tif_changed_cb, v))
         row.SetMinSize((-1, 22))
         row.Add(self._path_status_label, 1, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(8)
@@ -199,9 +202,9 @@ class FileSettingsView(wx.Panel):
         vsep1 = wx.Panel(self, size=(1, -1))
         vsep1.SetBackgroundColour(SEP_COLOUR)
 
-        self._crysalis_toggle = DarkToggle(self, "Use CrysAlis")
+        self._crysalis_toggle = FlatCheckBox(self, "Use CrysAlis", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._crysalis_toggle.SetBackgroundColour(BG_CARD)
-        self._crysalis_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_crysalis_changed_cb, v))
+        self._crysalis_toggle.SetAction(lambda v: self._fire(self._on_crysalis_changed_cb, v))
         self._crysalis_cal_label = wx.StaticText(self, label="Not loaded", style=wx.ST_ELLIPSIZE_START | wx.ALIGN_RIGHT | wx.ST_NO_AUTORESIZE)
         self._crysalis_cal_label.SetFont(cal_font)
         self._crysalis_cal_label.SetForegroundColour(FG_SECONDARY)
@@ -209,9 +212,9 @@ class FileSettingsView(wx.Panel):
         self._crysalis_cal_btn = IconButton(self, draw_folder, size=16, tooltip="Load CrysAlis calibration", bg=BG_CARD)
         self._crysalis_cal_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_calibration())
 
-        self._apex_toggle = DarkToggle(self, "Use APEX")
+        self._apex_toggle = FlatCheckBox(self, "Use APEX", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._apex_toggle.SetBackgroundColour(BG_CARD)
-        self._apex_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_apex_changed_cb, v))
+        self._apex_toggle.SetAction(lambda v: self._fire(self._on_apex_changed_cb, v))
         self._apex_cal_label = wx.StaticText(self, label="Not loaded", style=wx.ST_ELLIPSIZE_START | wx.ALIGN_RIGHT | wx.ST_NO_AUTORESIZE)
         self._apex_cal_label.SetFont(cal_font)
         self._apex_cal_label.SetForegroundColour(FG_SECONDARY)
@@ -309,12 +312,12 @@ class FileSettingsView(wx.Panel):
             self._cbf_toggle,
             self._tif_toggle,
         ):
-            toggle.SetLocked(not enabled)
+            toggle.Enable(enabled)
         if enabled:
             self._apply_detector_format_lock()
             self._refresh_crysalis_toggle_lock()
         else:
-            self._crysalis_toggle.SetLocked(True)
+            self._crysalis_toggle.Enable(False)
         self._path_status_label.Enable(True)
         lbl_colour = FG_SECONDARY if enabled else DISABLED_FG
         for lbl in (self._filename_lbl, self._frame_lbl, self._path_lbl, self._map_ext_lbl):
@@ -359,19 +362,19 @@ class FileSettingsView(wx.Panel):
         format_key = self._detector_format
         if format_key == "hdf5":
             self._hdf5_toggle.SetValue(True)
-            self._hdf5_toggle.SetLocked(True)
+            self._hdf5_toggle.Enable(False)
         else:
-            self._hdf5_toggle.SetLocked(False)
+            self._hdf5_toggle.Enable(True)
         if format_key == "cbf":
             self._cbf_toggle.SetValue(True)
-            self._cbf_toggle.SetLocked(True)
+            self._cbf_toggle.Enable(False)
         else:
-            self._cbf_toggle.SetLocked(False)
+            self._cbf_toggle.Enable(True)
         if format_key == "tif":
             self._tif_toggle.SetValue(True)
-            self._tif_toggle.SetLocked(True)
+            self._tif_toggle.Enable(False)
         else:
-            self._tif_toggle.SetLocked(False)
+            self._tif_toggle.Enable(True)
 
     def set_crysalis(self, value: bool) -> None:
         self._crysalis_toggle.SetValue(value)
@@ -388,7 +391,7 @@ class FileSettingsView(wx.Panel):
 
     def _refresh_crysalis_toggle_lock(self) -> None:
         par_loaded = self._crysalis_cal_label.GetLabel() != "Not loaded"
-        self._crysalis_toggle.SetLocked(not par_loaded)
+        self._crysalis_toggle.Enable(par_loaded)
         if not par_loaded:
             self._crysalis_toggle.SetValue(False)
 

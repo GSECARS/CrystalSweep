@@ -18,9 +18,9 @@ import wx
 
 from crystalsweep.ui.view.custom.colormaps import COLORMAP_NAMES
 from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME
-from wxutils import FlatButton
+from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TOGGLE_SCHEME
+from wxutils import FlatButton, FlatCheckBox
 
 __all__ = ["ImageSettingsPopup"]
 
@@ -137,12 +137,12 @@ class ImageSettingsPopup(wx.Frame):
         levels_row.Add(self._max_ctrl, 1, wx.EXPAND)
         sizer.Add(levels_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
-        self._auto_scale_cb = DarkToggle(parent, label="Auto-scale contrast", value=auto_scale)
-        self._auto_scale_cb.Bind(wx.EVT_CHECKBOX, self._evt_auto_scale)
+        self._auto_scale_cb = FlatCheckBox(parent, label="Auto-scale contrast", value=auto_scale, check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
+        self._auto_scale_cb.SetAction(lambda v: self._evt_auto_scale(v))
         sizer.Add(self._auto_scale_cb, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
-        self._filter_gaps_cb = DarkToggle(parent, label="Filter gaps (zeros)", value=filter_gaps)
-        self._filter_gaps_cb.Bind(wx.EVT_CHECKBOX, self._evt_filter_gaps)
+        self._filter_gaps_cb = FlatCheckBox(parent, label="Filter gaps (zeros)", value=filter_gaps, check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
+        self._filter_gaps_cb.SetAction(lambda v: self._evt_filter_gaps(v))
         sizer.Add(self._filter_gaps_cb, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
         bin_row = wx.BoxSizer(wx.HORIZONTAL)

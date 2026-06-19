@@ -29,9 +29,8 @@ from crystalsweep.ui.view.custom.theme import (
     PONI_LOADED,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DarkToggle
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME
-from wxutils import FlatButton
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TOGGLE_SCHEME
+from wxutils import FlatButton, FlatCheckBox
 
 __all__ = ["CollectView"]
 
@@ -163,7 +162,7 @@ class CollectView(wx.Panel):
         self._collect_btn.SetMinSize((120, 42))
         self._collect_btn.SetAction(self._on_btn_clicked)
 
-        self._test_mode_toggle = DarkToggle(self, "Test mode")
+        self._test_mode_toggle = FlatCheckBox(self, "Test mode", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._test_mode_toggle.SetBackgroundColour(BG_CARD)
 
         self._eta_label = wx.StaticText(self, label="")
@@ -215,7 +214,7 @@ class CollectView(wx.Panel):
 
     def set_collecting(self, collecting: bool) -> None:
         self._collecting = collecting
-        self._test_mode_toggle.SetLocked(collecting)
+        self._test_mode_toggle.Enable(not collecting)
         if collecting:
             self._collect_btn.SetLabel("Abort")
             self._collect_btn._idle_bg = _ABORT_SCHEME[0]
