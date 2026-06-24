@@ -64,7 +64,6 @@ __all__ = [
     "RadioDot",
     "ReadbackBox",
     "SectionDivider",
-    "ThemedSplitter",
 ]
 
 
@@ -792,57 +791,6 @@ class SectionDivider(wx.Control):
         gc.StrokeLine(pad, cy, tx - pad, cy)
         gc.StrokeLine(tx + tw + pad, cy, w - pad, cy)
         gc.DrawText(self._label, tx, ty)
-
-
-_SASH_COLOUR = wx.Colour(60, 60, 65)
-_SASH_HOVER_COLOUR = wx.Colour(90, 90, 100)
-
-
-class ThemedSplitter(wx.SplitterWindow):
-    """SplitterWindow with a dark-themed sash overlay panel and hover highlight."""
-
-    def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, style=wx.SP_LIVE_UPDATE)
-        self._overlay = wx.Panel(self, style=wx.BORDER_NONE)
-        self._overlay.SetBackgroundColour(_SASH_COLOUR)
-        self._overlay.SetCursor(wx.Cursor(wx.CURSOR_SIZEWE))
-        self._overlay.Bind(wx.EVT_ENTER_WINDOW, self._on_sash_enter)
-        self._overlay.Bind(wx.EVT_LEAVE_WINDOW, self._on_sash_leave)
-        self._overlay.Bind(wx.EVT_LEFT_DOWN, self._on_sash_down)
-        self.Bind(wx.EVT_SPLITTER_SASH_POS_CHANGED, self._reposition_overlay)
-        self.Bind(wx.EVT_SPLITTER_SASH_POS_CHANGING, self._reposition_overlay)
-        self.Bind(wx.EVT_SIZE, self._reposition_overlay)
-
-    def _reposition_overlay(self, event: wx.Event | None = None) -> None:
-        if event is not None:
-            event.Skip()
-        pos = self.GetSashPosition()
-        if pos <= 0:
-            self._overlay.Hide()
-            return
-        _, h = self.GetClientSize()
-        sash_w = self.GetSashSize()
-        self._overlay.SetSize(pos, 0, sash_w, h)
-        self._overlay.Raise()
-        self._overlay.Show()
-
-    def _on_sash_enter(self, event: wx.MouseEvent) -> None:
-        self._overlay.SetBackgroundColour(_SASH_HOVER_COLOUR)
-        self._overlay.Refresh()
-        event.Skip()
-
-    def _on_sash_leave(self, event: wx.MouseEvent) -> None:
-        self._overlay.SetBackgroundColour(_SASH_COLOUR)
-        self._overlay.Refresh()
-        event.Skip()
-
-    def _on_sash_down(self, event: wx.MouseEvent) -> None:
-        pt = self._overlay.ClientToScreen(event.GetPosition())
-        pt = self.ScreenToClient(pt)
-        new_event = wx.MouseEvent(wx.wxEVT_LEFT_DOWN)
-        new_event.SetPosition(pt)
-        wx.PostEvent(self, new_event)
-        event.Skip()
 
 
 class DarkAbortingDialog(wx.Dialog):

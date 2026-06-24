@@ -27,7 +27,6 @@ from crystalsweep.ui.view.custom.widgets import (
     LiveToggle,
     ReadbackBox,
     SectionDivider,
-    ThemedSplitter,
 )
 
 __all__ = [
@@ -47,5 +46,4 @@ __all__ = [
     "LiveToggle",
     "ReadbackBox",
     "SectionDivider",
-    "ThemedSplitter",
 ]

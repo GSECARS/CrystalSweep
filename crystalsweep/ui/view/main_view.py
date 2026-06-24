@@ -22,8 +22,9 @@ from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
-from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkConfirmDialog, DarkMenuBar, DarkTabbedPanel, SectionDivider, ThemedSplitter
+from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font, SPLITTER_SCHEME
+from crystalsweep.ui.view.custom.widgets import DarkConfirmDialog, DarkMenuBar, DarkTabbedPanel, SectionDivider
+from wxutils import FlatSplitter
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.preview_view import PreviewView
 
@@ -52,7 +53,7 @@ class MainView(wx.Frame):
         self._abort_cb: Callable[[], None] | None = None
 
         self._collecting = False
-        self._splitter = ThemedSplitter(self)
+        self._splitter = FlatSplitter(self, splitter_scheme=SPLITTER_SCHEME)
         self._splitter.SetSashGravity(0.0)
         self._splitter.SetMinimumPaneSize(180)
 
