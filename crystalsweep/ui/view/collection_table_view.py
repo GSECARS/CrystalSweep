@@ -26,9 +26,9 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, MUTED_SCHEME, FG_SECONDARY, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, MUTED_SCHEME, FG_SECONDARY, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME
+
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar
 
 __all__ = ["CollectionTableView"]
 
@@ -279,7 +279,7 @@ class _CollectionRow(wx.Panel):
             self._move_btn.SetToolTip("Move motors to stored positions")
             self._move_btn.SetAction(self._dispatch_move)
 
-        self._type_combo = DarkCombo(self, choices=list(SCAN_TYPES), choice_colours=_TYPE_COLOURS)
+        self._type_combo = FlatCombo(self, choices=list(SCAN_TYPES), choice_colours=_TYPE_COLOURS, combo_scheme=COMBO_SCHEME)
         self._type_combo.SetMinSize((-1, inner_h))
         self._type_combo.Bind(wx.EVT_CHOICE, self._on_type_commit)
 
@@ -945,7 +945,7 @@ class CollectionTableView(wx.Panel):
         header_border = wx.Panel(self, size=(-1, 1))
         header_border.SetBackgroundColour(_BORDER)
 
-        self._scrollbar = DarkScrollBar(self, on_scroll=self._on_sb_scroll)
+        self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll, scrollbar_scheme=SCROLLBAR_SCHEME)
         self._viewport = _RowsViewport(
             self,
             on_scroll_changed=self._on_scroll_changed,
@@ -1186,7 +1186,7 @@ class CollectionTableView(wx.Panel):
         self._viewport.scroll_to(fraction)
 
     def _on_scroll_changed(self, pos: float, size: float) -> None:
-        self._scrollbar.update(pos, size)
+        self._scrollbar.Update(pos, size)
 
     def _on_size(self, event: wx.SizeEvent) -> None:
         widths = self._col_widths()

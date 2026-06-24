@@ -24,13 +24,18 @@ import wx
 from crystalsweep.model.collection_model import SCAN_TYPES, ScanType
 from crystalsweep.ui.view.custom.theme import (
     BG_CARD,
+    BTN_DISABLED,
+    btn_font,
+    COMBO_SCHEME,
+    DEFAULT_SCHEME,
     DISABLED_FG,
     FG_SECONDARY,
+    MUTED_SCHEME,
     scaled_font,
+    TEXT_SCHEME,
+    TOGGLE_SCHEME,
 )
-from crystalsweep.ui.view.custom.widgets import DarkCombo
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, MUTED_SCHEME, TEXT_SCHEME, TOGGLE_SCHEME
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo
 
 __all__ = ["CollectionSettingsView"]
 
@@ -135,7 +140,7 @@ class _MapDataRow(wx.Panel):
         self._optional = row_index > 0
         self._enabled = not self._optional
 
-        self.motor_combo = DarkCombo(self, choices=[], selection=0)
+        self.motor_combo = FlatCombo(self, choices=[], selection=0, combo_scheme=COMBO_SCHEME)
         self.start_ctrl = FlatTextCtrl(self, value="-0.0025", text_scheme=TEXT_SCHEME)
         self.start_ctrl.SetRestrictToFloat(True)
         self.end_ctrl = FlatTextCtrl(self, value="0.0025", text_scheme=TEXT_SCHEME)
@@ -355,11 +360,12 @@ class CollectionSettingsView(wx.Panel):
 
         self._type_lbl = self._field_label("Type", label_font)
         type_lbl = self._type_lbl
-        self._type_combo = DarkCombo(
+        self._type_combo = FlatCombo(
             self,
             choices=list(SCAN_TYPES),
             selection=0,
             choice_colours=_TYPE_COLOURS,
+            combo_scheme=COMBO_SCHEME,
         )
         self._type_combo.Bind(wx.EVT_CHOICE, self._on_type_choice)
         row.Add(type_lbl, 0, wx.ALIGN_CENTER_VERTICAL)

@@ -20,9 +20,9 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.icons import draw_folder
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar, IconButton, RadioDot
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME
+from crystalsweep.ui.view.custom.widgets import IconButton, RadioDot
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar
 
 __all__ = [
     "GeneralConfigView",
@@ -247,10 +247,10 @@ class _DetectorRow(_TableRow):
         self.name_ctrl = FlatTextCtrl(self, value=detector.name, placeholder=_PLACEHOLDER_DETECTOR_NAME, text_scheme=TEXT_SCHEME)
         det_display = _DET_TYPE_TO_LABEL.get(detector.type, _DETECTOR_DISPLAY_NAMES[0])
         det_sel = _DETECTOR_DISPLAY_NAMES.index(det_display) if det_display in _DETECTOR_DISPLAY_NAMES else 0
-        self.type_combo = DarkCombo(self, choices=_DETECTOR_DISPLAY_NAMES, selection=det_sel)
+        self.type_combo = FlatCombo(self, choices=_DETECTOR_DISPLAY_NAMES, selection=det_sel, combo_scheme=COMBO_SCHEME)
         fmt_display = _FMT_KEY_TO_LABEL.get(detector.file_format, _FILE_FORMAT_DISPLAY_NAMES[0])
         fmt_sel = _FILE_FORMAT_DISPLAY_NAMES.index(fmt_display) if fmt_display in _FILE_FORMAT_DISPLAY_NAMES else 0
-        self.format_combo = DarkCombo(self, choices=_FILE_FORMAT_DISPLAY_NAMES, selection=fmt_sel)
+        self.format_combo = FlatCombo(self, choices=_FILE_FORMAT_DISPLAY_NAMES, selection=fmt_sel, combo_scheme=COMBO_SCHEME)
         self.prefix_ctrl = FlatTextCtrl(self, value=detector.pv_prefix, placeholder=_PLACEHOLDER_DETECTOR_PREFIX, text_scheme=TEXT_SCHEME)
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._remove_btn.SetAction(lambda _e: on_remove(self))
@@ -363,7 +363,7 @@ class _ControllerRow(_TableRow):
 
         display = _TYPE_TO_LABEL.get(controller.type, _CONTROLLER_DISPLAY_NAMES[0])
         sel = _CONTROLLER_DISPLAY_NAMES.index(display) if display in _CONTROLLER_DISPLAY_NAMES else 0
-        self.type_combo = DarkCombo(self, choices=_CONTROLLER_DISPLAY_NAMES, selection=sel)
+        self.type_combo = FlatCombo(self, choices=_CONTROLLER_DISPLAY_NAMES, selection=sel, combo_scheme=COMBO_SCHEME)
         self.type_combo.Bind(wx.EVT_CHOICE, self._on_type_changed)
 
         self._params_panel = wx.Panel(self)
@@ -447,7 +447,7 @@ class _RotationRow(_TableRow):
         self.centering_toggle = FlatCheckBox(self, "", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self.centering_toggle.SetBackgroundColour(BG_CARD)
         self.centering_toggle.SetValue(rm.centering_enabled if rm else False)
-        self.controller_combo = DarkCombo(self, choices=["epics"], selection=0)
+        self.controller_combo = FlatCombo(self, choices=["epics"], selection=0, combo_scheme=COMBO_SCHEME)
         self.controller_combo.Bind(wx.EVT_CHOICE, lambda _e: self._on_controller_changed())
 
         self.xps_group_ctrl = FlatTextCtrl(self, value=rm.xps_group if rm else "", placeholder=_PLACEHOLDER_XPS_GROUP, text_scheme=TEXT_SCHEME)
@@ -532,7 +532,7 @@ class _MotorRow(_TableRow):
 
         controller_choices = ["epics"] + controller_names
         sel = controller_choices.index(motor.controller) if motor.controller in controller_choices else 0
-        self.controller_combo = DarkCombo(self, choices=controller_choices, selection=sel)
+        self.controller_combo = FlatCombo(self, choices=controller_choices, selection=sel, combo_scheme=COMBO_SCHEME)
         self.controller_combo.Bind(wx.EVT_CHOICE, lambda _e: self._on_controller_changed())
 
         self.xps_group_ctrl = FlatTextCtrl(self, value=motor.xps_group, placeholder=_PLACEHOLDER_XPS_GROUP, text_scheme=TEXT_SCHEME)
@@ -628,9 +628,9 @@ def _status_label(parent: wx.Panel) -> wx.StaticText:
 
 
 class _DarkScrolledPanel(wx.Panel):
-    """A viewport + DarkScrollBar container that replaces wx.ScrolledWindow for
+    """A viewport + FlatScrollBar container that replaces wx.ScrolledWindow for
     dark-themed table rows. Children are stacked in a vertical sizer inside a
-    plain panel; the DarkScrollBar keeps them in sync."""
+    plain panel; the FlatScrollBar keeps them in sync."""
 
     def __init__(self, parent: wx.Window, row_height: int = _ROW_H) -> None:
         super().__init__(parent, style=wx.BORDER_NONE)
@@ -646,7 +646,7 @@ class _DarkScrolledPanel(wx.Panel):
         self._content.SetBackgroundColour(BG_CARD)
         self._content.SetSizer(self.rows_sizer)
 
-        self._scrollbar = DarkScrollBar(self, on_scroll=self._on_sb_scroll)
+        self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll, scrollbar_scheme=SCROLLBAR_SCHEME)
 
         outer = wx.BoxSizer(wx.HORIZONTAL)
         outer.Add(self._viewport, 1, wx.EXPAND)
@@ -695,9 +695,9 @@ class _DarkScrolledPanel(wx.Panel):
         total = self._content_height()
         visible = self._viewport_height()
         if total <= visible:
-            self._scrollbar.update(0.0, 1.0)
+            self._scrollbar.Update(0.0, 1.0)
         else:
-            self._scrollbar.update(self._offset / (total - visible), visible / total)
+            self._scrollbar.Update(self._offset / (total - visible), visible / total)
 
     def _sync(self) -> None:
         self._apply_offset()
@@ -1578,7 +1578,7 @@ class _ConfigDialog(wx.Dialog):
         self._viewport.SetBackgroundColour(BG_SURFACE)
         self._scroll_offset: int = 0
         self.config_panel = self._make_panel(self._viewport)
-        self._scrollbar = DarkScrollBar(self, on_scroll=self._on_sb_scroll)
+        self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll, scrollbar_scheme=SCROLLBAR_SCHEME)
         self._viewport.Bind(wx.EVT_SIZE, self._on_viewport_size)
         self._viewport.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
         self.config_panel.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
@@ -1621,9 +1621,9 @@ class _ConfigDialog(wx.Dialog):
         total = self._content_height()
         visible = self._viewport_height()
         if total <= visible:
-            self._scrollbar.update(0.0, 1.0)
+            self._scrollbar.Update(0.0, 1.0)
         else:
-            self._scrollbar.update(self._scroll_offset / (total - visible), visible / total)
+            self._scrollbar.Update(self._scroll_offset / (total - visible), visible / total)
 
     def _on_sb_scroll(self, fraction: float) -> None:
         self._scroll_offset = int(fraction * self._max_offset())

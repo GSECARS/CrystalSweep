@@ -18,10 +18,8 @@ from crystalsweep.ui.view.custom.integration_plot import IntegrationPlot
 from crystalsweep.ui.view.custom.intensity_histogram import IntensityHistogramWidget
 from crystalsweep.ui.view.custom.settings_popup import ImageSettingsPopup
 from crystalsweep.ui.view.custom.widgets import (
-    DarkCombo,
     DarkConfirmDialog,
     DarkMenuBar,
-    DarkScrollBar,
     DarkTabbedPanel,
     FlatButton,
     FrameLabel,
@@ -36,10 +34,8 @@ __all__ = [
     "COLORMAP_NAMES",
     "CUSTOM_COLORMAPS",
     "colormap_color",
-    "DarkCombo",
     "DarkConfirmDialog",
     "DarkMenuBar",
-    "DarkScrollBar",
     "DarkTabbedPanel",
     "FlatButton",
     "FrameLabel",

@@ -25,9 +25,9 @@ from crystalsweep.ui.view.custom.theme import (
     SEP_COLOUR,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DarkHScrollBar, DarkScrollBar
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME
-from wxutils import FlatButton
+
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, SCROLLBAR_SCHEME
+from wxutils import FlatButton, FlatScrollBar, FlatHScrollBar
 
 _SB_W = 8
 _SB_TRACK = wx.Colour(28, 28, 32)
@@ -126,8 +126,8 @@ class ScriptEditorDialog(wx.Dialog):
         self._editor = stc.StyledTextCtrl(self._container, style=wx.BORDER_NONE)
         self._setup_editor()
 
-        self._vscrollbar = DarkScrollBar(self._container, on_scroll=self._on_vsb_scroll)
-        self._hscrollbar = DarkHScrollBar(self._container, on_scroll=self._on_hsb_scroll)
+        self._vscrollbar = FlatScrollBar(self._container, on_scroll=self._on_vsb_scroll, scrollbar_scheme=SCROLLBAR_SCHEME)
+        self._hscrollbar = FlatHScrollBar(self._container, on_scroll=self._on_hsb_scroll, scrollbar_scheme=SCROLLBAR_SCHEME)
 
         _corner = wx.Panel(self._container, size=(_SB_W, _SB_W))
         _corner.SetBackgroundColour(_SB_TRACK)
@@ -217,19 +217,19 @@ class ScriptEditorDialog(wx.Dialog):
         visible = ed.LinesOnScreen()
         first = ed.GetFirstVisibleLine()
         if total <= visible:
-            self._vscrollbar.update(0.0, 1.0)
+            self._vscrollbar.Update(0.0, 1.0)
         else:
             scrollable = total - visible
-            self._vscrollbar.update(first / scrollable, visible / total)
+            self._vscrollbar.Update(first / scrollable, visible / total)
 
         scroll_width = ed.GetScrollWidth()
         client_width = ed.GetClientSize().width
         x_offset = ed.GetXOffset()
         if scroll_width <= client_width:
-            self._hscrollbar.update(0.0, 1.0)
+            self._hscrollbar.Update(0.0, 1.0)
         else:
             scrollable_w = scroll_width - client_width
-            self._hscrollbar.update(
+            self._hscrollbar.Update(
                 min(x_offset / scrollable_w, 1.0),
                 client_width / scroll_width,
             )

@@ -17,10 +17,9 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.colormaps import COLORMAP_NAMES
-from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkCombo
+from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font, COMBO_SCHEME
 from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME, TOGGLE_SCHEME
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo
 
 __all__ = ["ImageSettingsPopup"]
 
@@ -117,7 +116,7 @@ class ImageSettingsPopup(wx.Frame):
 
         cmap_row = wx.BoxSizer(wx.HORIZONTAL)
         cmap_row.Add(_lbl("Colormap"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        self._cmap_choice = DarkCombo(parent, choices=COLORMAP_NAMES)
+        self._cmap_choice = FlatCombo(parent, choices=COLORMAP_NAMES, combo_scheme=COMBO_SCHEME)
         if colormap in COLORMAP_NAMES:
             self._cmap_choice.SetSelection(COLORMAP_NAMES.index(colormap))
         self._cmap_choice.Bind(wx.EVT_CHOICE, self._evt_colormap)
@@ -149,7 +148,7 @@ class ImageSettingsPopup(wx.Frame):
         bin_row.Add(_lbl("Live binning"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
         self._bin_method_keys = [key for key, _ in self._BIN_METHOD_LABELS]
         bin_labels = [label for _, label in self._BIN_METHOD_LABELS]
-        self._bin_choice = DarkCombo(parent, choices=bin_labels)
+        self._bin_choice = FlatCombo(parent, choices=bin_labels, combo_scheme=COMBO_SCHEME)
         if bin_method in self._bin_method_keys:
             self._bin_choice.SetSelection(self._bin_method_keys.index(bin_method))
         else:
