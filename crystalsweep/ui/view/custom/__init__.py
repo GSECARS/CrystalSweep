@@ -24,7 +24,6 @@ from crystalsweep.ui.view.custom.widgets import (
     FlatButton,
     IconButton,
     LiveToggle,
-    ReadbackBox,
 )
 
 __all__ = [
@@ -41,5 +40,4 @@ __all__ = [
     "IntegrationPlot",
     "IntensityHistogramWidget",
     "LiveToggle",
-    "ReadbackBox",
 ]

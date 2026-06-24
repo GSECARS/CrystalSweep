@@ -34,9 +34,9 @@ from crystalsweep.ui.view.custom.theme import (
     SEP_COLOUR,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import IconButton, ReadbackBox
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME
-from wxutils import FlatButton, FlatTextCtrl
+from crystalsweep.ui.view.custom.widgets import IconButton
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME, STATUS_SCHEME
+from wxutils import FlatButton, FlatTextCtrl, StatusField
 
 __all__ = ["CenteringMotorSpec", "PreviewView"]
 
@@ -157,10 +157,10 @@ class _CenteringRow(wx.Panel):
         self._right_btn = IconButton(self, draw_chevron_right, size=self._ARROW_SIZE, tooltip=f"Move {label_text} + step", bg=BG_CARD)
         self._right_btn.Bind(wx.EVT_BUTTON, lambda _e: self._fire(self._on_right_cb))
 
-        self._value_box = ReadbackBox(self, height=self._ROW_H)
+        self._value_box = StatusField(self, height=self._ROW_H, bg=STATUS_SCHEME[0], fg=STATUS_SCHEME[1])
         self._value_box.SetMinSize((self._VALUE_W, self._ROW_H))
         self._value_box.SetMaxSize((self._VALUE_W, self._ROW_H))
-        self._value_box.set_text("—")
+        self._value_box.SetValue("—")
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(self._label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
@@ -191,7 +191,7 @@ class _CenteringRow(wx.Panel):
                 text = f"{float(value):.{self._precision}f}"
             except (TypeError, ValueError):
                 text = "—"
-        self._value_box.set_text(text)
+        self._value_box.SetValue(text)
 
     def _fire(self, cb: Callable[[CenteringMotorSpec], None] | None) -> None:
         if cb is not None:

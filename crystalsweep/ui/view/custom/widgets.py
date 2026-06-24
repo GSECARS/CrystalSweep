@@ -60,8 +60,6 @@ __all__ = [
     "DarkTabbedPanel",
     "IconButton",
     "LiveToggle",
-    "RadioDot",
-    "ReadbackBox",
 ]
 
 
@@ -695,38 +693,6 @@ class RadioDot(wx.Panel):
             if self._callback is not None:
                 self._callback()
         event.Skip()
-
-
-class ReadbackBox(wx.Control):
-    """Dark-styled read-only value display with text centred on both axes."""
-
-    def __init__(self, parent: wx.Window, height: int = 28) -> None:
-        super().__init__(parent, size=wx.Size(-1, height), style=wx.BORDER_NONE)
-        self._text = ""
-        self._font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        super().Bind(wx.EVT_PAINT, self._on_paint)
-        super().Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
-
-    def set_text(self, text: str) -> None:
-        self._text = text
-        self.Refresh()
-
-    def get_text(self) -> str:
-        return self._text
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(DISABLED_BG))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRoundedRectangle(0, 0, w, h, 3)
-        if not self._text:
-            return
-        gc.SetFont(self._font, DISABLED_FG)
-        tw, th = gc.GetTextExtent(self._text)
-        gc.DrawText(self._text, (w - tw) / 2, (h - th) / 2)
 
 
 class DarkAbortingDialog(wx.Dialog):
