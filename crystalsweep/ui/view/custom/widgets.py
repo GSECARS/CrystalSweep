@@ -58,42 +58,11 @@ __all__ = [
     "DarkMenuBar",
     "DarkMessageDialog",
     "DarkTabbedPanel",
-    "FrameLabel",
     "IconButton",
     "LiveToggle",
     "RadioDot",
     "ReadbackBox",
 ]
-
-
-class FrameLabel(wx.Control):
-    """Read-only frame-index display, centered, dark-styled."""
-
-    def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, size=wx.Size(36, 28), style=wx.BORDER_NONE)
-        self._value: str = "0"
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        super().Bind(wx.EVT_PAINT, self._on_paint)
-        super().Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
-
-    def ChangeValue(self, value: str) -> None:
-        self._value = value
-        self.Refresh()
-
-    def GetValue(self) -> str:
-        return self._value
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(BG_ELEVATED))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRoundedRectangle(0, 0, w, h, 3)
-        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
-        gc.SetFont(font, FG_PRIMARY)
-        tw, th = gc.GetTextExtent(self._value)
-        gc.DrawText(self._value, (w - tw) / 2, (h - th) / 2)
 
 
 class LiveToggle(wx.Control):
