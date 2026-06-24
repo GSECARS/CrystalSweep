@@ -28,9 +28,9 @@ from crystalsweep.ui.view.custom.theme import (
     FG_SECONDARY,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, MUTED_SCHEME, TOGGLE_SCHEME
-from wxutils import FlatButton, FlatCheckBox
+from crystalsweep.ui.view.custom.widgets import DarkCombo
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, MUTED_SCHEME, TEXT_SCHEME, TOGGLE_SCHEME
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl
 
 __all__ = ["CollectionSettingsView"]
 
@@ -136,13 +136,13 @@ class _MapDataRow(wx.Panel):
         self._enabled = not self._optional
 
         self.motor_combo = DarkCombo(self, choices=[], selection=0)
-        self.start_ctrl = DarkTextCtrl(self, value="-0.0025", parent_bg=bg)
-        self.start_ctrl.set_restrict_to_float(True)
-        self.end_ctrl = DarkTextCtrl(self, value="0.0025", parent_bg=bg)
-        self.end_ctrl.set_restrict_to_float(True)
-        self.step_ctrl = DarkTextCtrl(self, value="0.001", parent_bg=bg)
-        self.step_ctrl.set_restrict_to_float(True)
-        self.points_ctrl = DarkTextCtrl(self, value="6", parent_bg=bg)
+        self.start_ctrl = FlatTextCtrl(self, value="-0.0025", text_scheme=TEXT_SCHEME)
+        self.start_ctrl.SetRestrictToFloat(True)
+        self.end_ctrl = FlatTextCtrl(self, value="0.0025", text_scheme=TEXT_SCHEME)
+        self.end_ctrl.SetRestrictToFloat(True)
+        self.step_ctrl = FlatTextCtrl(self, value="0.001", text_scheme=TEXT_SCHEME)
+        self.step_ctrl.SetRestrictToFloat(True)
+        self.points_ctrl = FlatTextCtrl(self, value="6", text_scheme=TEXT_SCHEME)
 
         self.Bind(wx.EVT_PAINT, self._on_paint)
         self.Bind(wx.EVT_SIZE, self._on_size)
@@ -369,8 +369,8 @@ class CollectionSettingsView(wx.Panel):
 
         self._exp_lbl = self._field_label("Exp. (s)", label_font)
         exp_lbl = self._exp_lbl
-        self._exposure_ctrl = DarkTextCtrl(self, value="1.0", parent_bg=BG_CARD)
-        self._exposure_ctrl.set_restrict_to_float(True)
+        self._exposure_ctrl = FlatTextCtrl(self, value="1.0", text_scheme=TEXT_SCHEME)
+        self._exposure_ctrl.SetRestrictToFloat(True)
         self._exposure_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_exposure_enter)
         self._exposure_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_exposure_enter)
         row.Add(exp_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -379,8 +379,8 @@ class CollectionSettingsView(wx.Panel):
         row.AddSpacer(8)
 
         self._rot_range_lbl = self._field_label("Range", label_font)
-        self._rot_range_ctrl = DarkTextCtrl(self, value="180.0", parent_bg=BG_CARD)
-        self._rot_range_ctrl.set_restrict_to_float(True)
+        self._rot_range_ctrl = FlatTextCtrl(self, value="180.0", text_scheme=TEXT_SCHEME)
+        self._rot_range_ctrl.SetRestrictToFloat(True)
         self._rot_range_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_range_enter)
         self._rot_range_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_range_enter)
         row.Add(self._rot_range_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -389,8 +389,8 @@ class CollectionSettingsView(wx.Panel):
         row.AddSpacer(8)
 
         self._rot_start_lbl = self._field_label("Start", label_font)
-        self._rot_start_ctrl = DarkTextCtrl(self, value="0.0", parent_bg=BG_CARD)
-        self._rot_start_ctrl.set_restrict_to_float(True)
+        self._rot_start_ctrl = FlatTextCtrl(self, value="0.0", text_scheme=TEXT_SCHEME)
+        self._rot_start_ctrl.SetRestrictToFloat(True)
         self._rot_start_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_start_enter)
         self._rot_start_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_start_enter)
         row.Add(self._rot_start_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -399,8 +399,8 @@ class CollectionSettingsView(wx.Panel):
         row.AddSpacer(8)
 
         self._rot_end_lbl = self._field_label("End", label_font)
-        self._rot_end_ctrl = DarkTextCtrl(self, value="180.0", parent_bg=BG_CARD)
-        self._rot_end_ctrl.set_restrict_to_float(True)
+        self._rot_end_ctrl = FlatTextCtrl(self, value="180.0", text_scheme=TEXT_SCHEME)
+        self._rot_end_ctrl.SetRestrictToFloat(True)
         self._rot_end_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_end_enter)
         self._rot_end_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_end_enter)
         row.Add(self._rot_end_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -409,8 +409,8 @@ class CollectionSettingsView(wx.Panel):
         row.AddSpacer(8)
 
         self._step_lbl = self._field_label("Step (°)", label_font)
-        self._step_ctrl = DarkTextCtrl(self, value="1.0", parent_bg=BG_CARD)
-        self._step_ctrl.set_restrict_to_float(True)
+        self._step_ctrl = FlatTextCtrl(self, value="1.0", text_scheme=TEXT_SCHEME)
+        self._step_ctrl.SetRestrictToFloat(True)
         self._step_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_step_enter)
         self._step_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_step_enter)
         row.Add(self._step_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -811,7 +811,7 @@ class CollectionSettingsView(wx.Panel):
         else:
             cb(value)
 
-    def _fire_int(self, ctrl: DarkTextCtrl, cb: Callable[[int], None] | None) -> None:
+    def _fire_int(self, ctrl: FlatTextCtrl, cb: Callable[[int], None] | None) -> None:
         if cb is None:
             return
         try:
@@ -819,7 +819,7 @@ class CollectionSettingsView(wx.Panel):
         except ValueError:
             pass
 
-    def _fire_float(self, ctrl: DarkTextCtrl, cb: Callable[[float], None] | None) -> None:
+    def _fire_float(self, ctrl: FlatTextCtrl, cb: Callable[[float], None] | None) -> None:
         if cb is None:
             return
         try:

@@ -23,8 +23,8 @@ import wx
 
 from crystalsweep.ui.view.custom import IconButton, ImageCanvas, ImageSettingsPopup, IntegrationPlot, IntensityHistogramWidget, LiveToggle
 from crystalsweep.ui.view.custom.icons import draw_chevron_left, draw_chevron_right, draw_cog, draw_folder
-from crystalsweep.ui.view.custom.theme import BG_SURFACE, FG_SECONDARY, PONI_LOADED, PONI_MISSING, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkTextCtrl
+from crystalsweep.ui.view.custom.theme import BG_SURFACE, FG_SECONDARY, PONI_LOADED, PONI_MISSING, TEXT_SCHEME, scaled_font
+from wxutils import FlatTextCtrl
 
 __all__ = ["ADViewerView"]
 
@@ -103,7 +103,7 @@ class ADViewerView(wx.Panel):
         self._next_btn.Bind(wx.EVT_BUTTON, self._on_next_frame)
         self._next_btn.Hide()
 
-        self._frame_ctrl = DarkTextCtrl(overlay_parent, value="0")
+        self._frame_ctrl = FlatTextCtrl(overlay_parent, value="0", text_scheme=TEXT_SCHEME)
         self._frame_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_frame_ctrl_enter)
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_ctrl_enter)
         self._frame_ctrl.Hide()

@@ -18,9 +18,9 @@ import wx
 
 from crystalsweep.ui.view.custom.colormaps import COLORMAP_NAMES
 from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TOGGLE_SCHEME
-from wxutils import FlatButton, FlatCheckBox
+from crystalsweep.ui.view.custom.widgets import DarkCombo
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME, TOGGLE_SCHEME
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl
 
 __all__ = ["ImageSettingsPopup"]
 
@@ -126,12 +126,12 @@ class ImageSettingsPopup(wx.Frame):
 
         levels_row = wx.BoxSizer(wx.HORIZONTAL)
         levels_row.Add(_lbl("Min"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4)
-        self._min_ctrl = DarkTextCtrl(parent, value=f"{contrast_min:.4g}")
+        self._min_ctrl = FlatTextCtrl(parent, value=f"{contrast_min:.4g}", text_scheme=TEXT_SCHEME)
         self._min_ctrl.Bind(wx.EVT_KEY_DOWN, self._evt_levels_key)
         self._min_ctrl.Bind(wx.EVT_KILL_FOCUS, self._evt_levels)
         levels_row.Add(self._min_ctrl, 1, wx.EXPAND | wx.RIGHT, 8)
         levels_row.Add(_lbl("Max"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4)
-        self._max_ctrl = DarkTextCtrl(parent, value=f"{contrast_max:.4g}")
+        self._max_ctrl = FlatTextCtrl(parent, value=f"{contrast_max:.4g}", text_scheme=TEXT_SCHEME)
         self._max_ctrl.Bind(wx.EVT_KEY_DOWN, self._evt_levels_key)
         self._max_ctrl.Bind(wx.EVT_KILL_FOCUS, self._evt_levels)
         levels_row.Add(self._max_ctrl, 1, wx.EXPAND)

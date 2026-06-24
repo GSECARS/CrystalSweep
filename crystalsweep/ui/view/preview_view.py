@@ -34,9 +34,9 @@ from crystalsweep.ui.view.custom.theme import (
     SEP_COLOUR,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DarkTextCtrl, IconButton, ReadbackBox
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME
-from wxutils import FlatButton
+from crystalsweep.ui.view.custom.widgets import IconButton, ReadbackBox
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME
+from wxutils import FlatButton, FlatTextCtrl
 
 __all__ = ["CenteringMotorSpec", "PreviewView"]
 
@@ -461,17 +461,17 @@ class PreviewView(wx.Panel):
             preset_row.Add(btn, 0, wx.LEFT if i > 0 else 0, preset_gap)
         col.Add(preset_row, 0)
 
-        self._custom_ctrl = DarkTextCtrl(
+        self._custom_ctrl = FlatTextCtrl(
             self,
             value=self._format_mm(self._step_mm),
             placeholder="mm",
-            parent_bg=BG_CARD,
             centered=True,
+            text_scheme=TEXT_SCHEME,
         )
         self._custom_ctrl.SetMinSize((presets_total_w, 28))
         self._custom_ctrl.SetMaxSize((presets_total_w, 28))
-        self._custom_ctrl.set_restrict_to_float(True)
-        self._custom_ctrl.set_validator(self._validate_custom_step)
+        self._custom_ctrl.SetRestrictToFloat(True)
+        self._custom_ctrl.SetValidator(self._validate_custom_step)
         self._custom_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_custom_committed)
         self._custom_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_custom_committed)
         col.Add(self._custom_ctrl, 0, wx.TOP, 6)
@@ -697,16 +697,16 @@ class PreviewView(wx.Panel):
         range_lbl.SetFont(scaled_font(12))
         range_lbl.SetForegroundColour(FG_SECONDARY)
         range_lbl.SetBackgroundColour(BG_CARD)
-        self._auto_range_ctrl = DarkTextCtrl(panel, value="0.005", placeholder="", parent_bg=BG_CARD, centered=True)
-        self._auto_range_ctrl.set_restrict_to_float(True)
+        self._auto_range_ctrl = FlatTextCtrl(panel, value="0.005", placeholder="", centered=True, text_scheme=TEXT_SCHEME)
+        self._auto_range_ctrl.SetRestrictToFloat(True)
         self._auto_range_ctrl.SetMinSize((70, 28))
 
         step_lbl = wx.StaticText(panel, label="Step")
         step_lbl.SetFont(scaled_font(12))
         step_lbl.SetForegroundColour(FG_SECONDARY)
         step_lbl.SetBackgroundColour(BG_CARD)
-        self._auto_step_ctrl = DarkTextCtrl(panel, value="0.001", placeholder="", parent_bg=BG_CARD, centered=True)
-        self._auto_step_ctrl.set_restrict_to_float(True)
+        self._auto_step_ctrl = FlatTextCtrl(panel, value="0.001", placeholder="", centered=True, text_scheme=TEXT_SCHEME)
+        self._auto_step_ctrl.SetRestrictToFloat(True)
         self._auto_step_ctrl.SetMinSize((70, 28))
 
         inputs_row = wx.BoxSizer(wx.HORIZONTAL)

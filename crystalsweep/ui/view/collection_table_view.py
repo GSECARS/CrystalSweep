@@ -26,9 +26,9 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, MUTED_SCHEME, FG_SECONDARY, SEP_COLOUR, scaled_font, TOGGLE_SCHEME
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar, DarkTextCtrl
-from wxutils import FlatButton, FlatCheckBox
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, MUTED_SCHEME, FG_SECONDARY, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME
+from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkScrollBar
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl
 
 __all__ = ["CollectionTableView"]
 
@@ -244,8 +244,8 @@ class _CollectionRow(wx.Panel):
 
         inner_h = _ROW_H - 8
 
-        def _text(value: str, commit_attr: str) -> DarkTextCtrl:
-            ctrl = DarkTextCtrl(self, value=value)
+        def _text(value: str, commit_attr: str) -> FlatTextCtrl:
+            ctrl = FlatTextCtrl(self, value=value, text_scheme=TEXT_SCHEME)
             ctrl.SetMinSize((-1, inner_h))
             handler = self._make_commit_handler(ctrl, commit_attr)
             ctrl.Bind(wx.EVT_KILL_FOCUS, handler)
@@ -255,16 +255,16 @@ class _CollectionRow(wx.Panel):
         self._label_ctrl = _text("", "_dispatch_label")
 
         self._motor_shorthands = list(motor_shorthands)
-        self._motor_ctrls: dict[str, DarkTextCtrl] = {}
+        self._motor_ctrls: dict[str, FlatTextCtrl] = {}
         for shorthand in motor_shorthands:
             precision = motor_precisions.get(shorthand, 4)
-            ctrl = DarkTextCtrl(self, value="")
+            ctrl = FlatTextCtrl(self, value="", text_scheme=TEXT_SCHEME)
             ctrl.SetMinSize((-1, inner_h))
             handler = self._make_motor_commit_handler(ctrl, shorthand)
             ctrl.Bind(wx.EVT_KILL_FOCUS, handler)
             ctrl.Bind(wx.EVT_TEXT_ENTER, handler)
-            ctrl.set_restrict_to_float(True)
-            ctrl.set_validator(self._make_motor_validator(precision))
+            ctrl.SetRestrictToFloat(True)
+            ctrl.SetValidator(self._make_motor_validator(precision))
             self._motor_ctrls[shorthand] = ctrl
 
         self._get_btn: FlatButton | None = None
@@ -284,20 +284,20 @@ class _CollectionRow(wx.Panel):
         self._type_combo.Bind(wx.EVT_CHOICE, self._on_type_commit)
 
         self._rot_start_ctrl = _text("", "_dispatch_rot_start")
-        self._rot_start_ctrl.set_restrict_to_float(True)
-        self._rot_start_ctrl.set_validator(self._make_motor_validator(rotation_precision))
+        self._rot_start_ctrl.SetRestrictToFloat(True)
+        self._rot_start_ctrl.SetValidator(self._make_motor_validator(rotation_precision))
 
         self._rot_end_ctrl = _text("", "_dispatch_rot_end")
-        self._rot_end_ctrl.set_restrict_to_float(True)
-        self._rot_end_ctrl.set_validator(self._make_motor_validator(rotation_precision))
+        self._rot_end_ctrl.SetRestrictToFloat(True)
+        self._rot_end_ctrl.SetValidator(self._make_motor_validator(rotation_precision))
 
         self._step_ctrl = _text("", "_dispatch_step")
-        self._step_ctrl.set_restrict_to_float(True)
-        self._step_ctrl.set_validator(self._make_motor_validator(4))
+        self._step_ctrl.SetRestrictToFloat(True)
+        self._step_ctrl.SetValidator(self._make_motor_validator(4))
 
         self._time_ctrl = _text("", "_dispatch_time")
-        self._time_ctrl.set_restrict_to_float(True)
-        self._time_ctrl.set_validator(self._make_motor_validator(4))
+        self._time_ctrl.SetRestrictToFloat(True)
+        self._time_ctrl.SetValidator(self._make_motor_validator(4))
 
         self._remove_btn_panel = wx.Panel(self, style=wx.BORDER_NONE)
         self._remove_btn_panel.SetBackgroundColour(BG_CARD)
@@ -341,7 +341,7 @@ class _CollectionRow(wx.Panel):
         if self.GetBackgroundColour() != bg:
             self.SetBackgroundColour(bg)
 
-        # Programmatic value swap. DarkTextCtrl.SetValue updates the displayed
+        # Programmatic value swap. FlatTextCtrl.SetValue updates the displayed
         # text without firing EVT_TEXT_ENTER / EVT_KILL_FOCUS, so the commit
         # handlers (which would otherwise echo the swapped value back into the
         # model) do not run.
@@ -358,9 +358,9 @@ class _CollectionRow(wx.Panel):
         # Per-field limit error highlighting
         motor_errors, rot_start_error, rot_end_error = field_errors
         for shorthand, ctrl in self._motor_ctrls.items():
-            ctrl.set_limit_error(motor_errors.get(shorthand, False))
-        self._rot_start_ctrl.set_limit_error(rot_start_error)
-        self._rot_end_ctrl.set_limit_error(rot_end_error)
+            ctrl.SetLimitError(motor_errors.get(shorthand, False))
+        self._rot_start_ctrl.SetLimitError(rot_start_error)
+        self._rot_end_ctrl.SetLimitError(rot_end_error)
 
         self._apply_enabled_states(point.scan_type)
         self.Refresh()
@@ -554,9 +554,9 @@ class _CollectionRow(wx.Panel):
 
     def _apply_enabled_states(self, scan_type: ScanType) -> None:
         disabled = self._collecting
-        self._label_ctrl.set_disabled(disabled or not self._label_enabled)
+        self._label_ctrl.Enable(not disabled or not self._label_enabled)
         for ctrl in self._motor_ctrls.values():
-            ctrl.set_disabled(disabled)
+            ctrl.Enable(not disabled)
         if self._get_btn is not None:
             self._get_btn.Enable(not disabled)
         if self._move_btn is not None:
@@ -565,15 +565,15 @@ class _CollectionRow(wx.Panel):
         still = scan_type == "still"
         wide = scan_type == "wide"
         if disabled:
-            self._rot_start_ctrl.set_disabled(True)
-            self._rot_end_ctrl.set_disabled(True)
-            self._step_ctrl.set_disabled(True)
-            self._time_ctrl.set_disabled(True)
+            self._rot_start_ctrl.Enable(False)
+            self._rot_end_ctrl.Enable(False)
+            self._step_ctrl.Enable(False)
+            self._time_ctrl.Enable(False)
         else:
-            self._rot_start_ctrl.set_disabled(still)
-            self._rot_end_ctrl.set_disabled(still)
-            self._step_ctrl.set_disabled(still or wide)
-            self._time_ctrl.set_disabled(False)
+            self._rot_start_ctrl.Enable(not still)
+            self._rot_end_ctrl.Enable(not still)
+            self._step_ctrl.Enable(not still or wide)
+            self._time_ctrl.Enable(True)
         self._remove_btn.Enable(not disabled)
 
     def _on_type_commit(self, value: str) -> None:
@@ -581,7 +581,7 @@ class _CollectionRow(wx.Panel):
             self._apply_enabled_states(value)
             self._dispatch_type(value)
 
-    def _make_commit_handler(self, ctrl: DarkTextCtrl, dispatcher_attr: str) -> Callable[[wx.Event], None]:
+    def _make_commit_handler(self, ctrl: FlatTextCtrl, dispatcher_attr: str) -> Callable[[wx.Event], None]:
         # Look up the dispatcher method by name at fire-time so re-binding the
         # row to a different point is automatic — the closure only captures the
         # ctrl reference and the bound-method name.
@@ -591,7 +591,7 @@ class _CollectionRow(wx.Panel):
 
         return _handler
 
-    def _make_motor_commit_handler(self, ctrl: DarkTextCtrl, shorthand: str) -> Callable[[wx.Event], None]:
+    def _make_motor_commit_handler(self, ctrl: FlatTextCtrl, shorthand: str) -> Callable[[wx.Event], None]:
         def _handler(event: wx.Event) -> None:
             self._dispatch_motor(shorthand, ctrl.GetValue().strip())
             event.Skip()

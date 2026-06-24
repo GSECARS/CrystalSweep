@@ -30,10 +30,11 @@ from crystalsweep.ui.view.custom.theme import (
     PONI_LOADED,
     SEP_COLOUR,
     scaled_font,
+    TEXT_SCHEME,
     TOGGLE_SCHEME,
 )
-from crystalsweep.ui.view.custom.widgets import DarkTextCtrl, IconButton
-from wxutils import FlatCheckBox
+from crystalsweep.ui.view.custom.widgets import IconButton
+from wxutils import FlatCheckBox, FlatTextCtrl
 
 __all__ = ["FileSettingsView"]
 
@@ -107,14 +108,14 @@ class FileSettingsView(wx.Panel):
         self._filename_lbl = self._field_label("Filename", label_font)
         lbl = self._filename_lbl
         lbl.SetMinSize((70, -1))
-        self._filename_ctrl = DarkTextCtrl(self, parent_bg=BG_CARD)
+        self._filename_ctrl = FlatTextCtrl(self, text_scheme=TEXT_SCHEME)
         self._filename_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_filename_enter)
         self._filename_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_filename_enter)
         self._filename_update_btn = IconButton(self, draw_update, size=16, tooltip="Update filename", bg=BG_CARD)
         self._filename_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_filename_update_cb))
         self._frame_lbl = self._field_label("Frame #", label_font)
         frame_lbl = self._frame_lbl
-        self._frame_ctrl = DarkTextCtrl(self, value="0", placeholder="0", parent_bg=BG_CARD)
+        self._frame_ctrl = FlatTextCtrl(self, value="0", placeholder="0", text_scheme=TEXT_SCHEME)
         self._frame_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_frame_enter)
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_enter)
         self._frame_reset_btn = IconButton(self, draw_refresh, size=16, tooltip="Reset frame number", bg=BG_CARD)
@@ -147,7 +148,7 @@ class FileSettingsView(wx.Panel):
         self._path_lbl = self._field_label("Path", label_font)
         lbl = self._path_lbl
         lbl.SetMinSize((70, -1))
-        self._path_ctrl = DarkTextCtrl(self, parent_bg=BG_CARD)
+        self._path_ctrl = FlatTextCtrl(self, text_scheme=TEXT_SCHEME)
         self._path_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_path_enter)
         self._path_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_path_enter)
         self._path_browse_btn = IconButton(self, draw_folder_open, size=16, tooltip="Browse for directory", bg=BG_CARD)
@@ -195,7 +196,7 @@ class FileSettingsView(wx.Panel):
         self._map_ext_lbl = self._field_label("Map ext.", label_font)
         map_lbl = self._map_ext_lbl
         map_lbl.SetMinSize((70, -1))
-        self._map_ext_ctrl = DarkTextCtrl(self, parent_bg=BG_CARD)
+        self._map_ext_ctrl = FlatTextCtrl(self, text_scheme=TEXT_SCHEME)
         self._map_ext_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_map_ext_enter)
         self._map_ext_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_map_ext_enter)
 
