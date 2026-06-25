@@ -19,7 +19,6 @@ from crystalsweep.ui.view.custom.intensity_histogram import IntensityHistogramWi
 from crystalsweep.ui.view.custom.settings_popup import ImageSettingsPopup
 from crystalsweep.ui.view.custom.widgets import (
     DarkMenuBar,
-    DarkTabbedPanel,
     FlatButton,
     LiveToggle,
 )
@@ -29,7 +28,6 @@ __all__ = [
     "CUSTOM_COLORMAPS",
     "colormap_color",
     "DarkMenuBar",
-    "DarkTabbedPanel",
     "FlatButton",
     "ImageCanvas",
     "ImageSettingsPopup",

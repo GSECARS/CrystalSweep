@@ -83,6 +83,7 @@ MUTED_SCHEME   = (wx.Colour(38, 38, 44), wx.Colour(55, 60, 75), wx.Colour(30, 35
 STATUS_SCHEME  = (DISABLED_BG, DISABLED_FG)
 RADIO_SCHEME    = (BG_CARD, BG_ELEVATED, ACCENT_HOVER, FG_SECONDARY)
 PROGRESS_SCHEME = (BG_ELEVATED, ACCENT)
+TAB_SCHEME = (BG_CARD, BG_ELEVATED, wx.Colour(40, 40, 46), FG_PRIMARY, FG_SECONDARY, ACCENT, SEP_COLOUR)
 
 def dialog_scheme():
     """Return a DialogScheme using CS dark colours."""

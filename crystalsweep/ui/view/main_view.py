@@ -22,9 +22,9 @@ from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
-from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font, SPLITTER_SCHEME, DIVIDER_FG, DIVIDER_LINE, dialog_scheme, DANGER_SCHEME
-from crystalsweep.ui.view.custom.widgets import DarkMenuBar, DarkTabbedPanel
-from wxutils import FlatConfirmDialog, FlatSplitter, SectionDivider
+from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font, SPLITTER_SCHEME, DIVIDER_FG, DIVIDER_LINE, dialog_scheme, DANGER_SCHEME, TAB_SCHEME
+from crystalsweep.ui.view.custom.widgets import DarkMenuBar
+from wxutils import FlatConfirmDialog, FlatSplitter, FlatTabbedPanel, SectionDivider
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.preview_view import PreviewView
 
@@ -153,8 +153,8 @@ class MainView(wx.Frame):
     def bind_abort(self, callback: Callable[[], None]) -> None:
         self._abort_cb = callback
 
-    def _build_centering_tabs(self) -> DarkTabbedPanel:
-        tabs = DarkTabbedPanel(self._left_panel)
+    def _build_centering_tabs(self) -> FlatTabbedPanel:
+        tabs = FlatTabbedPanel(self._left_panel, scheme=TAB_SCHEME)
         tabs.SetMinSize((-1, 180))
 
         self.preview = PreviewView(tabs)
@@ -175,8 +175,8 @@ class MainView(wx.Frame):
         xrd_sizer.AddStretchSpacer(1)
         xrd_page.SetSizer(xrd_sizer)
 
-        tabs.add_page("Preview", self.preview)
-        tabs.add_page("XRD centering", xrd_page)
+        tabs.AddPage("Preview", self.preview)
+        tabs.AddPage("XRD centering", xrd_page)
         return tabs
 
     def _build_menu_bar(self) -> DarkMenuBar | None:
