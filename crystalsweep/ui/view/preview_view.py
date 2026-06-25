@@ -55,79 +55,11 @@ class CenteringMotorSpec:
 _START_SCHEME = DEFAULT_SCHEME
 _STOP_SCHEME = (DANGER, DANGER_HOVER, DANGER_PRESS, FG_PRIMARY, FG_PRIMARY)
 
-_STEP_BTN_IDLE = POPUP_BTN_BG
-_STEP_BTN_HOVER = POPUP_BTN_HOVER
-_STEP_BTN_PRESS = POPUP_BTN_PRESS
+_STEP_SCHEME = (POPUP_BTN_BG, POPUP_BTN_HOVER, POPUP_BTN_PRESS, FG_PRIMARY, FG_PRIMARY)
 
 _STEP_PRECISION = 4
 _UM_PER_MM = 1000.0
 _PREDEFINED_STEPS_UM: tuple[float, ...] = (1.0, 2.0, 5.0, 10.0)
-
-
-class _StepButton(wx.Control):
-    """Flat preset button. Click invokes its action; no toggled state."""
-
-    def __init__(self, parent: wx.Window, label: str) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE | wx.WANTS_CHARS)
-        self._label = label
-        self._hovered = False
-        self._pressed = False
-        self._action: Callable[[], None] | None = None
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.SetMinSize((-1, 28))
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
-        self.Bind(wx.EVT_ENTER_WINDOW, self._on_enter)
-        self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
-        self.Bind(wx.EVT_LEFT_DOWN, self._on_press)
-        self.Bind(wx.EVT_LEFT_UP, self._on_release)
-
-    def set_action(self, callback: Callable[[], None]) -> None:
-        self._action = callback
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(self.GetParent().GetBackgroundColour()))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        if self._pressed:
-            bg = _STEP_BTN_PRESS
-        elif self._hovered:
-            bg = _STEP_BTN_HOVER
-        else:
-            bg = _STEP_BTN_IDLE
-        gc.SetBrush(wx.Brush(bg))
-        gc.DrawRoundedRectangle(0, 0, w, h, 4)
-        font = scaled_font(12)
-        gc.SetFont(font, FG_PRIMARY)
-        tw, th = gc.GetTextExtent(self._label)
-        gc.DrawText(self._label, (w - tw) / 2, (h - th) / 2)
-
-    def _on_enter(self, event: wx.MouseEvent) -> None:
-        self._hovered = True
-        self.Refresh()
-        event.Skip()
-
-    def _on_leave(self, event: wx.MouseEvent) -> None:
-        self._hovered = False
-        self._pressed = False
-        self.Refresh()
-        event.Skip()
-
-    def _on_press(self, event: wx.MouseEvent) -> None:
-        self._pressed = True
-        self.Refresh()
-        event.Skip()
-
-    def _on_release(self, event: wx.MouseEvent) -> None:
-        was_pressed = self._pressed
-        self._pressed = False
-        self.Refresh()
-        event.Skip()
-        if was_pressed and self._action is not None:
-            wx.CallAfter(self._action)
 
 
 class _CenteringRow(wx.Panel):
@@ -452,11 +384,11 @@ class PreviewView(wx.Panel):
 
         preset_row = wx.BoxSizer(wx.HORIZONTAL)
         for i, value_um in enumerate(_PREDEFINED_STEPS_UM):
-            btn = _StepButton(self, self._format_um_label(value_um))
+            btn = FlatButton(self, self._format_um_label(value_um), color_scheme=_STEP_SCHEME)
             btn.SetToolTip(f"Set step to {self._format_um_label(value_um)} um")
             btn.SetMinSize((preset_btn_size, preset_btn_size))
             btn.SetMaxSize((preset_btn_size, preset_btn_size))
-            btn.set_action(lambda v=value_um / _UM_PER_MM: self._apply_preset(v))
+            btn.SetAction(lambda _e, v=value_um / _UM_PER_MM: self._apply_preset(v))
             preset_row.Add(btn, 0, wx.LEFT if i > 0 else 0, preset_gap)
         col.Add(preset_row, 0)
 
