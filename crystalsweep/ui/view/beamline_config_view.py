@@ -21,7 +21,7 @@ import wx
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.icons import draw_folder
 from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME, RADIO_SCHEME, icon_scheme
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar, FlatRadioButton, FlatIconButton
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar, FlatRadioButton, FlatIconButton, FlatScrolledPanel, FlatTableHeader, FlatTableRow
 
 __all__ = [
     "GeneralConfigView",
@@ -126,93 +126,24 @@ class _Section(wx.Panel):
         self.SetSizer(sizer)
 
 
-class _TableHeader(wx.Panel):
-    """Painted column-header bar matching the collection table style."""
-
+class _TableHeader(FlatTableHeader):
+    """CS table header — passes CS theme colors to the generic base."""
     def __init__(self, parent: wx.Window, labels: list[str], proportions: list[int]) -> None:
-        super().__init__(parent, size=(-1, _HEADER_H), style=wx.BORDER_NONE)
-        self.SetBackgroundColour(_HEADER_BG)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self._labels = labels
-        self._proportions = proportions
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, lambda _e: self.Refresh())
-
-    def _col_widths(self, total: int) -> list[int]:
-        total_parts = sum(self._proportions)
-        if total_parts == 0:
-            return [0] * len(self._proportions)
-        widths = [total * p // total_parts for p in self._proportions]
-        widths[-1] += total - sum(widths)
-        return widths
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(_HEADER_BG))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        widths = self._col_widths(w)
-        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
-        gc.SetFont(font, ACCENT)
-        gc.SetPen(wx.Pen(_BORDER, 1))
-        x = 0
-        for i, (label, cw) in enumerate(zip(self._labels, widths)):
-            if label:
-                tw, th = gc.GetTextExtent(label)
-                gc.DrawText(label, x + (cw - tw) / 2, (h - th) / 2)
-            if i < len(widths) - 1:
-                gc.StrokeLine(x + cw, 0, x + cw, h)
-            x += cw
-        gc.SetPen(wx.Pen(_BORDER, 1))
-        gc.StrokeLine(0, h - 1, w, h - 1)
+        from crystalsweep.ui.view.custom.theme import ACCENT, SEP_COLOUR
+        super().__init__(parent, labels, proportions, height=_HEADER_H,
+                         scheme=(wx.Colour(22, 22, 26), SEP_COLOUR, ACCENT))
 
 
-class _TableRow(wx.Panel):
-    """Base for a painted data row with absolute-positioned controls."""
+class _TableRow(FlatTableRow):
+    """CS table row base — passes CS theme colors to the generic base."""
+    def __init__(self, parent: wx.Window, proportions: list[int]) -> None:
+        from crystalsweep.ui.view.custom.theme import SEP_COLOUR
+        super().__init__(parent, proportions, height=_ROW_H,
+                         scheme=(wx.Colour(22, 22, 26), SEP_COLOUR, wx.Colour(0, 0, 0)))
 
-    def __init__(self, parent: wx.Window, bg: wx.Colour, proportions: list[int]) -> None:
-        super().__init__(parent, size=(-1, _ROW_H), style=wx.BORDER_NONE)
-        self.SetBackgroundColour(bg)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self._proportions = proportions
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, self._on_size)
+    def _row_bg(self) -> wx.Colour:
+        return BG_CARD
 
-    def _col_widths(self, total: int) -> list[int]:
-        total_parts = sum(self._proportions)
-        if total_parts == 0:
-            return [0] * len(self._proportions)
-        widths = [total * p // total_parts for p in self._proportions]
-        widths[-1] += total - sum(widths)
-        return widths
-
-    def _reposition(self) -> None:
-        """Subclasses place controls using _col_widths(self.GetClientSize().width)."""
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(self.GetBackgroundColour()))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        gc.SetPen(wx.Pen(_BORDER, 1))
-        gc.StrokeLine(0, h - 1, w, h - 1)
-        widths = self._col_widths(w)
-        x = 0
-        for i, cw in enumerate(widths[:-1]):
-            x += cw
-            gc.StrokeLine(x, 0, x, h)
-
-    def _on_size(self, event: wx.SizeEvent) -> None:
-        self._reposition()
-        self.Refresh()
-        event.Skip()
-
-    def _place(self, ctrl: wx.Window, x: int, cw: int) -> None:
-        ctrl.SetSize(x + _PAD, 4, cw - _PAD * 2, _ROW_H - 8)
 
 
 _DET_ROW_H = _ROW_H * 3 + 2
@@ -235,8 +166,7 @@ class _DetectorRow(_TableRow):
         on_make_active: Callable[["_DetectorRow"], None],
         on_remove: Callable[["_DetectorRow"], None],
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self.SetMinSize((-1, _DET_ROW_H))
         self._on_make_active = on_make_active
         self._on_remove = on_remove
@@ -256,19 +186,19 @@ class _DetectorRow(_TableRow):
 
         self._template_lbl = wx.StaticText(self, label="File template")
         self._template_lbl.SetForegroundColour(FG_SECONDARY)
-        self._template_lbl.SetBackgroundColour(bg)
+        self._template_lbl.SetBackgroundColour(self._row_bg())
         self._template_lbl.SetFont(scaled_font(11))
         self.template_ctrl = FlatTextCtrl(self, value=detector.file_template, placeholder=_PLACEHOLDER_FILE_TEMPLATE, text_scheme=TEXT_SCHEME)
 
         self._path_local_lbl = wx.StaticText(self, label="Local prefix")
         self._path_local_lbl.SetForegroundColour(FG_SECONDARY)
-        self._path_local_lbl.SetBackgroundColour(bg)
+        self._path_local_lbl.SetBackgroundColour(self._row_bg())
         self._path_local_lbl.SetFont(scaled_font(11))
         self.path_local_ctrl = FlatTextCtrl(self, value=detector.path_prefix_local, placeholder=_PLACEHOLDER_PATH_LOCAL, text_scheme=TEXT_SCHEME)
 
         self._path_remote_lbl = wx.StaticText(self, label="Remote prefix")
         self._path_remote_lbl.SetForegroundColour(FG_SECONDARY)
-        self._path_remote_lbl.SetBackgroundColour(bg)
+        self._path_remote_lbl.SetBackgroundColour(self._row_bg())
         self._path_remote_lbl.SetFont(scaled_font(11))
         self.path_remote_ctrl = FlatTextCtrl(self, value=detector.path_prefix_remote, placeholder=_PLACEHOLDER_PATH_REMOTE, text_scheme=TEXT_SCHEME)
 
@@ -351,8 +281,7 @@ class _ControllerRow(_TableRow):
         on_remove: Callable[["_ControllerRow"], None],
         on_name_changed: Callable[[], None] | None = None,
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self._on_remove = on_remove
         self._on_name_changed = on_name_changed
 
@@ -397,7 +326,7 @@ class _ControllerRow(_TableRow):
         for key, placeholder in _CONTROLLER_TYPE_PARAMS.get(controller_type, []):
             lbl = wx.StaticText(self._params_panel, label=f"{key}:")
             lbl.SetForegroundColour(FG_SECONDARY)
-            lbl.SetBackgroundColour(bg)
+            lbl.SetBackgroundColour(self._row_bg())
             lbl.SetFont(scaled_font(11))
             ctrl = FlatTextCtrl(self._params_panel, value=str(existing.get(key, "")), placeholder=placeholder, text_scheme=TEXT_SCHEME)
             self._params_sizer.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 2)
@@ -434,7 +363,7 @@ class _RotationRow(_TableRow):
     _PROPS = [3, 6, 10, 2, 3, 2, 7]
 
     def __init__(self, parent: wx.Window, motor: MotorConfig | None) -> None:
-        super().__init__(parent, BG_CARD, self._PROPS)
+        super().__init__(parent, self._PROPS)
         rm = motor
         self._controller_types: dict[str, str] = {}
 
@@ -512,8 +441,7 @@ class _MotorRow(_TableRow):
         index: int,
         on_remove: Callable[["_MotorRow"], None],
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self._controller_types = controller_types
 
         self.shorthand_ctrl = FlatTextCtrl(self, value=motor.shorthand, placeholder=_PLACEHOLDER_MOTOR_SHORT, text_scheme=TEXT_SCHEME)
@@ -522,11 +450,11 @@ class _MotorRow(_TableRow):
         self.precision_ctrl = FlatTextCtrl(self, value=str(motor.precision), placeholder=_PLACEHOLDER_MOTOR_PRECISION, text_scheme=TEXT_SCHEME)
 
         self.mapping_toggle = FlatCheckBox(self, "", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
-        self.mapping_toggle.SetBackgroundColour(bg)
+        self.mapping_toggle.SetBackgroundColour(self._row_bg())
         self.mapping_toggle.SetValue(motor.mapping_enabled)
 
         self.centering_toggle = FlatCheckBox(self, "", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
-        self.centering_toggle.SetBackgroundColour(bg)
+        self.centering_toggle.SetBackgroundColour(self._row_bg())
         self.centering_toggle.SetValue(motor.centering_enabled)
 
         controller_choices = ["epics"] + controller_names
@@ -626,94 +554,9 @@ def _status_label(parent: wx.Panel) -> wx.StaticText:
     return lbl
 
 
-class _DarkScrolledPanel(wx.Panel):
-    """A viewport + FlatScrollBar container that replaces wx.ScrolledWindow for
-    dark-themed table rows. Children are stacked in a vertical sizer inside a
-    plain panel; the FlatScrollBar keeps them in sync."""
 
-    def __init__(self, parent: wx.Window, row_height: int = _ROW_H) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
-        self.SetBackgroundColour(BG_CARD)
-        self._row_h = row_height
-        self._offset: int = 0
 
-        self._viewport = wx.Panel(self, style=wx.BORDER_NONE)
-        self._viewport.SetBackgroundColour(BG_CARD)
-
-        self.rows_sizer = wx.BoxSizer(wx.VERTICAL)
-        self._content = wx.Panel(self._viewport, style=wx.BORDER_NONE)
-        self._content.SetBackgroundColour(BG_CARD)
-        self._content.SetSizer(self.rows_sizer)
-
-        self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll, scrollbar_scheme=SCROLLBAR_SCHEME)
-
-        outer = wx.BoxSizer(wx.HORIZONTAL)
-        outer.Add(self._viewport, 1, wx.EXPAND)
-        outer.Add(self._scrollbar, 0, wx.EXPAND)
-        self.SetSizer(outer)
-
-        self._viewport.Bind(wx.EVT_SIZE, self._on_viewport_size)
-        self._viewport.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
-        self._content.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
-
-    def add_row(self, row: wx.Window) -> None:
-        self.rows_sizer.Add(row, 0, wx.EXPAND)
-        self._content.Layout()
-        self._sync()
-
-    def remove_row(self, row: wx.Window) -> None:
-        self.rows_sizer.Detach(row)
-        self._content.Layout()
-        self._sync()
-
-    def clear_rows(self) -> None:
-        self.rows_sizer.Clear(delete_windows=False)
-        self._content.Layout()
-        self._sync()
-
-    def bind_mousewheel(self, window: wx.Window) -> None:
-        window.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
-
-    def _content_height(self) -> int:
-        return self._content.GetBestSize().height
-
-    def _viewport_height(self) -> int:
-        return self._viewport.GetClientSize().height
-
-    def _max_offset(self) -> int:
-        return max(0, self._content_height() - self._viewport_height())
-
-    def _apply_offset(self) -> None:
-        self._offset = max(0, min(self._offset, self._max_offset()))
-        w = self._viewport.GetClientSize().width
-        h = max(self._content_height(), self._viewport_height())
-        self._content.SetSize(0, -self._offset, w, h)
-        self._sync_scrollbar()
-
-    def _sync_scrollbar(self) -> None:
-        total = self._content_height()
-        visible = self._viewport_height()
-        if total <= visible:
-            self._scrollbar.Update(0.0, 1.0)
-        else:
-            self._scrollbar.Update(self._offset / (total - visible), visible / total)
-
-    def _sync(self) -> None:
-        self._apply_offset()
-
-    def _on_sb_scroll(self, fraction: float) -> None:
-        self._offset = int(fraction * self._max_offset())
-        self._apply_offset()
-
-    def _on_viewport_size(self, event: wx.SizeEvent) -> None:
-        event.Skip()
-        self._apply_offset()
-
-    def _on_wheel(self, event: wx.MouseEvent) -> None:
-        delta = event.GetWheelRotation() // event.GetWheelDelta()
-        self._offset = max(0, min(self._offset - delta * self._row_h, self._max_offset()))
-        self._apply_offset()
-        event.Skip()
+_DET_ROW_H = _ROW_H * 3 + 2
 
 
 class _AbortPvRow(_TableRow):
@@ -727,8 +570,7 @@ class _AbortPvRow(_TableRow):
         index: int,
         on_remove: Callable[["_AbortPvRow"], None],
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self._on_remove = on_remove
         self.pv_ctrl = FlatTextCtrl(self, value=pv, placeholder="e.g. 13IDD:STOP", text_scheme=TEXT_SCHEME)
         self.value_ctrl = FlatTextCtrl(self, value=value, placeholder="e.g. 1", text_scheme=TEXT_SCHEME)
@@ -762,8 +604,7 @@ class _RestorePvRow(_TableRow):
         index: int,
         on_remove: Callable[["_RestorePvRow"], None],
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self._on_remove = on_remove
         self.pv_ctrl = FlatTextCtrl(self, value=pv, placeholder="e.g. 13IDD:SomePV.VAL", text_scheme=TEXT_SCHEME)
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
@@ -836,13 +677,13 @@ class GeneralConfigView(wx.Panel):
         self._abort_section = _Section(self, "Abort PVs")
         a_body = self._abort_section.body
         self._abort_header = _TableHeader(a_body, ["PV", "Value", ""], [6, 3, 1])
-        self._abort_rows_panel = _DarkScrolledPanel(a_body)
+        self._abort_rows_panel = FlatScrolledPanel(a_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                    header=self._abort_header)
         self._abort_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_abort_btn = FlatButton(a_body, "+ Add abort PV", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_abort_btn.SetMinSize((-1, 26))
         self._add_abort_btn.SetAction(self._on_add_abort_pv_clicked)
         a_sizer = wx.BoxSizer(wx.VERTICAL)
-        a_sizer.Add(self._abort_header, 0, wx.EXPAND)
         a_sizer.Add(self._abort_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         a_sizer.Add(self._add_abort_btn, 0, wx.EXPAND)
         a_body.SetSizer(a_sizer)
@@ -850,13 +691,13 @@ class GeneralConfigView(wx.Panel):
         self._restore_section = _Section(self, "Restore PVs")
         r_body = self._restore_section.body
         self._restore_header = _TableHeader(r_body, ["PV", ""], [9, 1])
-        self._restore_rows_panel = _DarkScrolledPanel(r_body)
+        self._restore_rows_panel = FlatScrolledPanel(r_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                      header=self._restore_header)
         self._restore_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_restore_btn = FlatButton(r_body, "+ Add restore PV", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_restore_btn.SetMinSize((-1, 26))
         self._add_restore_btn.SetAction(self._on_add_restore_pv_clicked)
         r_sizer = wx.BoxSizer(wx.VERTICAL)
-        r_sizer.Add(self._restore_header, 0, wx.EXPAND)
         r_sizer.Add(self._restore_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         r_sizer.Add(self._add_restore_btn, 0, wx.EXPAND)
         r_body.SetSizer(r_sizer)
@@ -924,7 +765,7 @@ class GeneralConfigView(wx.Panel):
 
     def _clear_abort_pv_rows(self) -> None:
         for row in self._abort_pv_rows:
-            self._abort_rows_panel.remove_row(row)
+            self._abort_rows_panel.RemoveRow(row)
             row.Destroy()
         self._abort_pv_rows.clear()
 
@@ -937,9 +778,9 @@ class GeneralConfigView(wx.Panel):
             index,
             on_remove=self._on_remove_abort_pv,
         )
-        self._abort_rows_panel.bind_mousewheel(row)
+        self._abort_rows_panel.BindMouseWheel(row)
         self._abort_pv_rows.append(row)
-        self._abort_rows_panel.add_row(row)
+        self._abort_rows_panel.AddRow(row)
 
     def _on_add_abort_pv_clicked(self, _e=None) -> None:
         self._append_abort_pv_row()
@@ -948,13 +789,13 @@ class GeneralConfigView(wx.Panel):
         if row not in self._abort_pv_rows:
             return
         self._abort_pv_rows.remove(row)
-        self._abort_rows_panel.remove_row(row)
-        row.Destroy()
+        self._abort_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         self.Layout()
 
     def _clear_restore_pv_rows(self) -> None:
         for row in self._restore_pv_rows:
-            self._restore_rows_panel.remove_row(row)
+            self._restore_rows_panel.RemoveRow(row)
             row.Destroy()
         self._restore_pv_rows.clear()
 
@@ -966,9 +807,9 @@ class GeneralConfigView(wx.Panel):
             index,
             on_remove=self._on_remove_restore_pv,
         )
-        self._restore_rows_panel.bind_mousewheel(row)
+        self._restore_rows_panel.BindMouseWheel(row)
         self._restore_pv_rows.append(row)
-        self._restore_rows_panel.add_row(row)
+        self._restore_rows_panel.AddRow(row)
 
     def _on_add_restore_pv_clicked(self, _e=None) -> None:
         self._append_restore_pv_row()
@@ -977,8 +818,8 @@ class GeneralConfigView(wx.Panel):
         if row not in self._restore_pv_rows:
             return
         self._restore_pv_rows.remove(row)
-        self._restore_rows_panel.remove_row(row)
-        row.Destroy()
+        self._restore_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         self.Layout()
 
 
@@ -1202,13 +1043,13 @@ class DetectorsConfigView(wx.Panel):
         self._detectors_section = _Section(self, "Detectors")
         d_body = self._detectors_section.body
         self._det_header = _TableHeader(d_body, ["", "Name", "Type", "Format", "PV prefix", ""], [2, 7, 3, 3, 11, 2])
-        self._detector_rows_panel = _DarkScrolledPanel(d_body)
+        self._detector_rows_panel = FlatScrolledPanel(d_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                       header=self._det_header)
         self._detector_rows_panel.SetMinSize((-1, _DET_ROW_H * 3))
         self._add_detector_btn = FlatButton(d_body, "+ Add detector", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_detector_btn.SetMinSize((-1, 26))
         self._add_detector_btn.SetAction(self._on_add_detector_clicked)
         d_sizer = wx.BoxSizer(wx.VERTICAL)
-        d_sizer.Add(self._det_header, 0, wx.EXPAND)
         d_sizer.Add(self._detector_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         d_sizer.Add(self._add_detector_btn, 0, wx.EXPAND)
         d_body.SetSizer(d_sizer)
@@ -1298,7 +1139,7 @@ class DetectorsConfigView(wx.Panel):
 
     def _clear_detector_rows(self) -> None:
         for row in self._detector_rows:
-            self._detector_rows_panel.remove_row(row)
+            self._detector_rows_panel.RemoveRow(row)
             row.Destroy()
         self._detector_rows.clear()
 
@@ -1312,9 +1153,9 @@ class DetectorsConfigView(wx.Panel):
             on_make_active=self._on_make_detector_active,
             on_remove=self._on_remove_detector,
         )
-        self._detector_rows_panel.bind_mousewheel(row)
+        self._detector_rows_panel.BindMouseWheel(row)
         self._detector_rows.append(row)
-        self._detector_rows_panel.add_row(row)
+        self._detector_rows_panel.AddRow(row)
 
     def _on_add_detector_clicked(self, _e=None) -> None:
         self._append_detector_row(DetectorConfig(), active=not self._detector_rows)
@@ -1328,8 +1169,8 @@ class DetectorsConfigView(wx.Panel):
             return
         was_active = row.active_dot.GetValue()
         self._detector_rows.remove(row)
-        self._detector_rows_panel.remove_row(row)
-        row.Destroy()
+        self._detector_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         if was_active and self._detector_rows:
             self._detector_rows[0].set_active_visual(True)
         _restripe(self._detector_rows, self._detector_rows_panel.rows_sizer)
@@ -1350,13 +1191,13 @@ class ControllersConfigView(wx.Panel):
         self._controllers_section = _Section(self, "Controllers")
         ctrl_body = self._controllers_section.body
         self._ctrl_header = _TableHeader(ctrl_body, ["Name", "Type", "Connection params", ""], [5, 5, 18, 2])
-        self._controller_rows_panel = _DarkScrolledPanel(ctrl_body)
+        self._controller_rows_panel = FlatScrolledPanel(ctrl_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                         header=self._ctrl_header)
         self._controller_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_controller_btn = FlatButton(ctrl_body, "+ Add controller", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_controller_btn.SetMinSize((-1, 26))
         self._add_controller_btn.SetAction(self._on_add_controller_clicked)
         ctrl_sizer = wx.BoxSizer(wx.VERTICAL)
-        ctrl_sizer.Add(self._ctrl_header, 0, wx.EXPAND)
         ctrl_sizer.Add(self._controller_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         ctrl_sizer.Add(self._add_controller_btn, 0, wx.EXPAND)
         ctrl_body.SetSizer(ctrl_sizer)
@@ -1396,7 +1237,7 @@ class ControllersConfigView(wx.Panel):
 
     def _clear_controller_rows(self) -> None:
         for row in self._controller_rows:
-            self._controller_rows_panel.remove_row(row)
+            self._controller_rows_panel.RemoveRow(row)
             row.Destroy()
         self._controller_rows.clear()
 
@@ -1408,9 +1249,9 @@ class ControllersConfigView(wx.Panel):
             index,
             on_remove=self._on_remove_controller,
         )
-        self._controller_rows_panel.bind_mousewheel(row)
+        self._controller_rows_panel.BindMouseWheel(row)
         self._controller_rows.append(row)
-        self._controller_rows_panel.add_row(row)
+        self._controller_rows_panel.AddRow(row)
 
     def _on_add_controller_clicked(self, _e=None) -> None:
         self._append_controller_row(ControllerConfig(name="", type=_CONTROLLER_TYPES[0]))
@@ -1419,8 +1260,8 @@ class ControllersConfigView(wx.Panel):
         if row not in self._controller_rows:
             return
         self._controller_rows.remove(row)
-        self._controller_rows_panel.remove_row(row)
-        row.Destroy()
+        self._controller_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         _restripe(self._controller_rows, self._controller_rows_panel.rows_sizer)
 
 
@@ -1450,13 +1291,13 @@ class PositionersConfigView(wx.Panel):
         self._motors_section = _Section(self, "Motors")
         m_body = self._motors_section.body
         self._mot_header = _TableHeader(m_body, ["Short", "Description", "PV", "Prec", "Map", "Center", "Controller", ""], [3, 6, 10, 2, 2, 2, 6, 2])
-        self._motor_rows_panel = _DarkScrolledPanel(m_body)
+        self._motor_rows_panel = FlatScrolledPanel(m_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                    header=self._mot_header)
         self._motor_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_motor_btn = FlatButton(m_body, "+ Add motor", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_motor_btn.SetMinSize((-1, 26))
         self._add_motor_btn.SetAction(self._on_add_motor_clicked)
         m_sizer = wx.BoxSizer(wx.VERTICAL)
-        m_sizer.Add(self._mot_header, 0, wx.EXPAND)
         m_sizer.Add(self._motor_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         m_sizer.Add(self._add_motor_btn, 0, wx.EXPAND)
         m_body.SetSizer(m_sizer)
@@ -1539,16 +1380,16 @@ class PositionersConfigView(wx.Panel):
 
     def _clear_motor_rows(self) -> None:
         for row in self._motor_rows:
-            self._motor_rows_panel.remove_row(row)
+            self._motor_rows_panel.RemoveRow(row)
             row.Destroy()
         self._motor_rows.clear()
 
     def _append_motor_row(self, motor: MotorConfig) -> None:
         index = len(self._motor_rows)
         row = _MotorRow(self._motor_rows_panel._content, motor, self._controller_names, self._controller_types, index, on_remove=self._on_remove_motor)
-        self._motor_rows_panel.bind_mousewheel(row)
+        self._motor_rows_panel.BindMouseWheel(row)
         self._motor_rows.append(row)
-        self._motor_rows_panel.add_row(row)
+        self._motor_rows_panel.AddRow(row)
 
     def _on_add_motor_clicked(self, _e=None) -> None:
         self._append_motor_row(MotorConfig(shorthand="", description="", pv=""))
@@ -1557,8 +1398,8 @@ class PositionersConfigView(wx.Panel):
         if row not in self._motor_rows:
             return
         self._motor_rows.remove(row)
-        self._motor_rows_panel.remove_row(row)
-        row.Destroy()
+        self._motor_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         _restripe(self._motor_rows, self._motor_rows_panel.rows_sizer)
 
     def _refresh_rotation_controller_choices(self, selected: str | None = None) -> None:

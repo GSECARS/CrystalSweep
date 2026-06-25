@@ -35,7 +35,7 @@ from crystalsweep.ui.view.custom.theme import (
     TEXT_SCHEME,
     TOGGLE_SCHEME,
 )
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatTableHeader, FlatTableRow
 
 __all__ = ["CollectionSettingsView"]
 
@@ -52,7 +52,6 @@ _TABLE_ROW_H = 28
 _TABLE_HDR_H = 26
 _TABLE_BORDER = wx.Colour(50, 50, 56)
 _TABLE_HDR_BG = wx.Colour(22, 22, 26)
-_TABLE_ROW_ALT = wx.Colour(32, 32, 36)
 _BOX_S = 12
 _BOX_R = 3
 _CHECK_FG = wx.Colour(72, 199, 116)
@@ -89,53 +88,30 @@ def _draw_checkbox(gc: wx.GraphicsContext, cx: int, cy: int, checked: bool, gray
         )
 
 
-class _MapHeaderRow(wx.Panel):
-    """Painted header for the map axes table."""
+_LABELS = ("", "Motor", "Start", "End", "Step", "#Pts")
+_PROPS = [1, 3, 2, 2, 2, 2]
+_TABLE_SCHEME = None  # resolved at paint time from palette + CS overrides
 
-    _LABELS = ("", "Motor", "Start", "End", "Step", "#Pts")
+
+def _cs_table_scheme():
+    return (_TABLE_HDR_BG, _TABLE_BORDER, FG_SECONDARY)
+
+
+class _MapHeaderRow(FlatTableHeader):
+    """Map axes table header — CS dark theme, checkbox in col 0."""
 
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, size=(-1, _TABLE_HDR_H), style=wx.BORDER_NONE)
-        self.SetBackgroundColour(_TABLE_HDR_BG)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, lambda _e: self.Refresh())
+        super().__init__(parent, list(_LABELS), _PROPS, height=_TABLE_HDR_H, scheme=_cs_table_scheme())
 
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(_TABLE_HDR_BG))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        widths = _col_widths(w)
-        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
-        gc.SetFont(font, FG_SECONDARY)
-        gc.SetPen(wx.Pen(_TABLE_BORDER, 1))
-        x = 0
-        for i, (label, cw) in enumerate(zip(self._LABELS, widths)):
-            if label:
-                tw, th = gc.GetTextExtent(label)
-                gc.DrawText(label, x + (cw - tw) / 2, (h - th) / 2)
-            if i < len(widths) - 1:
-                gc.StrokeLine(x + cw, 0, x + cw, h)
-            x += cw
-        gc.SetPen(wx.Pen(_TABLE_BORDER, 1))
-        gc.StrokeLine(0, h - 1, w, h - 1)
+    def _row_bg(self) -> wx.Colour:
+        return _TABLE_HDR_BG
 
 
-class _MapDataRow(wx.Panel):
-    """One painted data row in the map axes table with inline controls."""
+class _MapDataRow(FlatTableRow):
+    """One painted data row in the map axes table with inline controls and a toggle checkbox."""
 
-    def __init__(
-        self,
-        parent: wx.Window,
-        bg: wx.Colour,
-        row_index: int,
-    ) -> None:
-        super().__init__(parent, size=(-1, _TABLE_ROW_H), style=wx.BORDER_NONE)
-        self.SetBackgroundColour(bg)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+    def __init__(self, parent: wx.Window, row_index: int) -> None:
+        super().__init__(parent, _PROPS, height=_TABLE_ROW_H, scheme=_cs_table_scheme())
         self._row_index = row_index
         self._optional = row_index > 0
         self._enabled = not self._optional
@@ -149,18 +125,18 @@ class _MapDataRow(wx.Panel):
         self.step_ctrl.SetRestrictToFloat(True)
         self.points_ctrl = FlatTextCtrl(self, value="6", text_scheme=TEXT_SCHEME)
 
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, self._on_size)
         self.Bind(wx.EVT_LEFT_DOWN, self._on_click)
-
         self._reposition()
         self._apply_enabled()
+
+    def _row_bg(self) -> wx.Colour:
+        return BG_CARD
 
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(self.GetBackgroundColour()))
+        gc.SetBrush(wx.Brush(self._row_bg()))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
         cx = _CHECK_W // 2
@@ -168,11 +144,26 @@ class _MapDataRow(wx.Panel):
         _draw_checkbox(gc, cx, cy, self._enabled, grayed=not self._optional)
         gc.SetPen(wx.Pen(_TABLE_BORDER, 1))
         gc.StrokeLine(0, h - 1, w, h - 1)
-        widths = _col_widths(w)
+        widths = self._col_widths(w)
         x = 0
-        for i, cw in enumerate(widths[:-1]):
+        for cw in widths[:-1]:
             x += cw
             gc.StrokeLine(x, 0, x, h)
+
+    def _reposition(self) -> None:
+        w, _ = self.GetClientSize()
+        if w <= 0:
+            return
+        widths = self._col_widths(w)
+        ctrl_h = _TABLE_ROW_H - 8
+        y = 4
+        x = widths[0]
+        for ctrl, cw in zip(
+            (self.motor_combo, self.start_ctrl, self.end_ctrl, self.step_ctrl, self.points_ctrl),
+            widths[1:],
+        ):
+            ctrl.SetSize(x + _PAD, y, cw - _PAD * 2, ctrl_h)
+            x += cw
 
     def _on_size(self, event: wx.SizeEvent) -> None:
         self._reposition()
@@ -188,21 +179,6 @@ class _MapDataRow(wx.Panel):
             self.Refresh()
             wx.PostEvent(self, wx.CommandEvent(wx.EVT_CHECKBOX.typeId, self.GetId()))
         event.Skip()
-
-    def _reposition(self) -> None:
-        w, _ = self.GetClientSize()
-        if w <= 0:
-            return
-        widths = _col_widths(w)
-        ctrl_h = _TABLE_ROW_H - 8
-        y = 4
-        x = widths[0]
-        for ctrl, cw in zip(
-            (self.motor_combo, self.start_ctrl, self.end_ctrl, self.step_ctrl, self.points_ctrl),
-            widths[1:],
-        ):
-            ctrl.SetSize(x + _PAD, y, cw - _PAD * 2, ctrl_h)
-            x += cw
 
     def _apply_enabled(self) -> None:
         for ctrl in (self.motor_combo, self.start_ctrl, self.end_ctrl, self.step_ctrl, self.points_ctrl):
@@ -249,13 +225,6 @@ class _MapDataRow(wx.Panel):
         return self.motor_combo.GetStringSelection()
 
 
-def _col_widths(total_w: int) -> list[int]:
-    """Return pixel widths for [checkbox, motor, start, end, step, #pts] columns."""
-    remaining = max(0, total_w - _CHECK_W)
-    motor_w = max(60, remaining * 3 // 10)
-    field_w = max(30, (remaining - motor_w) // 4)
-    last_w = remaining - motor_w - field_w * 3
-    return [_CHECK_W, motor_w, field_w, field_w, field_w, last_w]
 
 
 class _MapTable(wx.Panel):
@@ -266,8 +235,8 @@ class _MapTable(wx.Panel):
         self.SetBackgroundColour(BG_CARD)
 
         self._header = _MapHeaderRow(self)
-        self.row1 = _MapDataRow(self, BG_CARD, row_index=0)
-        self.row2 = _MapDataRow(self, _TABLE_ROW_ALT, row_index=1)
+        self.row1 = _MapDataRow(self, row_index=0)
+        self.row2 = _MapDataRow(self, row_index=1)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self._header, 0, wx.EXPAND)

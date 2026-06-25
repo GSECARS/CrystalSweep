@@ -1305,7 +1305,7 @@ class CollectionTableView(wx.Panel):
 
     def _bind_pool_row(self, row: _CollectionRow, data_idx: int) -> None:
         point = self._points[data_idx]
-        bg = BG_CARD if data_idx % 2 == 0 else _ROW_ALT
+        bg = BG_CARD
         selected = self._selected_flags[data_idx]
         active = self._active_index == data_idx
         limit_error = self._limit_error_flags[data_idx]
