@@ -84,6 +84,19 @@ STATUS_SCHEME  = (DISABLED_BG, DISABLED_FG)
 RADIO_SCHEME    = (BG_CARD, BG_ELEVATED, ACCENT_HOVER, FG_SECONDARY)
 PROGRESS_SCHEME = (BG_ELEVATED, ACCENT)
 TAB_SCHEME = (BG_CARD, BG_ELEVATED, wx.Colour(40, 40, 46), FG_PRIMARY, FG_SECONDARY, ACCENT, SEP_COLOUR)
+MENU_BAR_SCHEME = (
+    wx.Colour(24, 24, 26),   # bar_bg
+    wx.Colour(50, 50, 56),   # btn_hover_bg
+    wx.Colour(60, 60, 68),   # btn_active_bg
+    FG_SECONDARY,            # btn_fg
+    DISABLED_FG,             # btn_disabled_fg
+    wx.Colour(55, 55, 62),   # sep_colour
+    POPUP_BG,                # popup_bg
+    POPUP_BTN_HOVER,         # popup_hover_bg
+    FG_PRIMARY,              # popup_fg
+    FG_SECONDARY,            # popup_secondary_fg
+    wx.Colour(55, 55, 62),   # popup_sep
+)
 
 def dialog_scheme():
     """Return a DialogScheme using CS dark colours."""

@@ -23,7 +23,7 @@ from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font, SPLITTER_SCHEME, DIVIDER_FG, DIVIDER_LINE, dialog_scheme, DANGER_SCHEME, TAB_SCHEME
-from crystalsweep.ui.view.custom.widgets import DarkMenuBar
+from crystalsweep.ui.view.custom.widgets import CrystalMenuBar
 from wxutils import FlatConfirmDialog, FlatSplitter, FlatTabbedPanel, SectionDivider
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.preview_view import PreviewView
@@ -179,7 +179,7 @@ class MainView(wx.Frame):
         tabs.AddPage("XRD centering", xrd_page)
         return tabs
 
-    def _build_menu_bar(self) -> DarkMenuBar | None:
+    def _build_menu_bar(self) -> CrystalMenuBar | None:
         if sys.platform == "darwin":
             menu_bar = wx.MenuBar()
 
@@ -223,8 +223,8 @@ class MainView(wx.Frame):
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_positioners_cb), positioners_item)
             return None
 
-        bar = DarkMenuBar(self)
-        bar.append_menu(
+        bar = CrystalMenuBar(self)
+        bar.AppendMenu(
             title="File",
             items=["Load config", "Save config", "Save config as", None, "Exit"],
             shortcuts=["Ctrl+O", "Ctrl+S", "Ctrl+Shift+S", None, "Ctrl+Q"],
@@ -236,12 +236,12 @@ class MainView(wx.Frame):
                 self._on_exit,
             ],
         )
-        bar.append_action("General", lambda: self._fire(self._open_general_cb))
-        bar.append_action("CrysAlis", lambda: self._fire(self._open_crysalis_cb))
-        bar.append_action("Detectors", lambda: self._fire(self._open_detectors_cb))
-        bar.append_action("Controllers", lambda: self._fire(self._open_controllers_cb))
-        bar.append_action("Positioners", lambda: self._fire(self._open_positioners_cb))
-        bar.append_action("Scripts", lambda: self._fire(self._open_scripts_cb))
+        bar.AppendAction("General", lambda: self._fire(self._open_general_cb))
+        bar.AppendAction("CrysAlis", lambda: self._fire(self._open_crysalis_cb))
+        bar.AppendAction("Detectors", lambda: self._fire(self._open_detectors_cb))
+        bar.AppendAction("Controllers", lambda: self._fire(self._open_controllers_cb))
+        bar.AppendAction("Positioners", lambda: self._fire(self._open_positioners_cb))
+        bar.AppendAction("Scripts", lambda: self._fire(self._open_scripts_cb))
 
         accel = wx.AcceleratorTable(
             [

@@ -18,7 +18,7 @@ from crystalsweep.ui.view.custom.integration_plot import IntegrationPlot
 from crystalsweep.ui.view.custom.intensity_histogram import IntensityHistogramWidget
 from crystalsweep.ui.view.custom.settings_popup import ImageSettingsPopup
 from crystalsweep.ui.view.custom.widgets import (
-    DarkMenuBar,
+    CrystalMenuBar,
     FlatButton,
     LiveToggle,
 )
