@@ -116,5 +116,20 @@ TEXT_SCHEME    = (BG_ELEVATED, FG_PRIMARY, FG_SECONDARY, DISABLED_BG, DISABLED_F
 COMBO_SCHEME   = (BG_ELEVATED, BTN_HOVER_BG, FG_PRIMARY, SEP_COLOUR, FG_SECONDARY, DISABLED_BG, DISABLED_FG, POPUP_BG, POPUP_BTN_HOVER)
 SCROLLBAR_SCHEME = (wx.Colour(28, 28, 32), wx.Colour(70, 70, 80), wx.Colour(100, 100, 115))
 SPLITTER_SCHEME  = (wx.Colour(60, 60, 65), wx.Colour(90, 90, 100))
+SYNTAX_SCHEME = (
+    wx.Colour(28, 28, 32),    # editor_bg
+    wx.Colour(220, 220, 228), # editor_fg
+    wx.Colour(22, 22, 26),    # gutter_bg
+    wx.Colour(90, 90, 100),   # gutter_fg
+    wx.Colour(50, 80, 120),   # sel_bg
+    wx.Colour(86, 156, 214),  # keyword_fg
+    wx.Colour(78, 201, 176),  # keyword2_fg
+    wx.Colour(206, 145, 120), # string_fg
+    wx.Colour(106, 153, 85),  # comment_fg
+    wx.Colour(181, 206, 168), # number_fg
+    wx.Colour(212, 212, 212), # operator_fg
+    wx.Colour(220, 220, 100), # decorator_fg
+    wx.Colour(220, 220, 170), # defname_fg
+)
 DIVIDER_FG       = wx.Colour(140, 140, 150)   # matches FG_SECONDARY
 DIVIDER_LINE     = wx.Colour(70, 70, 76)
