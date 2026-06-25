@@ -68,6 +68,7 @@ LIVE_OFF = wx.Colour(90, 90, 95)
 LIVE_ON = wx.Colour(180, 40, 40)
 LIVE_ON_HOVER = wx.Colour(210, 55, 55)
 LIVE_OFF_HOVER = wx.Colour(120, 120, 125)
+LIVE_SCHEME = (LIVE_OFF, LIVE_OFF_HOVER, LIVE_ON, LIVE_ON_HOVER)
 
 def btn_font() -> wx.Font:
     """Return the standard FlatButton font. Call after wx.App is created."""

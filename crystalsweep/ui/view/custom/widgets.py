@@ -16,7 +16,7 @@ from typing import Callable
 
 import wx
 
-from wxutils import FlatButton
+from wxutils import FlatButton, FlatToggleButton
 from crystalsweep.ui.view.custom.theme import (
     ACCENT,
     ACCENT_HOVER,
@@ -38,10 +38,7 @@ from crystalsweep.ui.view.custom.theme import (
     FG_SECONDARY,
     ICON_SIZE,
     LIVE_H,
-    LIVE_OFF,
-    LIVE_OFF_HOVER,
-    LIVE_ON,
-    LIVE_ON_HOVER,
+    LIVE_SCHEME,
     LIVE_W,
     PONI_LOADED,
     POPUP_BG,
@@ -62,49 +59,53 @@ __all__ = [
     "LiveToggle",
 ]
 
-class LiveToggle(wx.Control):
-    """Vertical LIVE toggle button. Gray when off, matte red when on."""
+class LiveToggle(FlatToggleButton):
+    """Vertical LIVE toggle button. Gray when off, matte red when on.
 
-    def __init__(self, parent: wx.Window, live: bool = True, tooltip: str = "Toggle live updates") -> None:
-        super().__init__(parent, size=wx.Size(LIVE_W, LIVE_H), style=wx.BORDER_NONE)
-        self._live = live
-        self._hovered = False
-        self._on_toggled: Callable[[bool], None] | None = None
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.SetToolTip(tooltip)
-        super().Bind(wx.EVT_PAINT, self._on_paint)
-        super().Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
-        super().Bind(wx.EVT_MOTION, self._on_motion)
-        super().Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
-        super().Bind(wx.EVT_LEFT_UP, self._on_click)
+    Thin CS wrapper around FlatToggleButton — preserves the vertical
+    character-by-character label layout specific to the beamline UI.
+    """
 
-    def set_toggled_callback(self, cb: Callable[[bool], None]) -> None:
-        self._on_toggled = cb
+    def __init__(self, parent: wx.Window, live: bool = False, tooltip: str = "Toggle live updates") -> None:
+        super().__init__(
+            parent,
+            label="LIVE",
+            value=live,
+            toggle_scheme=LIVE_SCHEME,
+            size=wx.Size(LIVE_W, LIVE_H),
+        )
+        if tooltip:
+            self.SetToolTip(tooltip)
 
     def set_live(self, live: bool) -> None:
-        self._live = live
-        self.Refresh()
+        self.SetValue(live)
 
     def set_hovered(self, hovered: bool) -> None:
         if hovered != self._hovered:
             self._hovered = hovered
             self.Refresh()
 
+    def set_toggled_callback(self, cb: Callable[[bool], None]) -> None:
+        self.SetAction(lambda _e: cb(self.GetValue()))
+
     @property
     def is_live(self) -> bool:
-        return self._live
+        return self.GetValue()
 
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
+
         gc.SetBrush(wx.Brush(BG_SURFACE))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
-        colour = (LIVE_ON_HOVER if self._hovered else LIVE_ON) if self._live else (LIVE_OFF_HOVER if self._hovered else LIVE_OFF)
+
+        colour = (self._on_hover if self._hovered else self._on) if self._value else (self._off_hover if self._hovered else self._off)
         gc.SetPen(wx.Pen(colour, 1))
         gc.SetBrush(wx.TRANSPARENT_BRUSH)
-        gc.DrawRoundedRectangle(1, 1, w - 2, h - 2, 3)
+        gc.DrawRoundedRectangle(1, 1, w - 2, h - 2, self._corner_radius)
+
         font = scaled_font(10, weight=wx.FONTWEIGHT_BOLD)
         gc.SetFont(font, colour)
         _, ch_h = gc.GetTextExtent("L")
@@ -113,25 +114,6 @@ class LiveToggle(wx.Control):
             tw, th = gc.GetTextExtent(ch)
             gc.DrawText(ch, (w - tw) / 2, y)
             y += th + 2
-
-    def _on_motion(self, event: wx.MouseEvent) -> None:
-        inside = wx.Rect(0, 0, *self.GetClientSize()).Contains(event.GetPosition())
-        if inside != self._hovered:
-            self._hovered = inside
-            self.Refresh()
-        event.Skip()
-
-    def _on_leave(self, event: wx.MouseEvent) -> None:
-        self._hovered = False
-        self.Refresh()
-        event.Skip()
-
-    def _on_click(self, event: wx.MouseEvent) -> None:
-        self._live = not self._live
-        self.Refresh()
-        if self._on_toggled:
-            self._on_toggled(self._live)
-        event.Skip()
 
 
 class IconButton(wx.Panel):
