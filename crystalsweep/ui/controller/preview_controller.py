@@ -25,7 +25,8 @@ from epics import caget, camonitor, camonitor_clear, caput
 from crystalsweep.model import MainModel
 from crystalsweep.model.beamline_config_model import BeamlineConfig, DetectorConfig, MotorConfig
 from crystalsweep.model.motor_limits import check_soft_limits
-from crystalsweep.ui.view.custom.widgets import DarkMessageDialog
+from wxutils import FlatMessageDialog
+from crystalsweep.ui.view.custom.theme import dialog_scheme
 from crystalsweep.ui.view.preview_view import CenteringMotorSpec, PreviewView
 
 __all__ = ["PreviewController"]
@@ -237,10 +238,11 @@ class PreviewController:
         if self._previewing:
             return
         if not self._model.ad_viewer.has_roi:
-            DarkMessageDialog(
+            FlatMessageDialog(
                 self._view,
                 "Please select an ROI on the image canvas before starting the preview.",
                 "No ROI Selected",
+                scheme=dialog_scheme(),
             ).ShowModal()
             return
         cfg = self._model.beamline.active
@@ -448,10 +450,11 @@ class PreviewController:
             return
 
         if not self._model.ad_viewer.has_roi:
-            DarkMessageDialog(
+            FlatMessageDialog(
                 self._view,
                 "Please select an ROI on the image canvas before running Auto Optimize.",
                 "No ROI Selected",
+                scheme=dialog_scheme(),
             ).ShowModal()
             return
 
@@ -585,7 +588,7 @@ class PreviewController:
                 wx.CallAfter(self._view.set_auto_optimize_enabled, bool(self._current_specs))
 
     def _show_limit_error(self, err: str) -> None:
-        DarkMessageDialog(self._view, f"Soft limit violation — {err}", "Soft Limit Violation").ShowModal()
+        FlatMessageDialog(self._view, f"Soft limit violation — {err}", "Soft Limit Violation", scheme=dialog_scheme()).ShowModal()
 
     def _on_go_original(self, key: str | None) -> None:
         self._dispatch_go(self._original_snapshot, key, "original")

@@ -32,7 +32,8 @@ from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.model.motor_limits import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
 from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
-from crystalsweep.ui.view.custom.widgets import DarkAbortingDialog
+from wxutils import FlatWaitDialog
+from crystalsweep.ui.view.custom.theme import dialog_scheme
 
 __all__ = ["CollectController"]
 
@@ -69,7 +70,7 @@ class CollectController:
 
         self._restore_pv_snapshot: dict[str, object] = {}
         self._monitored_limit_pvs: list[str] = []
-        self._aborting_dlg: DarkAbortingDialog | None = None
+        self._aborting_dlg: FlatWaitDialog | None = None
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
@@ -275,14 +276,26 @@ class CollectController:
     def _show_aborting_dialog(self, elapsed_str: str) -> None:
         if self._aborting_dlg is not None:
             return
-        self._aborting_dlg = DarkAbortingDialog(self._view, elapsed=elapsed_str)
+        lines = [
+            "The collection was aborted. Motors are being restored,",
+            "the detector is being stopped, and abort PVs are being written.",
+        ]
+        if elapsed_str:
+            lines.append(f"\nElapsed time: {elapsed_str}")
+        self._aborting_dlg = FlatWaitDialog(
+            self._view,
+            title="Collection Aborted",
+            message="\n".join(lines),
+            status="Cleaning up, please wait\u2026",
+            scheme=dialog_scheme(),
+        )
         self._aborting_dlg.Show()
         self._aborting_dlg.Raise()
         self._aborting_dlg.SetFocus()
 
     def _ready_aborting_dialog(self) -> None:
         if self._aborting_dlg is not None:
-            self._aborting_dlg.ready()
+            self._aborting_dlg.Ready("Abort complete.")
         self._aborting_dlg = None
 
     def _on_file_number_updated(self, file_number: int) -> None:

@@ -84,6 +84,17 @@ STATUS_SCHEME  = (DISABLED_BG, DISABLED_FG)
 RADIO_SCHEME    = (BG_CARD, BG_ELEVATED, ACCENT_HOVER, FG_SECONDARY)
 PROGRESS_SCHEME = (BG_ELEVATED, ACCENT)
 
+def dialog_scheme():
+    """Return a DialogScheme using CS dark colours."""
+    return (
+        BG_SURFACE,
+        FG_PRIMARY,
+        FG_SECONDARY,
+        SEP_COLOUR,
+        DEFAULT_SCHEME,
+        BTN_DISABLED,
+    )
+
 def icon_scheme(bg: wx.Colour) -> tuple:
     """Return an (idle_bg, hover_bg, press_bg) IconScheme for a given idle background."""
     return (bg, BTN_HOVER_BG, BTN_PRESS_BG)

@@ -22,9 +22,9 @@ from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
-from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font, SPLITTER_SCHEME, DIVIDER_FG, DIVIDER_LINE
-from crystalsweep.ui.view.custom.widgets import DarkConfirmDialog, DarkMenuBar, DarkTabbedPanel
-from wxutils import FlatSplitter, SectionDivider
+from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font, SPLITTER_SCHEME, DIVIDER_FG, DIVIDER_LINE, dialog_scheme, DANGER_SCHEME
+from crystalsweep.ui.view.custom.widgets import DarkMenuBar, DarkTabbedPanel
+from wxutils import FlatConfirmDialog, FlatSplitter, SectionDivider
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.preview_view import PreviewView
 
@@ -318,12 +318,12 @@ class MainView(wx.Frame):
     def _close_event_handler(self, event: wx.CloseEvent) -> None:
         """Runs when trying to close the main window."""
         if self._collecting:
-            result = DarkConfirmDialog(self, "Collection is in progress. Abort and close?", "Collection in Progress").ShowModal()
+            result = FlatConfirmDialog(self, "Collection is in progress. Abort and close?", "Collection in Progress", yes_scheme=DANGER_SCHEME, scheme=dialog_scheme()).ShowModal()
             if result == wx.ID_YES:
                 self._fire(self._abort_cb)
                 event.Skip()
             else:
                 event.Veto()
             return
-        result = DarkConfirmDialog(self, "Are you sure you want to close the application?", "Close Application").ShowModal()
+        result = FlatConfirmDialog(self, "Are you sure you want to close the application?", "Close Application", yes_scheme=DANGER_SCHEME, scheme=dialog_scheme()).ShowModal()
         event.Skip() if result == wx.ID_YES else event.Veto()
