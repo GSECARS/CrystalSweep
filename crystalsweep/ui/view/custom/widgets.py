@@ -16,36 +16,17 @@ from typing import Callable
 
 import wx
 
-from wxutils import FlatButton, FlatToggleButton, FlatMenuBar
+from wxutils import FlatToggleButton, FlatMenuBar
 from crystalsweep.ui.view.custom.theme import (
     ACCENT,
-    ACCENT_HOVER,
-    BG_CARD,
-    BG_ELEVATED,
     BG_SURFACE,
-    BTN_DISABLED,
-    btn_font,
-    BTN_HOVER_BG,
-    BTN_PRESS_BG,
     DANGER,
-    DANGER_HOVER,
-    DANGER_PRESS,
-    DANGER_SCHEME,
-    DEFAULT_SCHEME,
-    DISABLED_BG,
-    DISABLED_FG,
-    FG_PRIMARY,
     FG_SECONDARY,
     LIVE_H,
     LIVE_SCHEME,
     LIVE_W,
     MENU_BAR_SCHEME,
     PONI_LOADED,
-    POPUP_BG,
-    POPUP_BTN_BG,
-    POPUP_BTN_HOVER,
-    POPUP_BTN_PRESS,
-    SEP_COLOUR,
     scaled_font,
 )
 
@@ -57,7 +38,7 @@ __all__ = [
 class LiveToggle(FlatToggleButton):
     """Vertical LIVE toggle button. Gray when off, matte red when on.
 
-    Thin CS wrapper around FlatToggleButton — preserves the vertical
+    Thin wrapper around FlatToggleButton — preserves the vertical
     character-by-character label layout specific to the beamline UI.
     """
 
