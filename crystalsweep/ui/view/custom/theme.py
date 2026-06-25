@@ -81,7 +81,8 @@ DANGER_SCHEME  = (POPUP_BTN_BG, DANGER_HOVER, DANGER_PRESS, wx.Colour(230, 90, 9
 TOGGLE_SCHEME  = (POPUP_BTN_BG, POPUP_BTN_HOVER, PONI_LOADED, FG_SECONDARY)
 MUTED_SCHEME   = (wx.Colour(38, 38, 44), wx.Colour(55, 60, 75), wx.Colour(30, 35, 55), wx.Colour(120, 150, 190), wx.Colour(120, 150, 190))
 STATUS_SCHEME  = (DISABLED_BG, DISABLED_FG)
-RADIO_SCHEME   = (BG_CARD, BG_ELEVATED, ACCENT_HOVER, FG_SECONDARY)
+RADIO_SCHEME    = (BG_CARD, BG_ELEVATED, ACCENT_HOVER, FG_SECONDARY)
+PROGRESS_SCHEME = (BG_ELEVATED, ACCENT)
 
 def icon_scheme(bg: wx.Colour) -> tuple:
     """Return an (idle_bg, hover_bg, press_bg) IconScheme for a given idle background."""
