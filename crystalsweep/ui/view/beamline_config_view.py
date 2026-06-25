@@ -20,9 +20,9 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.icons import draw_folder
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME
-from crystalsweep.ui.view.custom.widgets import IconButton, RadioDot
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME, RADIO_SCHEME
+from crystalsweep.ui.view.custom.widgets import IconButton
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar, FlatRadioButton
 
 __all__ = [
     "GeneralConfigView",
@@ -242,7 +242,7 @@ class _DetectorRow(_TableRow):
         self._on_make_active = on_make_active
         self._on_remove = on_remove
 
-        self.active_dot = RadioDot(self, value=active, tooltip="Set as active detector")
+        self.active_dot = FlatRadioButton(self, value=active, tooltip="Set as active detector", radio_scheme=RADIO_SCHEME)
         self.active_dot.SetAction(lambda _e: on_make_active(self))
         self.name_ctrl = FlatTextCtrl(self, value=detector.name, placeholder=_PLACEHOLDER_DETECTOR_NAME, text_scheme=TEXT_SCHEME)
         det_display = _DET_TYPE_TO_LABEL.get(detector.type, _DETECTOR_DISPLAY_NAMES[0])
@@ -338,7 +338,7 @@ class _DetectorRow(_TableRow):
         )
 
     def set_active_visual(self, active: bool) -> None:
-        self.active_dot.set_value(active)
+        self.active_dot.SetValue(active)
 
 
 class _ControllerRow(_TableRow):
@@ -1281,7 +1281,7 @@ class DetectorsConfigView(wx.Panel):
             det = row.to_detector()
             if not det.name and not det.pv_prefix:
                 continue
-            if row.active_dot.get_value() and active_index == -1:
+            if row.active_dot.GetValue() and active_index == -1:
                 active_index = len(detectors)
             detectors.append(det)
         if detectors and active_index == -1:
@@ -1327,7 +1327,7 @@ class DetectorsConfigView(wx.Panel):
     def _on_remove_detector(self, row: _DetectorRow) -> None:
         if row not in self._detector_rows:
             return
-        was_active = row.active_dot.get_value()
+        was_active = row.active_dot.GetValue()
         self._detector_rows.remove(row)
         self._detector_rows_panel.remove_row(row)
         row.Destroy()

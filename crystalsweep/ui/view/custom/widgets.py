@@ -62,7 +62,6 @@ __all__ = [
     "LiveToggle",
 ]
 
-
 class LiveToggle(wx.Control):
     """Vertical LIVE toggle button. Gray when off, matte red when on."""
 
@@ -624,75 +623,6 @@ class DarkMenuBar(wx.Panel):
         popup.Bind(wx.EVT_SHOW, lambda e: on_dismiss() if not e.IsShown() else None)
         pos = btn.ClientToScreen(wx.Point(0, btn.GetSize().height))
         popup.popup_below(pos)
-
-
-class RadioDot(wx.Panel):
-    """Small dark-styled radio indicator. Click toggles to selected and fires the callback."""
-
-    _SIZE = 16
-
-    def __init__(self, parent: wx.Window, value: bool = False, tooltip: str = "") -> None:
-        super().__init__(parent, size=wx.Size(self._SIZE + 8, self._SIZE + 8), style=wx.BORDER_NONE)
-        self._value = value
-        self._hovered = False
-        self._callback: Callable[[], None] | None = None
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.SetBackgroundColour(BG_CARD)
-        if tooltip:
-            self.SetToolTip(tooltip)
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, lambda e: (self.Refresh(), e.Skip()))
-        self.Bind(wx.EVT_LEFT_UP, self._on_click)
-        self.Bind(wx.EVT_ENTER_WINDOW, self._on_enter_dot)
-        self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave_dot)
-
-    def set_value(self, value: bool) -> None:
-        if value != self._value:
-            self._value = value
-            self.Refresh()
-
-    def get_value(self) -> bool:
-        return self._value
-
-    def set_action(self, callback: Callable[[], None]) -> None:
-        self._callback = callback
-
-    def _on_enter_dot(self, event: wx.MouseEvent) -> None:
-        self._hovered = True
-        self.Refresh()
-        event.Skip()
-
-    def _on_leave_dot(self, event: wx.MouseEvent) -> None:
-        self._hovered = False
-        self.Refresh()
-        event.Skip()
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(BG_CARD))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        cx, cy = w / 2, h / 2
-        r = self._SIZE / 2
-        ring = ACCENT_HOVER if (self._value or self._hovered) else FG_SECONDARY
-        gc.SetPen(wx.Pen(ring, 2))
-        gc.SetBrush(wx.Brush(BG_ELEVATED))
-        gc.DrawEllipse(cx - r, cy - r, self._SIZE, self._SIZE)
-        if self._value:
-            inner = self._SIZE * 0.45
-            gc.SetPen(wx.TRANSPARENT_PEN)
-            gc.SetBrush(wx.Brush(ACCENT_HOVER))
-            gc.DrawEllipse(cx - inner / 2, cy - inner / 2, inner, inner)
-
-    def _on_click(self, event: wx.MouseEvent) -> None:
-        if not self._value:
-            self._value = True
-            self.Refresh()
-            if self._callback is not None:
-                self._callback()
-        event.Skip()
 
 
 class DarkAbortingDialog(wx.Dialog):
