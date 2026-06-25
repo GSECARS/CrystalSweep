@@ -36,7 +36,6 @@ from crystalsweep.ui.view.custom.theme import (
     DISABLED_FG,
     FG_PRIMARY,
     FG_SECONDARY,
-    ICON_SIZE,
     LIVE_H,
     LIVE_SCHEME,
     LIVE_W,
@@ -55,7 +54,6 @@ __all__ = [
     "DarkMenuBar",
     "DarkMessageDialog",
     "DarkTabbedPanel",
-    "IconButton",
     "LiveToggle",
 ]
 
@@ -114,105 +112,6 @@ class LiveToggle(FlatToggleButton):
             tw, th = gc.GetTextExtent(ch)
             gc.DrawText(ch, (w - tw) / 2, y)
             y += th + 2
-
-
-class IconButton(wx.Panel):
-    """Borderless icon button with hover and press background effects."""
-
-    def __init__(self, parent: wx.Window, draw_fn: Callable, size: int = ICON_SIZE, tooltip: str = "", bg: wx.Colour | None = None) -> None:
-        super().__init__(parent, size=wx.Size(size + 8, size + 8), style=wx.BORDER_NONE)
-        self._draw_fn = draw_fn
-        self._icon_size = size
-        self._hovered = False
-        self._pressed = False
-        self._idle_bg: wx.Colour = bg if bg is not None else wx.Colour(0, 0, 0)
-        self._callback: Callable[[wx.CommandEvent], None] | None = None
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        if tooltip:
-            self.SetToolTip(tooltip)
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, self._on_size)
-        self.Bind(wx.EVT_MOTION, self._on_motion)
-        self.Bind(wx.EVT_LEAVE_WINDOW, self._on_leave)
-        self.Bind(wx.EVT_LEFT_DOWN, self._on_press)
-        self.Bind(wx.EVT_LEFT_UP, self._on_release)
-
-    def Bind(self, event, handler, source=None, id=wx.ID_ANY, id2=wx.ID_ANY):
-        if event == wx.EVT_BUTTON:
-            self._callback = handler
-        else:
-            super().Bind(event, handler, source, id, id2)
-
-    def set_hovered(self, hovered: bool) -> None:
-        if hovered != self._hovered:
-            self._hovered = hovered
-            if not hovered:
-                self._pressed = False
-            self.Refresh()
-
-    def _on_size(self, event: wx.SizeEvent) -> None:
-        self.Refresh()
-        event.Skip()
-
-    def Enable(self, enable: bool = True) -> bool:
-        result = super().Enable(enable)
-        self.Refresh()
-        return result
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        enabled = self.IsEnabled()
-        gc.SetBrush(wx.Brush(self._idle_bg))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        if not enabled:
-            bg = self._idle_bg
-        elif self._pressed:
-            bg = BTN_PRESS_BG
-        elif self._hovered:
-            bg = BTN_HOVER_BG
-        else:
-            bg = self._idle_bg
-        gc.SetBrush(wx.Brush(bg))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRoundedRectangle(0, 0, w, h, 4)
-        gc.SetAntialiasMode(wx.ANTIALIAS_DEFAULT)
-        offset = (w - self._icon_size) / 2
-        gc.Translate(offset, offset)
-        if not enabled:
-            gc.BeginLayer(0.25)
-        self._draw_fn(gc, self._icon_size)
-        if not enabled:
-            gc.EndLayer()
-
-    def _on_leave(self, event: wx.MouseEvent) -> None:
-        self.set_hovered(False)
-        event.Skip()
-
-    def _on_motion(self, event: wx.MouseEvent) -> None:
-        self.set_hovered(wx.Rect(0, 0, *self.GetClientSize()).Contains(event.GetPosition()))
-        event.Skip()
-
-    def _on_press(self, event: wx.MouseEvent) -> None:
-        if not self.IsEnabled():
-            return
-        self._pressed = True
-        self.Refresh()
-        event.Skip()
-
-    def _on_release(self, event: wx.MouseEvent) -> None:
-        if not self.IsEnabled():
-            return
-        if self._pressed:
-            self._pressed = False
-            self.Refresh()
-            if self._callback is not None:
-                evt = wx.CommandEvent()
-                evt.SetEventType(wx.EVT_BUTTON.typeId)
-                self._callback(evt)
-        event.Skip()
 
 
 class _DarkMenuPopup(wx.PopupTransientWindow):

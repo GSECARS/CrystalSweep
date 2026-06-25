@@ -82,6 +82,10 @@ TOGGLE_SCHEME  = (POPUP_BTN_BG, POPUP_BTN_HOVER, PONI_LOADED, FG_SECONDARY)
 MUTED_SCHEME   = (wx.Colour(38, 38, 44), wx.Colour(55, 60, 75), wx.Colour(30, 35, 55), wx.Colour(120, 150, 190), wx.Colour(120, 150, 190))
 STATUS_SCHEME  = (DISABLED_BG, DISABLED_FG)
 RADIO_SCHEME   = (BG_CARD, BG_ELEVATED, ACCENT_HOVER, FG_SECONDARY)
+
+def icon_scheme(bg: wx.Colour) -> tuple:
+    """Return an (idle_bg, hover_bg, press_bg) IconScheme for a given idle background."""
+    return (bg, BTN_HOVER_BG, BTN_PRESS_BG)
 TEXT_SCHEME    = (BG_ELEVATED, FG_PRIMARY, FG_SECONDARY, DISABLED_BG, DISABLED_FG, wx.Colour(70, 28, 28))
 COMBO_SCHEME   = (BG_ELEVATED, BTN_HOVER_BG, FG_PRIMARY, SEP_COLOUR, FG_SECONDARY, DISABLED_BG, DISABLED_FG, POPUP_BG, POPUP_BTN_HOVER)
 SCROLLBAR_SCHEME = (wx.Colour(28, 28, 32), wx.Colour(70, 70, 80), wx.Colour(100, 100, 115))

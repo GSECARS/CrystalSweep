@@ -22,7 +22,6 @@ from crystalsweep.ui.view.custom.widgets import (
     DarkMenuBar,
     DarkTabbedPanel,
     FlatButton,
-    IconButton,
     LiveToggle,
 )
 
@@ -34,7 +33,6 @@ __all__ = [
     "DarkMenuBar",
     "DarkTabbedPanel",
     "FlatButton",
-    "IconButton",
     "ImageCanvas",
     "ImageSettingsPopup",
     "IntegrationPlot",

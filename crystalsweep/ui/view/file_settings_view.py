@@ -32,9 +32,9 @@ from crystalsweep.ui.view.custom.theme import (
     scaled_font,
     TEXT_SCHEME,
     TOGGLE_SCHEME,
+    icon_scheme,
 )
-from crystalsweep.ui.view.custom.widgets import IconButton
-from wxutils import FlatCheckBox, FlatTextCtrl
+from wxutils import FlatCheckBox, FlatTextCtrl, FlatIconButton
 
 __all__ = ["FileSettingsView"]
 
@@ -111,16 +111,16 @@ class FileSettingsView(wx.Panel):
         self._filename_ctrl = FlatTextCtrl(self, text_scheme=TEXT_SCHEME)
         self._filename_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_filename_enter)
         self._filename_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_filename_enter)
-        self._filename_update_btn = IconButton(self, draw_update, size=16, tooltip="Update filename", bg=BG_CARD)
+        self._filename_update_btn = FlatIconButton(self, draw_update, icon_size=16, tooltip="Update filename", icon_scheme=icon_scheme(BG_CARD))
         self._filename_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_filename_update_cb))
         self._frame_lbl = self._field_label("Frame #", label_font)
         frame_lbl = self._frame_lbl
         self._frame_ctrl = FlatTextCtrl(self, value="0", placeholder="0", text_scheme=TEXT_SCHEME)
         self._frame_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_frame_enter)
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_enter)
-        self._frame_reset_btn = IconButton(self, draw_refresh, size=16, tooltip="Reset frame number", bg=BG_CARD)
+        self._frame_reset_btn = FlatIconButton(self, draw_refresh, icon_size=16, tooltip="Reset frame number", icon_scheme=icon_scheme(BG_CARD))
         self._frame_reset_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_reset())
-        self._frame_update_btn = IconButton(self, draw_update, size=16, tooltip="Update frame number", bg=BG_CARD)
+        self._frame_update_btn = FlatIconButton(self, draw_update, icon_size=16, tooltip="Update frame number", icon_scheme=icon_scheme(BG_CARD))
         self._frame_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_update())
         vsep = wx.Panel(self, size=(1, -1))
         vsep.SetBackgroundColour(SEP_COLOUR)
@@ -151,9 +151,9 @@ class FileSettingsView(wx.Panel):
         self._path_ctrl = FlatTextCtrl(self, text_scheme=TEXT_SCHEME)
         self._path_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_path_enter)
         self._path_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_path_enter)
-        self._path_browse_btn = IconButton(self, draw_folder_open, size=16, tooltip="Browse for directory", bg=BG_CARD)
+        self._path_browse_btn = FlatIconButton(self, draw_folder_open, icon_size=16, tooltip="Browse for directory", icon_scheme=icon_scheme(BG_CARD))
         self._path_browse_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_directory())
-        self._path_update_btn = IconButton(self, draw_update, size=16, tooltip="Update path", bg=BG_CARD)
+        self._path_update_btn = FlatIconButton(self, draw_update, icon_size=16, tooltip="Update path", icon_scheme=icon_scheme(BG_CARD))
         self._path_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_path_update_cb))
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(6)
@@ -210,7 +210,7 @@ class FileSettingsView(wx.Panel):
         self._crysalis_cal_label.SetFont(cal_font)
         self._crysalis_cal_label.SetForegroundColour(FG_SECONDARY)
         self._crysalis_cal_label.SetBackgroundColour(BG_CARD)
-        self._crysalis_cal_btn = IconButton(self, draw_folder, size=16, tooltip="Load CrysAlis calibration", bg=BG_CARD)
+        self._crysalis_cal_btn = FlatIconButton(self, draw_folder, icon_size=16, tooltip="Load CrysAlis calibration", icon_scheme=icon_scheme(BG_CARD))
         self._crysalis_cal_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_calibration())
 
         self._apex_toggle = FlatCheckBox(self, "Use APEX", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
@@ -220,7 +220,7 @@ class FileSettingsView(wx.Panel):
         self._apex_cal_label.SetFont(cal_font)
         self._apex_cal_label.SetForegroundColour(FG_SECONDARY)
         self._apex_cal_label.SetBackgroundColour(BG_CARD)
-        self._apex_cal_btn = IconButton(self, draw_folder, size=16, tooltip="Load APEX calibration", bg=BG_CARD)
+        self._apex_cal_btn = FlatIconButton(self, draw_folder, icon_size=16, tooltip="Load APEX calibration", icon_scheme=icon_scheme(BG_CARD))
         self._apex_cal_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_apex_calibration())
         self._apex_toggle.Hide()
         self._apex_cal_label.Hide()

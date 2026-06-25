@@ -34,9 +34,8 @@ from crystalsweep.ui.view.custom.theme import (
     SEP_COLOUR,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import IconButton
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME, STATUS_SCHEME
-from wxutils import FlatButton, FlatTextCtrl, StatusField
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME, STATUS_SCHEME, icon_scheme
+from wxutils import FlatButton, FlatTextCtrl, StatusField, FlatIconButton
 
 __all__ = ["CenteringMotorSpec", "PreviewView"]
 
@@ -151,10 +150,10 @@ class _CenteringRow(wx.Panel):
         self._label.SetForegroundColour(FG_SECONDARY)
         self._label.SetBackgroundColour(BG_CARD)
 
-        self._left_btn = IconButton(self, draw_chevron_left, size=self._ARROW_SIZE, tooltip=f"Move {label_text} − step", bg=BG_CARD)
+        self._left_btn = FlatIconButton(self, draw_chevron_left, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} − step", icon_scheme=icon_scheme(BG_CARD))
         self._left_btn.Bind(wx.EVT_BUTTON, lambda _e: self._fire(self._on_left_cb))
 
-        self._right_btn = IconButton(self, draw_chevron_right, size=self._ARROW_SIZE, tooltip=f"Move {label_text} + step", bg=BG_CARD)
+        self._right_btn = FlatIconButton(self, draw_chevron_right, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} + step", icon_scheme=icon_scheme(BG_CARD))
         self._right_btn.Bind(wx.EVT_BUTTON, lambda _e: self._fire(self._on_right_cb))
 
         self._value_box = StatusField(self, height=self._ROW_H, bg=STATUS_SCHEME[0], fg=STATUS_SCHEME[1])

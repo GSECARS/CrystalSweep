@@ -21,10 +21,10 @@ from typing import Callable, Protocol
 import numpy as np
 import wx
 
-from crystalsweep.ui.view.custom import IconButton, ImageCanvas, ImageSettingsPopup, IntegrationPlot, IntensityHistogramWidget, LiveToggle
+from crystalsweep.ui.view.custom import ImageCanvas, ImageSettingsPopup, IntegrationPlot, IntensityHistogramWidget, LiveToggle
 from crystalsweep.ui.view.custom.icons import draw_chevron_left, draw_chevron_right, draw_cog, draw_folder
-from crystalsweep.ui.view.custom.theme import BG_SURFACE, FG_SECONDARY, PONI_LOADED, PONI_MISSING, TEXT_SCHEME, scaled_font
-from wxutils import FlatTextCtrl
+from crystalsweep.ui.view.custom.theme import BG_SURFACE, FG_SECONDARY, PONI_LOADED, PONI_MISSING, TEXT_SCHEME, scaled_font, icon_scheme
+from wxutils import FlatTextCtrl, FlatIconButton
 
 __all__ = ["ADViewerView"]
 
@@ -92,14 +92,14 @@ class ADViewerView(wx.Panel):
         # Parent overlay buttons to the VisPy native widget so they render above it on Windows
         overlay_parent = self._image_canvas.native
 
-        self._load_file_btn = IconButton(overlay_parent, draw_folder, tooltip="Load image file")
+        self._load_file_btn = FlatIconButton(overlay_parent, draw_folder, tooltip="Load image file", icon_scheme=icon_scheme(BG_SURFACE))
         self._load_file_btn.Bind(wx.EVT_BUTTON, lambda _: self._trigger_load_file())
 
-        self._prev_btn = IconButton(overlay_parent, draw_chevron_left, tooltip="Previous frame")
+        self._prev_btn = FlatIconButton(overlay_parent, draw_chevron_left, tooltip="Previous frame", icon_scheme=icon_scheme(BG_SURFACE))
         self._prev_btn.Bind(wx.EVT_BUTTON, self._on_prev_frame)
         self._prev_btn.Hide()
 
-        self._next_btn = IconButton(overlay_parent, draw_chevron_right, tooltip="Next frame")
+        self._next_btn = FlatIconButton(overlay_parent, draw_chevron_right, tooltip="Next frame", icon_scheme=icon_scheme(BG_SURFACE))
         self._next_btn.Bind(wx.EVT_BUTTON, self._on_next_frame)
         self._next_btn.Hide()
 
@@ -108,7 +108,7 @@ class ADViewerView(wx.Panel):
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_ctrl_enter)
         self._frame_ctrl.Hide()
 
-        self._settings_btn = IconButton(overlay_parent, draw_cog, tooltip="Image settings")
+        self._settings_btn = FlatIconButton(overlay_parent, draw_cog, tooltip="Image settings", icon_scheme=icon_scheme(BG_SURFACE))
         self._settings_btn.Bind(wx.EVT_BUTTON, self._on_settings_btn)
 
         self._live_toggle = LiveToggle(overlay_parent, live=self._live_updates)

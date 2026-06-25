@@ -20,9 +20,8 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.icons import draw_folder
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME, RADIO_SCHEME
-from crystalsweep.ui.view.custom.widgets import IconButton
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar, FlatRadioButton
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME, RADIO_SCHEME, icon_scheme
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar, FlatRadioButton, FlatIconButton
 
 __all__ = [
     "GeneralConfigView",
@@ -999,7 +998,7 @@ class CrysalisConfigView(wx.Panel):
 
         self._crysalis_par_ctrl = FlatTextCtrl(c_body, placeholder="Path to .par calibration file", text_scheme=TEXT_SCHEME)
         self._crysalis_par_ctrl.SetMinSize((-1, 28))
-        self._crysalis_par_btn = IconButton(c_body, draw_folder, size=16, tooltip="Browse for .par file", bg=POPUP_BG)
+        self._crysalis_par_btn = FlatIconButton(c_body, draw_folder, icon_size=16, tooltip="Browse for .par file", icon_scheme=icon_scheme(POPUP_BG))
         self._crysalis_par_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_par())
         par_row = wx.BoxSizer(wx.HORIZONTAL)
         par_row.Add(self._crysalis_par_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
@@ -1008,7 +1007,7 @@ class CrysalisConfigView(wx.Panel):
 
         self._crysalis_set_ctrl = FlatTextCtrl(c_body, placeholder="Path to .set file (optional, derived from PAR if blank)", text_scheme=TEXT_SCHEME)
         self._crysalis_set_ctrl.SetMinSize((-1, 28))
-        self._crysalis_set_btn = IconButton(c_body, draw_folder, size=16, tooltip="Browse for .set file", bg=POPUP_BG)
+        self._crysalis_set_btn = FlatIconButton(c_body, draw_folder, icon_size=16, tooltip="Browse for .set file", icon_scheme=icon_scheme(POPUP_BG))
         self._crysalis_set_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_set())
         set_row = wx.BoxSizer(wx.HORIZONTAL)
         set_row.Add(self._crysalis_set_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
@@ -1017,7 +1016,7 @@ class CrysalisConfigView(wx.Panel):
 
         self._crysalis_ccd_ctrl = FlatTextCtrl(c_body, placeholder="Path to .ccd file (optional, derived from PAR if blank)", text_scheme=TEXT_SCHEME)
         self._crysalis_ccd_ctrl.SetMinSize((-1, 28))
-        self._crysalis_ccd_btn = IconButton(c_body, draw_folder, size=16, tooltip="Browse for .ccd file", bg=POPUP_BG)
+        self._crysalis_ccd_btn = FlatIconButton(c_body, draw_folder, icon_size=16, tooltip="Browse for .ccd file", icon_scheme=icon_scheme(POPUP_BG))
         self._crysalis_ccd_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_ccd())
         ccd_row = wx.BoxSizer(wx.HORIZONTAL)
         ccd_row.Add(self._crysalis_ccd_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
