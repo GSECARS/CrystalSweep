@@ -59,15 +59,15 @@ class ScriptEditorController:
             self._model.save_source(source)
             self._dialog.set_status(
                 f"Saved — {self._model.hooks_path.name}",
-                ok_colour=PONI_LOADED,
-                error_colour=DANGER,
+                ok_color=PONI_LOADED,
+                error_color=DANGER,
             )
             _log.info("hooks.py saved")
         except Exception as exc:
             self._dialog.set_status(
                 f"Save failed: {exc}",
-                ok_colour=PONI_LOADED,
-                error_colour=DANGER,
+                ok_color=PONI_LOADED,
+                error_color=DANGER,
                 error=True,
             )
             _log.error("Failed to save hooks.py: %s", exc)
