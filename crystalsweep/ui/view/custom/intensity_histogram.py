@@ -18,7 +18,7 @@ import numpy as np
 import wx
 
 from wxmplot.colors import get_colormap_names, lookup_colormap
-from crystalsweep.ui.view.custom.histogram_utils import compute_histogram_data
+from wxmplot.histogram import compute_histogram_data
 from crystalsweep.ui.view.custom.theme import scaled_font
 
 __all__ = ["IntensityHistogramWidget"]
