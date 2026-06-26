@@ -16,9 +16,8 @@ from typing import Callable
 
 import numpy as np
 import wx
-from vispy.color import get_colormap
 
-from crystalsweep.ui.view.custom.colormaps import CUSTOM_COLORMAPS
+from wxmplot.colors import get_colormap_names, lookup_colormap
 from crystalsweep.ui.view.custom.histogram_utils import compute_histogram_data
 from crystalsweep.ui.view.custom.theme import scaled_font
 
@@ -135,7 +134,7 @@ class IntensityHistogramWidget(wx.Panel):
         return np.expm1(log_min + t * (log_max - log_min))
 
     def _build_gradient_bitmap(self, w: int, h: int) -> wx.Bitmap:
-        cmap = CUSTOM_COLORMAPS.get(self._colormap) or get_colormap(self._colormap)
+        cmap = lookup_colormap(self._colormap)
         ts = np.linspace(0.0, 1.0, max(w, 1))
         rgba = cmap[ts].rgba
         rgb = (np.clip(rgba[:, :3], 0.0, 1.0) * 255).astype(np.uint8)

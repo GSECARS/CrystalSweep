@@ -12,7 +12,7 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from crystalsweep.ui.view.custom.colormaps import COLORMAP_NAMES, CUSTOM_COLORMAPS, colormap_color
+from crystalsweep.ui.view.custom.colormaps import register_cs_colormaps
 from crystalsweep.ui.view.custom.image_canvas import ImageCanvas
 from crystalsweep.ui.view.custom.integration_plot import IntegrationPlot
 from crystalsweep.ui.view.custom.intensity_histogram import IntensityHistogramWidget
@@ -21,11 +21,16 @@ from crystalsweep.ui.view.custom.widgets import (
     CrystalMenuBar,
     LiveToggle,
 )
+from wxmplot.colors import colormap_color, get_colormap_names, lookup_colormap
+
+# Register CS-specific colormaps as soon as this package is imported.
+register_cs_colormaps()
 
 __all__ = [
-    "COLORMAP_NAMES",
-    "CUSTOM_COLORMAPS",
     "colormap_color",
+    "get_colormap_names",
+    "lookup_colormap",
+    "register_cs_colormaps",
     "CrystalMenuBar",
     "ImageCanvas",
     "ImageSettingsPopup",

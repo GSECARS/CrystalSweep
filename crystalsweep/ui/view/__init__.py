@@ -29,12 +29,11 @@ from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom import (
-    COLORMAP_NAMES,
-    CUSTOM_COLORMAPS,
     ImageCanvas,
     IntegrationPlot,
     IntensityHistogramWidget,
     colormap_color,
+    get_colormap_names,
 )
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.main_view import MainView
@@ -54,9 +53,8 @@ __all__ = [
     "PositionersConfigView",
     "CollectionSettingsView",
     "CollectionTableView",
-    "COLORMAP_NAMES",
-    "CUSTOM_COLORMAPS",
     "colormap_color",
+    "get_colormap_names",
     "FileSettingsView",
     "ImageCanvas",
     "IntegrationPlot",

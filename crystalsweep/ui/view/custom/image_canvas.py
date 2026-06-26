@@ -25,7 +25,7 @@ vispy.use(app="wx", gl="glplus")
 
 from vispy import scene  # noqa: E402
 
-from crystalsweep.ui.view.custom.colormaps import CUSTOM_COLORMAPS  # noqa: E402
+from wxmplot.colors import lookup_colormap
 
 __all__ = ["ImageCanvas"]
 
@@ -195,7 +195,7 @@ class ImageCanvas(wx.Panel):
 
     def set_colormap(self, colormap: str) -> None:
         self._colormap = colormap
-        self._image_visual.cmap = CUSTOM_COLORMAPS.get(colormap) or colormap
+        self._image_visual.cmap = lookup_colormap(colormap)
         self._canvas.update()
 
     def set_image(self, image: np.ndarray) -> None:
