@@ -23,18 +23,18 @@ import wx
 
 from crystalsweep.ui.view.custom.icons import draw_folder, draw_folder_open, draw_refresh, draw_update
 from crystalsweep.ui.view.custom.theme import (
-    ACCENT,
     BG_CARD,
-    BG_ELEVATED,
-    BG_SURFACE,
+    BTN_DISABLED,
     DISABLED_FG,
-    FG_PRIMARY,
     FG_SECONDARY,
     PONI_LOADED,
     SEP_COLOUR,
     scaled_font,
+    TEXT_SCHEME,
+    TOGGLE_SCHEME,
+    icon_scheme,
 )
-from crystalsweep.ui.view.custom.widgets import DarkTextCtrl, DarkToggle, IconButton
+from wxutils import FlatCheckBox, FlatTextCtrl, FlatIconButton
 
 __all__ = ["FileSettingsView"]
 
@@ -65,6 +65,8 @@ class FileSettingsView(wx.Panel):
         self._on_crysalis_calibration_cb: Callable[[Path], None] | None = None
         self._on_apex_changed_cb: Callable[[bool], None] | None = None
         self._on_apex_calibration_cb: Callable[[Path], None] | None = None
+
+        self._detector_format: str | None = None
 
         self.SetBackgroundColour(BG_CARD)
         self._build_layout()
@@ -106,19 +108,19 @@ class FileSettingsView(wx.Panel):
         self._filename_lbl = self._field_label("Filename", label_font)
         lbl = self._filename_lbl
         lbl.SetMinSize((70, -1))
-        self._filename_ctrl = DarkTextCtrl(self, parent_bg=BG_CARD)
+        self._filename_ctrl = FlatTextCtrl(self, text_scheme=TEXT_SCHEME)
         self._filename_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_filename_enter)
         self._filename_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_filename_enter)
-        self._filename_update_btn = IconButton(self, draw_update, size=16, tooltip="Update filename", bg=BG_CARD)
+        self._filename_update_btn = FlatIconButton(self, draw_update, icon_size=16, tooltip="Update filename", icon_scheme=icon_scheme(BG_CARD))
         self._filename_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_filename_update_cb))
         self._frame_lbl = self._field_label("Frame #", label_font)
         frame_lbl = self._frame_lbl
-        self._frame_ctrl = DarkTextCtrl(self, value="0", placeholder="0", parent_bg=BG_CARD)
+        self._frame_ctrl = FlatTextCtrl(self, value="0", placeholder="0", text_scheme=TEXT_SCHEME)
         self._frame_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_frame_enter)
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_enter)
-        self._frame_reset_btn = IconButton(self, draw_refresh, size=16, tooltip="Reset frame number", bg=BG_CARD)
+        self._frame_reset_btn = FlatIconButton(self, draw_refresh, icon_size=16, tooltip="Reset frame number", icon_scheme=icon_scheme(BG_CARD))
         self._frame_reset_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_reset())
-        self._frame_update_btn = IconButton(self, draw_update, size=16, tooltip="Update frame number", bg=BG_CARD)
+        self._frame_update_btn = FlatIconButton(self, draw_update, icon_size=16, tooltip="Update frame number", icon_scheme=icon_scheme(BG_CARD))
         self._frame_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_update())
         vsep = wx.Panel(self, size=(1, -1))
         vsep.SetBackgroundColour(SEP_COLOUR)
@@ -146,12 +148,12 @@ class FileSettingsView(wx.Panel):
         self._path_lbl = self._field_label("Path", label_font)
         lbl = self._path_lbl
         lbl.SetMinSize((70, -1))
-        self._path_ctrl = DarkTextCtrl(self, parent_bg=BG_CARD)
+        self._path_ctrl = FlatTextCtrl(self, text_scheme=TEXT_SCHEME)
         self._path_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_path_enter)
         self._path_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_path_enter)
-        self._path_browse_btn = IconButton(self, draw_folder_open, size=16, tooltip="Browse for directory", bg=BG_CARD)
+        self._path_browse_btn = FlatIconButton(self, draw_folder_open, icon_size=16, tooltip="Browse for directory", icon_scheme=icon_scheme(BG_CARD))
         self._path_browse_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_directory())
-        self._path_update_btn = IconButton(self, draw_update, size=16, tooltip="Update path", bg=BG_CARD)
+        self._path_update_btn = FlatIconButton(self, draw_update, icon_size=16, tooltip="Update path", icon_scheme=icon_scheme(BG_CARD))
         self._path_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_path_update_cb))
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(6)
@@ -168,15 +170,15 @@ class FileSettingsView(wx.Panel):
         self._path_status_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
         self._path_status_label.SetBackgroundColour(BG_CARD)
         self._path_status_label.SetForegroundColour(FG_SECONDARY)
-        self._hdf5_toggle = DarkToggle(self, "HDF5")
+        self._hdf5_toggle = FlatCheckBox(self, "HDF5", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._hdf5_toggle.SetBackgroundColour(BG_CARD)
-        self._hdf5_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_hdf5_changed_cb, v))
-        self._cbf_toggle = DarkToggle(self, "CBF")
+        self._hdf5_toggle.SetAction(lambda v: self._fire(self._on_hdf5_changed_cb, v))
+        self._cbf_toggle = FlatCheckBox(self, "CBF", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._cbf_toggle.SetBackgroundColour(BG_CARD)
-        self._cbf_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_cbf_changed_cb, v))
-        self._tif_toggle = DarkToggle(self, "TIF")
+        self._cbf_toggle.SetAction(lambda v: self._fire(self._on_cbf_changed_cb, v))
+        self._tif_toggle = FlatCheckBox(self, "TIF", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._tif_toggle.SetBackgroundColour(BG_CARD)
-        self._tif_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_tif_changed_cb, v))
+        self._tif_toggle.SetAction(lambda v: self._fire(self._on_tif_changed_cb, v))
         row.SetMinSize((-1, 22))
         row.Add(self._path_status_label, 1, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(8)
@@ -194,31 +196,31 @@ class FileSettingsView(wx.Panel):
         self._map_ext_lbl = self._field_label("Map ext.", label_font)
         map_lbl = self._map_ext_lbl
         map_lbl.SetMinSize((70, -1))
-        self._map_ext_ctrl = DarkTextCtrl(self, parent_bg=BG_CARD)
+        self._map_ext_ctrl = FlatTextCtrl(self, text_scheme=TEXT_SCHEME)
         self._map_ext_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_map_ext_enter)
         self._map_ext_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_map_ext_enter)
 
         vsep1 = wx.Panel(self, size=(1, -1))
         vsep1.SetBackgroundColour(SEP_COLOUR)
 
-        self._crysalis_toggle = DarkToggle(self, "Use CrysAlis")
+        self._crysalis_toggle = FlatCheckBox(self, "Use CrysAlis", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._crysalis_toggle.SetBackgroundColour(BG_CARD)
-        self._crysalis_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_crysalis_changed_cb, v))
+        self._crysalis_toggle.SetAction(lambda v: self._fire(self._on_crysalis_changed_cb, v))
         self._crysalis_cal_label = wx.StaticText(self, label="Not loaded", style=wx.ST_ELLIPSIZE_START | wx.ALIGN_RIGHT | wx.ST_NO_AUTORESIZE)
         self._crysalis_cal_label.SetFont(cal_font)
         self._crysalis_cal_label.SetForegroundColour(FG_SECONDARY)
         self._crysalis_cal_label.SetBackgroundColour(BG_CARD)
-        self._crysalis_cal_btn = IconButton(self, draw_folder, size=16, tooltip="Load CrysAlis calibration", bg=BG_CARD)
+        self._crysalis_cal_btn = FlatIconButton(self, draw_folder, icon_size=16, tooltip="Load CrysAlis calibration", icon_scheme=icon_scheme(BG_CARD))
         self._crysalis_cal_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_calibration())
 
-        self._apex_toggle = DarkToggle(self, "Use APEX")
+        self._apex_toggle = FlatCheckBox(self, "Use APEX", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._apex_toggle.SetBackgroundColour(BG_CARD)
-        self._apex_toggle.Bind(wx.EVT_CHECKBOX, lambda v: self._fire(self._on_apex_changed_cb, v))
+        self._apex_toggle.SetAction(lambda v: self._fire(self._on_apex_changed_cb, v))
         self._apex_cal_label = wx.StaticText(self, label="Not loaded", style=wx.ST_ELLIPSIZE_START | wx.ALIGN_RIGHT | wx.ST_NO_AUTORESIZE)
         self._apex_cal_label.SetFont(cal_font)
         self._apex_cal_label.SetForegroundColour(FG_SECONDARY)
         self._apex_cal_label.SetBackgroundColour(BG_CARD)
-        self._apex_cal_btn = IconButton(self, draw_folder, size=16, tooltip="Load APEX calibration", bg=BG_CARD)
+        self._apex_cal_btn = FlatIconButton(self, draw_folder, icon_size=16, tooltip="Load APEX calibration", icon_scheme=icon_scheme(BG_CARD))
         self._apex_cal_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_apex_calibration())
         self._apex_toggle.Hide()
         self._apex_cal_label.Hide()
@@ -294,20 +296,29 @@ class FileSettingsView(wx.Panel):
 
     def set_enabled(self, enabled: bool) -> None:
         for ctrl in (
-            self._filename_ctrl, self._filename_update_btn,
-            self._frame_ctrl, self._frame_reset_btn, self._frame_update_btn,
-            self._path_ctrl, self._path_browse_btn, self._path_update_btn,
-            self._map_ext_ctrl, self._crysalis_cal_btn,
+            self._filename_ctrl,
+            self._filename_update_btn,
+            self._frame_ctrl,
+            self._frame_reset_btn,
+            self._frame_update_btn,
+            self._path_ctrl,
+            self._path_browse_btn,
+            self._path_update_btn,
+            self._map_ext_ctrl,
+            self._crysalis_cal_btn,
         ):
             ctrl.Enable(enabled)
         for toggle in (
-            self._hdf5_toggle, self._cbf_toggle, self._tif_toggle,
+            self._hdf5_toggle,
+            self._cbf_toggle,
+            self._tif_toggle,
         ):
-            toggle.SetLocked(not enabled)
+            toggle.Enable(enabled)
         if enabled:
+            self._apply_detector_format_lock()
             self._refresh_crysalis_toggle_lock()
         else:
-            self._crysalis_toggle.SetLocked(True)
+            self._crysalis_toggle.Enable(False)
         self._path_status_label.Enable(True)
         lbl_colour = FG_SECONDARY if enabled else DISABLED_FG
         for lbl in (self._filename_lbl, self._frame_lbl, self._path_lbl, self._map_ext_lbl):
@@ -343,21 +354,28 @@ class FileSettingsView(wx.Panel):
         self._tif_toggle.SetValue(value)
 
     def set_detector_format(self, format_key: str | None) -> None:
+        self._detector_format = format_key
+        self._apply_detector_format_lock()
+
+    def _apply_detector_format_lock(self) -> None:
+        """Lock the toggle for the detector's native format so it can't be
+        unchecked, and force its value to True. Unlock the other two."""
+        format_key = self._detector_format
         if format_key == "hdf5":
             self._hdf5_toggle.SetValue(True)
-            self._hdf5_toggle.SetLocked(True)
+            self._hdf5_toggle.Enable(False)
         else:
-            self._hdf5_toggle.SetLocked(False)
+            self._hdf5_toggle.Enable(True)
         if format_key == "cbf":
             self._cbf_toggle.SetValue(True)
-            self._cbf_toggle.SetLocked(True)
+            self._cbf_toggle.Enable(False)
         else:
-            self._cbf_toggle.SetLocked(False)
+            self._cbf_toggle.Enable(True)
         if format_key == "tif":
             self._tif_toggle.SetValue(True)
-            self._tif_toggle.SetLocked(True)
+            self._tif_toggle.Enable(False)
         else:
-            self._tif_toggle.SetLocked(False)
+            self._tif_toggle.Enable(True)
 
     def set_crysalis(self, value: bool) -> None:
         self._crysalis_toggle.SetValue(value)
@@ -374,7 +392,7 @@ class FileSettingsView(wx.Panel):
 
     def _refresh_crysalis_toggle_lock(self) -> None:
         par_loaded = self._crysalis_cal_label.GetLabel() != "Not loaded"
-        self._crysalis_toggle.SetLocked(not par_loaded)
+        self._crysalis_toggle.Enable(par_loaded)
         if not par_loaded:
             self._crysalis_toggle.SetValue(False)
 

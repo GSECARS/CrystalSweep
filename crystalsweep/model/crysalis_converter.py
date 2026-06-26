@@ -16,7 +16,9 @@
 #     "filepath":    "<local directory containing the data files>",
 #     "basename":    "<filename stem WITHOUT frame number, e.g. t1_pos1>",
 #     "filenumber":  1,
-#     "par_file":    "<path to .par calibration file; .ccd and .set are siblings>",
+#     "par_file":    "<path to .par calibration file>",
+#     "set_file":    "<explicit path to .set file; if empty, derived from par_file path>",
+#     "ccd_file":    "<explicit path to .ccd file; if empty, derived from par_file path>",
 #     "scan_info":   {<esperanto_scan_info dict>},
 #     "file_format": "hdf5" | "cbf"
 #   }
@@ -39,18 +41,23 @@ from pathlib import Path
 _log = logging.getLogger(__name__)
 
 
-def _make_directory(filepath: str, basename: str) -> str:
-    new_directory = os.path.normpath(os.path.join(filepath, basename + "_crys"))
+def _make_directory(filepath: str, basename: str, output_dir: str | None = None) -> str:
+    new_directory = os.path.normpath(output_dir) if output_dir else os.path.normpath(os.path.join(filepath, basename + "_crys"))
     if os.path.isdir(new_directory):
         shutil.rmtree(new_directory)
     os.makedirs(new_directory)
     return new_directory
 
 
-def _copy_set_ccd(new_directory: str, basename: str, par_file: str) -> None:
+def _copy_set_ccd(new_directory: str, basename: str, par_file: str, set_file: str = "", ccd_file: str = "") -> None:
     par_path = Path(par_file)
+    explicit = {".set": set_file, ".ccd": ccd_file}
     for ext in (".set", ".ccd"):
-        src = par_path.with_suffix(ext)
+        explicit_path = explicit[ext]
+        if explicit_path:
+            src = Path(explicit_path)
+        else:
+            src = par_path.with_suffix(ext)
         if not src.is_file():
             _log.warning("Companion %s file not found: %s", ext, src)
             continue
@@ -95,37 +102,134 @@ def _create_crysalis_run(new_directory: str, basename: str, scan_info: dict) -> 
 
 def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: str, scan_info: dict) -> None:
     try:
+        from dataclasses import dataclass, field as dc_field
+        from fabio.app import eiger2crysalis
+        from fabio.nexus import get_isotime
         import h5py
-        import numpy as np
-        from cryio import esperanto
+        import numexpr
+        import numpy
     except ImportError:
-        _log.warning("h5py/numpy/cryio not available; skipping HDF5 conversion")
+        _log.warning("fabio/h5py/numexpr not available; skipping HDF5 conversion")
         return
 
-    h5_path = os.path.join(filepath, f"{basename}_{filenumber:04d}.h5")
     full_basename = f"{basename}_{filenumber:04d}"
-    _log.info("Converting HDF5: %s", h5_path)
+    h5_path = os.path.join(filepath, f"{full_basename}.h5")
+    _log.info("Converting HDF5 via eiger2crysalis: %s", h5_path)
+
+    omega_start = scan_info.get("omega_start", 0.0)
+    domega = scan_info.get("domega", 1.0)
+    wavelength = scan_info.get("wavelength", 0.2952)
+    distance = scan_info.get("dist", 200.0)
+    center_x = scan_info.get("center_x", 0.0)
+    center_y = scan_info.get("center_y", 0.0)
+    alpha = scan_info.get("alpha", 50.0)
+    polarization = scan_info.get("mono", 0.99)
+    pixel_size = scan_info.get("pixel_size", 0.075)
+    exposure = scan_info.get("Exposure_time", 1.0)
+
+    @dataclass
+    class Options:
+        output: str
+        wavelength: float
+        distance: float
+        beam: list
+        rotation: int
+        transpose: bool
+        flip_ud: bool
+        flip_lr: bool
+        alpha: float
+        kappa: str
+        theta: str
+        phi: str
+        omega: str
+        polarization: float
+        energy: float = dc_field(default=0)
+        offset: int = dc_field(default=1)
+        dry_run: bool = dc_field(default=False)
+        debug: bool = dc_field(default=False)
+        dummy: int = dc_field(default=-1)
+        images: list = dc_field(default_factory=list)
+        verbose: bool = dc_field(default=False)
+
+    options = Options(
+        output=os.path.join(new_directory, f"{full_basename}_1_{{index}}.esperanto"),
+        wavelength=wavelength,
+        distance=distance,
+        beam=[center_x, center_y],
+        rotation=180,
+        transpose=False,
+        flip_ud=False,
+        flip_lr=True,
+        alpha=alpha,
+        kappa=str(scan_info.get("kappa", 0.0)),
+        theta=str(scan_info.get("theta", 0.0)),
+        phi=str(scan_info.get("phi", 0.0)),
+        omega=f"{omega_start} + {domega} * i",
+        polarization=polarization,
+        images=[h5_path],
+    )
+
+    class _Converter(eiger2crysalis.Converter):
+        def common_headers(self):
+            with h5py.File(h5_path, "r") as f:
+                shape = f["entry/data/data"].shape[1:]
+                dtype = f["entry/data/data"].dtype
+            self.mask = numpy.zeros(shape, dtype=dtype)
+
+            cx, cy = self.new_beam_center(center_x, center_y, shape)
+            omega_expr = numexpr.NumExpr(self.options.omega)
+            self.scan_type = "omega"
+
+            return {
+                "delectronsperadu": 1,
+                "ldarkcorrectionswitch": 0,
+                "lfloodfieldcorrectionswitch/mode": 0,
+                "dsystemdcdb2gain": 1.0,
+                "ddarksignal": 0,
+                "dreadnoiserms": 0,
+                "ioverflowflag": 0,
+                "ioverflowafterremeasureflag": 0,
+                "inumofdarkcurrentimages": 0,
+                "inumofmultipleimages": 0,
+                "loverflowthreshold": 1000000,
+                "doverflowtimeinsec": 0,
+                "doverflowfilter": 0,
+                "dsithicknessmmforpixeldetector": 1,
+                "timestampstring": get_isotime(),
+                "dbeam2indeg": 0,
+                "dbeam3indeg": 0,
+                "detectorrotindeg_x": 0,
+                "detectorrotindeg_y": 0,
+                "detectorrotindeg_z": 0,
+                "dalphaindeg": alpha,
+                "dbetaindeg": 0,
+                "ddvalue-prepolfac": polarization,
+                "orientation-type": "SYNCHROTRON",
+                "drealpixelsizex": pixel_size,
+                "drealpixelsizey": pixel_size,
+                "dexposuretimeinsec": exposure,
+                "ddistanceinmm": distance,
+                "dalpha1": wavelength,
+                "dalpha2": wavelength,
+                "dalpha12": wavelength,
+                "dbeta1": wavelength,
+                "dxorigininpix": cx,
+                "dyorigininpix": cy,
+                "dom_s": omega_expr,
+                "dom_e": numexpr.NumExpr(f"{omega_start} + {domega} * (i + 1)"),
+                "dth_s": float(self.options.theta),
+                "dth_e": float(self.options.theta),
+                "dka_s": float(self.options.kappa),
+                "dka_e": float(self.options.kappa),
+                "dph_s": float(self.options.phi),
+                "dph_e": float(self.options.phi),
+            }
 
     try:
-        with h5py.File(h5_path, "r") as f:
-            data = f["entry/data/data"]
-            count = data.shape[0]
-            _log.info("Found %d frames in %s", count, h5_path)
-            for i in range(count):
-                try:
-                    frame = data[i]
-                    frame = np.flipud(frame)
-                    frame = np.fliplr(frame)
-                    esp_file = os.path.join(new_directory, f"{full_basename}_1_{i + 1}.esperanto")
-                    rot = dict(scan_info)
-                    rot["omega"] = rot.get("omega_start", 0.0) + rot.get("domega", 1.0) * i
-                    esp = esperanto.EsperantoImage()
-                    esp.save(esp_file, frame, **rot)
-                    _log.debug("Wrote frame %d -> %s", i + 1, esp_file)
-                except Exception:
-                    _log.exception("HDF5 frame %d conversion failed", i + 1)
-                    break
-        _log.info("HDF5 conversion complete: %d frames", count)
+        converter = _Converter(options=options)
+        converter.convert_all()
+        converter.finish()
+        _log.info("HDF5 conversion complete: %s", full_basename)
     except Exception:
         _log.exception("HDF5 conversion failed")
 
@@ -172,17 +276,20 @@ def run_conversion(args: dict) -> None:
     basename = args["basename"]
     filenumber = int(args.get("filenumber", 1))
     par_file = args.get("par_file", "")
+    set_file = args.get("set_file", "")
+    ccd_file = args.get("ccd_file", "")
     scan_info = args.get("scan_info", {})
     file_format = args.get("file_format", "hdf5")
+    output_dir = args.get("output_dir") or None
 
     full_basename = f"{basename}_{filenumber:04d}"
-    _log.info("run_conversion: filepath=%r full_basename=%r file_format=%r", filepath, full_basename, file_format)
+    _log.info("run_conversion: filepath=%r full_basename=%r file_format=%r output_dir=%r", filepath, full_basename, file_format, output_dir)
 
-    new_directory = _make_directory(filepath, full_basename)
+    new_directory = _make_directory(filepath, full_basename, output_dir)
 
     if par_file and os.path.isfile(par_file):
         _create_par_file(new_directory, full_basename, par_file)
-        _copy_set_ccd(new_directory, full_basename, par_file)
+        _copy_set_ccd(new_directory, full_basename, par_file, set_file=set_file, ccd_file=ccd_file)
     else:
         _log.warning("Par file not found: %s", par_file)
 

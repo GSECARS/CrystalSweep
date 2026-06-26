@@ -4,10 +4,11 @@
 # File: crystalsweep/model/script_model.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Manages the user-editable hooks.py script stored on disk under the configs/
-# directory. The file contains both pre_scan and post_scan (and any helpers the
-# user adds). Scripts are hot-reloaded via importlib on every call so edits saved
-# from the GUI take effect immediately without restarting the app.
+# Manages the user-editable hooks.py script stored on disk under the per-user
+# CrystalSweep app data directory. The file contains both pre_scan and post_scan
+# (and any helpers the user adds). Scripts are hot-reloaded via importlib on
+# every call so edits saved from the GUI take effect immediately without
+# restarting the app.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -19,6 +20,8 @@ import importlib.util
 import logging
 import traceback
 from pathlib import Path
+
+from crystalsweep.paths import user_config_dir
 
 __all__ = ["ScriptModel"]
 
@@ -36,6 +39,20 @@ from crystalsweep.model.beamline_config_model import BeamlineConfig
 def is_map(point: CollectionPoint) -> bool:
     """Return True if this point is part of a map group."""
     return bool(point.map_group)
+
+
+def pre_collection(points: list[CollectionPoint], config: BeamlineConfig) -> str | None:
+    """Called once before the entire collection starts (before any scans or maps).
+
+    Return an error string to abort the collection, or None to proceed.
+    *points* is the full list of points that will be collected.
+    """
+    return None
+
+
+def post_collection(points: list[CollectionPoint], config: BeamlineConfig) -> None:
+    """Called once after the entire collection completes (after all scans and maps)."""
+    pass
 
 
 def pre_scan(point: CollectionPoint, config: BeamlineConfig) -> str | None:
@@ -68,14 +85,14 @@ def post_scan(point: CollectionPoint, config: BeamlineConfig) -> None:
 
 
 class ScriptModel:
-    """Loads, saves, and hot-reloads hooks.py from a scripts/ directory.
+    """Loads, saves, and hot-reloads hooks.py from the user config directory.
 
     Uses importlib to load the file as a proper Python module so that
     tracebacks point to the actual file and line numbers.
     """
 
-    def __init__(self, directory: Path | str = "configs") -> None:
-        self._directory = Path(directory)
+    def __init__(self, directory: Path | str | None = None) -> None:
+        self._directory = Path(directory) if directory is not None else user_config_dir()
         self._directory.mkdir(parents=True, exist_ok=True)
         self._ensure_default()
 
@@ -114,7 +131,7 @@ class ScriptModel:
 
         fn = getattr(module, name, None)
         if fn is None:
-            _log.error("hooks.py does not define a function named %r", name)
+            _log.debug("hooks.py does not define a function named %r", name)
             return None
 
         try:

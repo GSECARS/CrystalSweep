@@ -35,6 +35,7 @@ class FileSettingsController:
     def __init__(self, model: MainModel, view: MainView) -> None:
         self._model = model
         self._view = view
+        self._on_hdf5_changed_listeners: list = []
 
         fs = self._view.file_settings
         fs.bind_filename_changed(self._on_filename_changed)
@@ -75,6 +76,10 @@ class FileSettingsController:
         self._model.file_settings.use_crysalis = True
         self._view.file_settings.set_crysalis_calibration_label(path)
         self._view.file_settings.set_crysalis(True)
+        if cfg.crysalis_set_path:
+            self._model.file_settings.crysalis_set_file = Path(cfg.crysalis_set_path)
+        if cfg.crysalis_ccd_path:
+            self._model.file_settings.crysalis_ccd_file = Path(cfg.crysalis_ccd_path)
         _log.debug("apply_crysalis_from_config: loaded %s", path)
 
     def _sync_format_from_detector(self) -> None:
@@ -139,8 +144,7 @@ class FileSettingsController:
             except Exception as exc:
                 _log.warning("sync_from_detector: failed to fetch file info: %s", exc)
                 return
-            wx.CallAfter(self._apply_detector_file_info, directory, filename, file_number,
-                         update_directory, update_filename, update_frame)
+            wx.CallAfter(self._apply_detector_file_info, directory, filename, file_number, update_directory, update_filename, update_frame)
 
         threading.Thread(target=_fetch, daemon=True, name="detector-file-sync").start()
 
@@ -208,8 +212,13 @@ class FileSettingsController:
         self._model.file_settings.map_ext = value
         _log.debug("file_settings.map_ext = %r", value)
 
+    def add_hdf5_changed_listener(self, callback) -> None:
+        self._on_hdf5_changed_listeners.append(callback)
+
     def _on_hdf5_changed(self, value: bool) -> None:
         self._model.file_settings.use_hdf5 = value
+        for cb in self._on_hdf5_changed_listeners:
+            cb(value)
         _log.debug("file_settings.use_hdf5 = %s", value)
 
     def _on_cbf_changed(self, value: bool) -> None:

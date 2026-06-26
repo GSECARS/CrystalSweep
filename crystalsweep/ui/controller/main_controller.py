@@ -26,6 +26,7 @@ from crystalsweep.ui.controller.collect_controller import CollectController
 from crystalsweep.ui.controller.collection_settings_controller import CollectionSettingsController
 from crystalsweep.ui.controller.collection_table_controller import CollectionTableController
 from crystalsweep.ui.controller.file_settings_controller import FileSettingsController
+from crystalsweep.ui.controller.preview_controller import PreviewController
 from crystalsweep.ui.controller.script_editor_controller import ScriptEditorController
 from crystalsweep.ui.view import MainView
 
@@ -46,11 +47,18 @@ class MainController:
                 ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
         self._app = wx.App(False)
+        from crystalsweep.ui.view.custom.theme import apply_cs_theme
+        apply_cs_theme()
         self._model = MainModel()
         self._view = MainView(version=version)
 
         self._file_settings_controller = FileSettingsController(model=self._model, view=self._view)
         self._collection_settings_controller = CollectionSettingsController(model=self._model, view=self._view)
+        # When the HDF5 file-settings toggle flips, the still-map combine
+        # toggle should appear/disappear accordingly.
+        self._file_settings_controller.add_hdf5_changed_listener(
+            lambda _v: self._collection_settings_controller.refresh_dependent_toggles()
+        )
         self._collection_controller = CollectionTableController(model=self._model, view=self._view.collection_table)
         self._collect_controller = CollectController(model=self._model, view=self._view)
         self._collect_controller.bind_collecting_changed(self._on_collecting_changed)
@@ -68,6 +76,7 @@ class MainController:
             model=self._model.scripts,
             view=self._view,
         )
+        self._preview_controller = PreviewController(model=self._model, view=self._view.preview)
 
     def _on_collecting_changed(self, collecting: bool) -> None:
         self._view.set_ui_collecting(collecting)
@@ -81,6 +90,7 @@ class MainController:
         self._file_settings_controller.push_to_detector()
         self._file_settings_controller.apply_crysalis_from_config()
         self._collect_controller.on_config_applied()
+        self._preview_controller.on_config_applied(cfg)
         self._check_epics_status(cfg)
 
     def _check_epics_status(self, cfg: BeamlineConfig | None = None) -> None:

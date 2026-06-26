@@ -95,6 +95,7 @@ class CollectionSettingsController:
         """Called when a new beamline config is applied — refresh rotation shorthand and map motors."""
         self._sync_rotation_shorthand()
         self._sync_map_motors()
+        self._sync_trajectory_toggle()
 
     def _sync_rotation_shorthand(self) -> None:
         rm = self._model.beamline.active.rotation_motor
@@ -131,13 +132,50 @@ class CollectionSettingsController:
 
     def _sync_trajectory_toggle(self) -> None:
         cs = self._model.collection_settings
-        still_trajectory = cs.scan_type == "still" and cs.map
+        still_map = cs.scan_type == "still" and cs.map
         wide_flip_map = cs.scan_type == "wide" and cs.map and cs.wide_flip
-        self._view.collection_table.set_trajectory_visible(still_trajectory)
-        keep_shutter_visible = (still_trajectory and self._view.collection_table.trajectory_scan) or wide_flip_map
+
+        # Trajectory toggle only makes sense for still maps whose map motor
+        # is driven by an XPS controller (the only controller type that
+        # supports the array trajectory used by the still-map row scan).
+        trajectory_visible = still_map and self._map_motor_uses_xps()
+        self._view.collection_table.set_trajectory_visible(trajectory_visible)
+
+        keep_shutter_visible = still_map or wide_flip_map
         self._view.collection_table.set_keep_shutter_open_visible(keep_shutter_visible)
         self._view.collection_table.set_use_ext_visible(not cs.map)
         self._view.collection_table.set_map_mode(cs.map)
+
+        # Combine-map only makes sense when the output is HDF5 (the combiner
+        # only handles HDF5 row files).
+        combine_visible = cs.map and self._model.file_settings.use_hdf5
+        self._view.collection_table.set_snake_combine_visible(combine_visible)
+
+    def _map_motor_uses_xps(self) -> bool:
+        """Return True if the currently-selected map motor (or, when map2 is
+        enabled, either map motor) is driven by a Newport XPS controller."""
+        cs = self._model.collection_settings
+        cfg = self._model.beamline.active
+        controller_types = {c.name: c.type for c in cfg.controllers if c.name}
+
+        shorthands = [cs.map_motor]
+        if cs.map2_enabled and cs.map2_motor:
+            shorthands.append(cs.map2_motor)
+
+        for shorthand in shorthands:
+            if not shorthand:
+                continue
+            motor = next((m for m in cfg.motors if m.shorthand == shorthand), None)
+            if motor is None:
+                continue
+            if controller_types.get(motor.controller) == "newport_xps":
+                return True
+        return False
+
+    def refresh_dependent_toggles(self) -> None:
+        """Re-sync visibility of trajectory / combine-map toggles. Used by the
+        file settings controller after HDF5 toggling, and after config load."""
+        self._sync_trajectory_toggle()
 
     def _apply_type_defaults(self, scan_type: ScanType) -> None:
         cs = self._model.collection_settings
@@ -176,6 +214,7 @@ class CollectionSettingsController:
 
     def _on_map_motor_changed(self, value: str) -> None:
         self._model.collection_settings.map_motor = self._desc_to_shorthand.get(value, value)
+        self._sync_trajectory_toggle()
         _log.debug("collection_settings.map_motor = %r", self._model.collection_settings.map_motor)
 
     def _on_map_start_changed(self, value: float) -> None:
@@ -196,10 +235,12 @@ class CollectionSettingsController:
 
     def _on_map2_enabled_changed(self, value: bool) -> None:
         self._model.collection_settings.map2_enabled = value
+        self._sync_trajectory_toggle()
         _log.debug("collection_settings.map2_enabled = %s", value)
 
     def _on_map2_motor_changed(self, value: str) -> None:
         self._model.collection_settings.map2_motor = self._desc_to_shorthand.get(value, value)
+        self._sync_trajectory_toggle()
         _log.debug("collection_settings.map2_motor = %r", self._model.collection_settings.map2_motor)
 
     def _on_map2_start_changed(self, value: float) -> None:
@@ -330,8 +371,8 @@ class CollectionSettingsController:
         point_index = 0
         for row_idx, pos2 in enumerate(axis2):
             for col_idx, pos1 in enumerate(axis1):
-                point = self._model.collection.add_point(shorthands)
-                point.label = f"{map_ext}_{frame_number + point_index:0{width}d}"
+                label = f"{map_ext}_{frame_number + point_index:0{width}d}"
+                point = self._model.collection.add_point(shorthands, label=label)
                 point.selected = True
                 point.scan_type = cs.scan_type
                 point.time = str(cs.exposure)

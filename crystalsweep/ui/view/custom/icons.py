@@ -4,8 +4,10 @@
 # File: crystalsweep/ui/view/custom/icons.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Icon draw functions used with IconButton and similar wx.GraphicsContext painters.
-# Each function accepts (gc, s) where gc is a wx.GraphicsContext and s is the size.
+# Icon draw functions for use with IconButton and FlatIconButton.
+# Thin wrappers around wxutils.icons that inject CS-specific colours so
+# icons match the dark theme (ICON_FG stroke, BG_SURFACE hole-punch,
+# ACCENT fill for folder shapes).
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -19,7 +21,74 @@ import wx
 
 from crystalsweep.ui.view.custom.theme import ACCENT, BG_SURFACE, ICON_FG
 
-__all__ = ["draw_folder", "draw_chevron_left", "draw_chevron_right", "draw_cog", "draw_folder_open", "draw_refresh", "draw_update"]
+__all__ = [
+    "draw_chevron_left",
+    "draw_chevron_right",
+    "draw_cog",
+    "draw_folder",
+    "draw_folder_open",
+    "draw_refresh",
+    "draw_update",
+]
+
+
+def _pen(s: float) -> wx.Pen:
+    return wx.Pen(ICON_FG, max(1, int(s * 0.1)))
+
+
+def draw_chevron_left(gc: wx.GraphicsContext, s: int) -> None:
+    """Left-pointing chevron."""
+    cx, cy, hw, hh = s * 0.55, s * 0.5, s * 0.18, s * 0.28
+    p = gc.CreatePath()
+    p.MoveToPoint(cx + hw, cy - hh)
+    p.AddLineToPoint(cx - hw, cy)
+    p.AddLineToPoint(cx + hw, cy + hh)
+    gc.SetPen(_pen(s))
+    gc.SetBrush(wx.TRANSPARENT_BRUSH)
+    gc.StrokePath(p)
+
+
+def draw_chevron_right(gc: wx.GraphicsContext, s: int) -> None:
+    """Right-pointing chevron."""
+    cx, cy, hw, hh = s * 0.45, s * 0.5, s * 0.18, s * 0.28
+    p = gc.CreatePath()
+    p.MoveToPoint(cx - hw, cy - hh)
+    p.AddLineToPoint(cx + hw, cy)
+    p.AddLineToPoint(cx - hw, cy + hh)
+    gc.SetPen(_pen(s))
+    gc.SetBrush(wx.TRANSPARENT_BRUSH)
+    gc.StrokePath(p)
+
+
+def draw_cog(gc: wx.GraphicsContext, s: int) -> None:
+    """Gear / settings icon."""
+    cx, cy = s / 2.0, s / 2.0
+    outer_r, inner_r = s * 0.38, s * 0.22
+    tooth_n = 8
+    tooth_depth = s * 0.09
+    half_angle = math.pi / tooth_n * 0.55
+    path = gc.CreatePath()
+    for i in range(tooth_n * 2):
+        angle = i * math.pi / tooth_n
+        r = outer_r + tooth_depth if i % 2 == 0 else outer_r
+        x = cx + r * math.cos(angle - half_angle)
+        y = cy + r * math.sin(angle - half_angle)
+        if i == 0:
+            path.MoveToPoint(x, y)
+        else:
+            path.AddLineToPoint(x, y)
+        path.AddLineToPoint(
+            cx + r * math.cos(angle + half_angle),
+            cy + r * math.sin(angle + half_angle),
+        )
+    path.CloseSubpath()
+    gc.SetBrush(wx.Brush(ICON_FG))
+    gc.SetPen(wx.TRANSPARENT_PEN)
+    gc.FillPath(path)
+    hole = gc.CreatePath()
+    hole.AddCircle(cx, cy, inner_r)
+    gc.SetBrush(wx.Brush(BG_SURFACE))
+    gc.FillPath(hole)
 
 
 def draw_folder(gc: wx.GraphicsContext, s: int) -> None:
@@ -41,67 +110,12 @@ def draw_folder(gc: wx.GraphicsContext, s: int) -> None:
     arrow.MoveToPoint(cx - aw * 0.45, cy - ah * 0.04)
     arrow.AddLineToPoint(cx, cy - ah * 0.5)
     arrow.AddLineToPoint(cx + aw * 0.45, cy - ah * 0.04)
-    gc.SetPen(wx.Pen(BG_SURFACE, max(1, int(s * 0.1)), wx.PENSTYLE_SOLID))
+    gc.SetPen(wx.Pen(BG_SURFACE, max(1, int(s * 0.1))))
     gc.StrokePath(arrow)
 
 
-def draw_chevron_left(gc: wx.GraphicsContext, s: int) -> None:
-    """Left-pointing chevron."""
-    cx, cy, hw, hh = s * 0.55, s * 0.5, s * 0.18, s * 0.28
-    p = gc.CreatePath()
-    p.MoveToPoint(cx + hw, cy - hh)
-    p.AddLineToPoint(cx - hw, cy)
-    p.AddLineToPoint(cx + hw, cy + hh)
-    gc.SetPen(wx.Pen(ICON_FG, max(1, int(s * 0.1)), wx.PENSTYLE_SOLID))
-    gc.SetBrush(wx.TRANSPARENT_BRUSH)
-    gc.StrokePath(p)
-
-
-def draw_chevron_right(gc: wx.GraphicsContext, s: int) -> None:
-    """Right-pointing chevron."""
-    cx, cy, hw, hh = s * 0.45, s * 0.5, s * 0.18, s * 0.28
-    p = gc.CreatePath()
-    p.MoveToPoint(cx - hw, cy - hh)
-    p.AddLineToPoint(cx + hw, cy)
-    p.AddLineToPoint(cx - hw, cy + hh)
-    gc.SetPen(wx.Pen(ICON_FG, max(1, int(s * 0.1)), wx.PENSTYLE_SOLID))
-    gc.SetBrush(wx.TRANSPARENT_BRUSH)
-    gc.StrokePath(p)
-
-
-def draw_cog(gc: wx.GraphicsContext, s: int) -> None:
-    """Gear / settings icon."""
-    cx, cy = s / 2.0, s / 2.0
-    outer_r, inner_r = s * 0.38, s * 0.22
-    tooth_n = 8
-    tooth_depth = s * 0.09
-    half_angle = math.pi / tooth_n * 0.55
-
-    path = gc.CreatePath()
-    for i in range(tooth_n * 2):
-        angle = i * math.pi / tooth_n
-        r = outer_r + tooth_depth if i % 2 == 0 else outer_r
-        x = cx + r * math.cos(angle - half_angle)
-        y = cy + r * math.sin(angle - half_angle)
-        if i == 0:
-            path.MoveToPoint(x, y)
-        else:
-            path.AddLineToPoint(x, y)
-        path.AddLineToPoint(cx + r * math.cos(angle + half_angle), cy + r * math.sin(angle + half_angle))
-    path.CloseSubpath()
-
-    hole = gc.CreatePath()
-    hole.AddCircle(cx, cy, inner_r)
-
-    gc.SetBrush(wx.Brush(ICON_FG))
-    gc.SetPen(wx.TRANSPARENT_PEN)
-    gc.FillPath(path)
-    gc.SetBrush(wx.Brush(BG_SURFACE))
-    gc.FillPath(hole)
-
-
 def draw_folder_open(gc: wx.GraphicsContext, s: int) -> None:
-    """Open folder icon for directory selection."""
+    """Open folder / browse directory icon."""
     m, r = s * 0.1, s * 0.07
     body = gc.CreatePath()
     body.AddRoundedRectangle(m, m + s * 0.18, s - 2 * m, s - 2 * m - s * 0.18, r)
@@ -111,9 +125,8 @@ def draw_folder_open(gc: wx.GraphicsContext, s: int) -> None:
     tab = gc.CreatePath()
     tab.AddRoundedRectangle(m, m, s * 0.38, s * 0.18 + r, r * 0.8)
     gc.FillPath(tab)
-    gc.SetPen(wx.Pen(BG_SURFACE, max(1, int(s * 0.09)), wx.PENSTYLE_SOLID))
-    cx, cy = s * 0.62, s * 0.6
-    aw = s * 0.18
+    gc.SetPen(wx.Pen(BG_SURFACE, max(1, int(s * 0.09))))
+    cx, cy, aw = s * 0.62, s * 0.6, s * 0.18
     path = gc.CreatePath()
     path.MoveToPoint(cx - aw, cy)
     path.AddLineToPoint(cx + aw, cy)
@@ -121,9 +134,9 @@ def draw_folder_open(gc: wx.GraphicsContext, s: int) -> None:
 
 
 def draw_refresh(gc: wx.GraphicsContext, s: int) -> None:
-    """Circular refresh / reset arrow icon."""
+    """Circular refresh / reset icon."""
     cx, cy, r = s * 0.5, s * 0.5, s * 0.32
-    gc.SetPen(wx.Pen(ICON_FG, max(1, int(s * 0.1)), wx.PENSTYLE_SOLID))
+    gc.SetPen(_pen(s))
     gc.SetBrush(wx.TRANSPARENT_BRUSH)
     path = gc.CreatePath()
     path.AddArc(cx, cy, r, math.radians(30), math.radians(330), True)
@@ -139,12 +152,10 @@ def draw_refresh(gc: wx.GraphicsContext, s: int) -> None:
 
 
 def draw_update(gc: wx.GraphicsContext, s: int) -> None:
-    """Upward arrow icon representing an update / apply action."""
+    """Upward arrow / apply / update icon."""
     cx = s * 0.5
-    stem_top = s * 0.22
-    stem_bot = s * 0.78
-    stem_w = s * 0.1
-    head_w = s * 0.28
+    stem_top, stem_bot = s * 0.22, s * 0.78
+    stem_w, head_w = s * 0.1, s * 0.28
     gc.SetBrush(wx.Brush(ICON_FG))
     gc.SetPen(wx.TRANSPARENT_PEN)
     stem = gc.CreatePath()

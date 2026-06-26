@@ -23,13 +23,13 @@ from typing import Protocol, runtime_checkable
 
 from epics import caget, caput
 
-__all__ = ["DetectorModel", "ADEigerModel", "ADPilatusModel", "ADSpinnakerModel", "get_detector_model", "set_file_info"]
+__all__ = ["DetectorModel", "ADEigerModel", "ADPilatusModel", "ADSpinnakerModel", "get_detector_model"]
 
 _log = logging.getLogger(__name__)
 
 _PLUGIN_MAP: dict[str, str] = {
     "hdf5": "HDF1",
-    "cbf": "CBF1",
+    "cbf": "TIFF1",
     "tif": "TIFF1",
 }
 
@@ -139,8 +139,8 @@ class ADEigerModel:
 
     def save_cbf(self) -> None:
         p = self._prefix
-        caput(f"{p}CBF1:NumCapture", 1)
-        caput(f"{p}CBF1:Capture", 1)
+        caput(f"{p}TIFF1:NumCapture", 1)
+        caput(f"{p}TIFF1:Capture", 1)
 
     def fetch_file_info(self) -> tuple[str, str, int]:
         p = self._prefix
@@ -163,7 +163,16 @@ class ADEigerModel:
         if disable_auto_increment:
             saved = int(caget(f"{p}{plugin}:AutoIncrement") or 1)
             caput(f"{p}{plugin}:AutoIncrement", 0, wait=True)
-        _log.debug("ADEigerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s", p, plugin, directory, filename, frame_number, file_template, disable_auto_increment)
+        _log.debug(
+            "ADEigerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s",
+            p,
+            plugin,
+            directory,
+            filename,
+            frame_number,
+            file_template,
+            disable_auto_increment,
+        )
         return saved
 
     def restore_auto_increment(self, saved_value: int) -> None:
@@ -182,8 +191,8 @@ class ADEigerModel:
             caput(f"{p}TIFF1:NumCapture", n_frames)
             caput(f"{p}TIFF1:Capture", 1)
         else:
-            caput(f"{p}CBF1:NumCapture", n_frames)
-            caput(f"{p}CBF1:Capture", 1)
+            caput(f"{p}TIFF1:NumCapture", n_frames)
+            caput(f"{p}TIFF1:Capture", 1)
         _log.debug("ADEigerModel arm_plugin: %s plugin=%s n_frames=%d", p, plugin, n_frames)
 
     def collect_frame(self, exposure: float) -> None:
@@ -286,9 +295,30 @@ class ADPilatusModel:
             prefix += ":"
         self._prefix = prefix
         self._plugin = _file_plugin(file_format)
+        # ArrayCounter is cumulative across acquisitions, so we baseline it
+        # at the start of each Acquire and report frames-since-start.
+        self._array_counter_baseline: int = 0
+
+    def _snapshot_array_counter(self) -> None:
+        try:
+            self._array_counter_baseline = int(caget(f"{self._prefix}cam1:ArrayCounter_RBV") or 0)
+        except Exception as exc:
+            _log.warning("ADPilatusModel: could not read ArrayCounter_RBV: %s", exc)
+            self._array_counter_baseline = 0
 
     def frames_captured(self) -> int:
-        return int(caget(f"{self._prefix}cam1:NumImagesCounter_RBV") or 0)
+        """Frames captured in the current Acquire window.
+
+        Pilatus increments cam1:ArrayCounter_RBV once per readout (mid-series),
+        while NumImagesCounter_RBV only updates at the end of a multi-image
+        acquisition. Subtract the baseline taken at Acquire start so the value
+        is a per-acquisition frame count starting from 0.
+        """
+        try:
+            current = int(caget(f"{self._prefix}cam1:ArrayCounter_RBV") or 0)
+        except Exception:
+            return 0
+        return max(0, current - self._array_counter_baseline)
 
     def save_hdf5(self) -> None:
         p = self._prefix
@@ -302,8 +332,8 @@ class ADPilatusModel:
 
     def save_cbf(self) -> None:
         p = self._prefix
-        caput(f"{p}CBF1:NumCapture", 1)
-        caput(f"{p}CBF1:Capture", 1)
+        caput(f"{p}TIFF1:NumCapture", 1)
+        caput(f"{p}TIFF1:Capture", 1)
 
     def fetch_file_info(self) -> tuple[str, str, int]:
         p = self._prefix
@@ -326,7 +356,16 @@ class ADPilatusModel:
         if disable_auto_increment:
             saved = int(caget(f"{p}{plugin}:AutoIncrement") or 1)
             caput(f"{p}{plugin}:AutoIncrement", 0, wait=True)
-        _log.debug("ADPilatusModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s", p, plugin, directory, filename, frame_number, file_template, disable_auto_increment)
+        _log.debug(
+            "ADPilatusModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s",
+            p,
+            plugin,
+            directory,
+            filename,
+            frame_number,
+            file_template,
+            disable_auto_increment,
+        )
         return saved
 
     def restore_auto_increment(self, saved_value: int) -> None:
@@ -345,8 +384,8 @@ class ADPilatusModel:
             caput(f"{p}TIFF1:NumCapture", n_frames)
             caput(f"{p}TIFF1:Capture", 1)
         else:
-            caput(f"{p}CBF1:NumCapture", n_frames)
-            caput(f"{p}CBF1:Capture", 1)
+            caput(f"{p}TIFF1:NumCapture", n_frames)
+            caput(f"{p}TIFF1:Capture", 1)
         _log.debug("ADPilatusModel arm_plugin: %s plugin=%s n_frames=%d", p, plugin, n_frames)
 
     def collect_frame(self, exposure: float) -> None:
@@ -355,6 +394,7 @@ class ADPilatusModel:
         caput(f"{p}cam1:TriggerMode", 0, wait=True)
         caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
         caput(f"{p}cam1:NumImages", 1, wait=True)
+        self._snapshot_array_counter()
         caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
         _log.debug("ADPilatusModel collect_frame: %s exposure=%.4f done", p, exposure)
 
@@ -369,15 +409,16 @@ class ADPilatusModel:
 
         self.arm_plugin(n_frames)
 
+        self._snapshot_array_counter()
         caput(f"{p}cam1:Acquire", 1)
         _log.debug("ADPilatusModel step: %s plugin=%s exposure=%.4f n_frames=%d armed", p, plugin, exposure, n_frames)
 
     def collect_wide(self, exposure: float) -> None:
         p = self._prefix
         plugin = self._plugin
-        acq_time = max(0.001, exposure - 0.001)
+        acq_time = max(0.001, exposure * 0.999 - 0.001)
 
-        caput(f"{p}cam1:TriggerMode", 0, wait=True)
+        caput(f"{p}cam1:TriggerMode", 2, wait=True)
         caput(f"{p}cam1:AcquireTime", acq_time, wait=True)
         caput(f"{p}cam1:NumImages", 1, wait=True)
 
@@ -388,6 +429,7 @@ class ADPilatusModel:
         else:
             self.save_cbf()
 
+        self._snapshot_array_counter()
         caput(f"{p}cam1:Acquire", 1)
         _log.debug("ADPilatusModel wide: %s plugin=%s exposure=%.4f armed", p, plugin, exposure)
 
@@ -407,6 +449,7 @@ class ADPilatusModel:
         else:
             self.save_cbf()
 
+        self._snapshot_array_counter()
         caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
 
         print(f"[detector] Pilatus {p} ({plugin}): still done (exposure={exposure:.4f}s)")
@@ -465,8 +508,8 @@ class ADSpinnakerModel:
 
     def save_cbf(self) -> None:
         p = self._prefix
-        caput(f"{p}CBF1:NumCapture", 1)
-        caput(f"{p}CBF1:Capture", 1)
+        caput(f"{p}TIFF1:NumCapture", 1)
+        caput(f"{p}TIFF1:Capture", 1)
 
     def fetch_file_info(self) -> tuple[str, str, int]:
         p = self._prefix
@@ -489,7 +532,16 @@ class ADSpinnakerModel:
         if disable_auto_increment:
             saved = int(caget(f"{p}{plugin}:AutoIncrement") or 1)
             caput(f"{p}{plugin}:AutoIncrement", 0, wait=True)
-        _log.debug("ADSpinnakerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s", p, plugin, directory, filename, frame_number, file_template, disable_auto_increment)
+        _log.debug(
+            "ADSpinnakerModel set_file_info: %s plugin=%s dir=%r name=%r num=%d template=%r auto_inc_disabled=%s",
+            p,
+            plugin,
+            directory,
+            filename,
+            frame_number,
+            file_template,
+            disable_auto_increment,
+        )
         return saved
 
     def restore_auto_increment(self, saved_value: int) -> None:
@@ -508,8 +560,8 @@ class ADSpinnakerModel:
             caput(f"{p}TIFF1:NumCapture", n_frames)
             caput(f"{p}TIFF1:Capture", 1)
         else:
-            caput(f"{p}CBF1:NumCapture", n_frames)
-            caput(f"{p}CBF1:Capture", 1)
+            caput(f"{p}TIFF1:NumCapture", n_frames)
+            caput(f"{p}TIFF1:Capture", 1)
         _log.debug("ADSpinnakerModel arm_plugin: %s plugin=%s n_frames=%d", p, plugin, n_frames)
 
     def collect_frame(self, exposure: float) -> None:

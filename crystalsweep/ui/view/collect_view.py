@@ -18,9 +18,7 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.theme import (
-    ACCENT,
     BG_CARD,
-    BG_ELEVATED,
     DANGER,
     DANGER_HOVER,
     DANGER_PRESS,
@@ -29,7 +27,8 @@ from crystalsweep.ui.view.custom.theme import (
     PONI_LOADED,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.widgets import DarkToggle, FlatButton
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TOGGLE_SCHEME, PROGRESS_SCHEME
+from wxutils import FlatButton, FlatCheckBox, FlatProgressBar
 
 __all__ = ["CollectView"]
 
@@ -41,102 +40,6 @@ _COLLECT_SCHEME = (
     wx.Colour(200, 255, 220),
 )
 _ABORT_SCHEME = (DANGER, DANGER_HOVER, DANGER_PRESS, FG_PRIMARY, FG_PRIMARY)
-
-_BAR_H = 28
-
-
-def _format_hms(seconds: float) -> str:
-    s = int(seconds)
-    h, rem = divmod(s, 3600)
-    m, s = divmod(rem, 60)
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-
-class _ProgressBar(wx.Panel):
-    """Custom-painted progress bar with point/frame text overlay."""
-
-    def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, size=(-1, _BAR_H), style=wx.BORDER_NONE)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.SetBackgroundColour(BG_CARD)
-        self._fraction: float = 0.0
-        self._point_text: str = ""
-        self._frame_text: str = ""
-        self._elapsed_text: str = ""
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, lambda _e: self.Refresh())
-
-    def update(
-        self,
-        point: int,
-        total_points: int,
-        frame: int = 0,
-        total_frames: int = 0,
-        point_fraction: float | None = None,
-    ) -> None:
-        if point_fraction is not None:
-            self._fraction = max(0.0, min(1.0, point_fraction))
-        else:
-            completed_points = point - 1
-            inner = frame / total_frames if total_frames > 1 else 0.0
-            self._fraction = max(0.0, min(1.0, (completed_points + inner) / total_points if total_points > 0 else 0.0))
-        self._point_text = f"Point {point}/{total_points}"
-        self._frame_text = f"  Frame {frame}/{total_frames}" if total_frames > 1 else ""
-        self.Refresh()
-
-    def set_elapsed(self, elapsed_seconds: float) -> None:
-        self._elapsed_text = _format_hms(elapsed_seconds)
-        self.Refresh()
-
-    def clear_elapsed(self) -> None:
-        self._elapsed_text = ""
-        self.Refresh()
-
-    def reset(self) -> None:
-        self._fraction = 0.0
-        self._point_text = ""
-        self._frame_text = ""
-        self._elapsed_text = ""
-        self.Refresh()
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        r = 4
-
-        gc.SetBrush(wx.Brush(BG_ELEVATED))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRoundedRectangle(0, 0, w, h, r)
-
-        fill_w = int(w * self._fraction)
-        if fill_w > 0:
-            gc.SetBrush(wx.Brush(ACCENT))
-            gc.DrawRoundedRectangle(0, 0, fill_w, h, r)
-
-        if self._point_text:
-            font = scaled_font(11, weight=wx.FONTWEIGHT_BOLD)
-            full_text = self._point_text + self._frame_text
-            gc.SetFont(font, wx.Colour(255, 255, 255))
-            tw, th = gc.GetTextExtent(full_text)
-            tx = (w - tw) / 2
-            ty = (h - th) / 2
-
-            if self._frame_text:
-                pt_w, _ = gc.GetTextExtent(self._point_text)
-                gc.SetFont(font, wx.Colour(255, 255, 255))
-                gc.DrawText(self._point_text, tx, ty)
-                gc.SetFont(scaled_font(11), wx.Colour(200, 230, 255))
-                gc.DrawText(self._frame_text, tx + pt_w, ty)
-            else:
-                gc.DrawText(self._point_text, tx, ty)
-
-        if self._elapsed_text:
-            efont = scaled_font(11)
-            gc.SetFont(efont, wx.Colour(200, 230, 255))
-            ew, eh = gc.GetTextExtent(self._elapsed_text)
-            pad = 6
-            gc.DrawText(self._elapsed_text, w - ew - pad, (h - eh) / 2)
 
 
 class CollectView(wx.Panel):
@@ -155,13 +58,13 @@ class CollectView(wx.Panel):
         self._status_label.SetForegroundColour(FG_SECONDARY)
         self._status_label.SetBackgroundColour(BG_CARD)
 
-        self._progress_bar = _ProgressBar(self)
+        self._progress_bar = FlatProgressBar(self, progress_scheme=PROGRESS_SCHEME)
 
-        self._collect_btn = FlatButton(self, "Collect", color_scheme=_COLLECT_SCHEME)
+        self._collect_btn = FlatButton(self, "Collect", color_scheme=_COLLECT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._collect_btn.SetMinSize((120, 42))
-        self._collect_btn.set_action(self._on_btn_clicked)
+        self._collect_btn.SetAction(self._on_btn_clicked)
 
-        self._test_mode_toggle = DarkToggle(self, "Test mode")
+        self._test_mode_toggle = FlatCheckBox(self, "Test mode", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._test_mode_toggle.SetBackgroundColour(BG_CARD)
 
         self._eta_label = wx.StaticText(self, label="")
@@ -213,7 +116,7 @@ class CollectView(wx.Panel):
 
     def set_collecting(self, collecting: bool) -> None:
         self._collecting = collecting
-        self._test_mode_toggle.SetLocked(collecting)
+        self._test_mode_toggle.Enable(not collecting)
         if collecting:
             self._collect_btn.SetLabel("Abort")
             self._collect_btn._idle_bg = _ABORT_SCHEME[0]
@@ -238,10 +141,21 @@ class CollectView(wx.Panel):
         total_frames: int = 0,
         point_fraction: float | None = None,
     ) -> None:
-        self._progress_bar.update(point, total_points, frame, total_frames, point_fraction)
+        if point_fraction is not None:
+            fraction = max(0.0, min(1.0, point_fraction))
+        else:
+            completed = point - 1
+            inner = frame / total_frames if total_frames > 1 else 0.0
+            fraction = max(0.0, min(1.0, (completed + inner) / total_points if total_points > 0 else 0.0))
+        label = f"Point {point}/{total_points}"
+        sublabel = f"  Frame {frame}/{total_frames}" if total_frames > 1 else ""
+        self._progress_bar.Update(fraction, label, sublabel)
 
     def set_eta(self, total_seconds: float) -> None:
-        self._eta_label.SetLabel(f"Estimated Time: {_format_hms(total_seconds)}")
+        s = int(total_seconds)
+        h, rem = divmod(s, 3600)
+        m, s = divmod(rem, 60)
+        self._eta_label.SetLabel(f"Estimated Time: {h:02d}:{m:02d}:{s:02d}")
         self._eta_label.Refresh()
 
     def clear_eta(self) -> None:
@@ -249,13 +163,13 @@ class CollectView(wx.Panel):
         self._eta_label.Refresh()
 
     def set_elapsed(self, elapsed_seconds: float) -> None:
-        self._progress_bar.set_elapsed(elapsed_seconds)
+        self._progress_bar.SetElapsed(elapsed_seconds)
 
     def clear_elapsed(self) -> None:
-        self._progress_bar.clear_elapsed()
+        self._progress_bar.ClearElapsed()
 
     def reset_progress(self) -> None:
-        self._progress_bar.reset()
+        self._progress_bar.Reset()
         self.clear_eta()
 
     def set_status_collecting(self) -> None:
@@ -271,7 +185,7 @@ class CollectView(wx.Panel):
         self.set_status(message, DANGER)
         self.set_collecting(False)
 
-    def _on_btn_clicked(self) -> None:
+    def _on_btn_clicked(self, _e=None) -> None:
         if self._collecting:
             if self._on_abort_cb is not None:
                 self._on_abort_cb()

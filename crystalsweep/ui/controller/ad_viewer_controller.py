@@ -21,6 +21,7 @@ import numpy as np
 import wx
 
 from crystalsweep.model import MainModel
+from crystalsweep.model.ad_viewer_model import FrameModel
 from crystalsweep.model.integration_model import HAS_PYFAI
 from crystalsweep.ui.view import MainView
 
@@ -50,13 +51,17 @@ class ADViewerController:
         self.resubscribe_detector()
 
     def resubscribe_detector(self) -> None:
-        """(Re)subscribe to the active detector's image PV, or unsubscribe if none."""
+        """(Re)subscribe to the active detector's image PV, but only when the PV actually changes."""
         active = self._model.beamline.active.active_detector_config
         pv_name = active.image_pv if active is not None else ""
         if not pv_name:
-            _log.info("No active detector configured; AD viewer is idle.")
-            self._model.ad_viewer.unsubscribe()
+            if self._model.ad_viewer.is_subscribed:
+                _log.info("No active detector configured; AD viewer is idle.")
+                self._model.ad_viewer.unsubscribe()
             self._view.ad_viewer.set_status_overlay("No detector configured")
+            return
+        if self._model.ad_viewer.is_subscribed and self._model.ad_viewer.pv_name == pv_name:
+            self._view.ad_viewer.set_status_overlay("")
             return
         self._view.ad_viewer.set_status_overlay("")
         self._model.ad_viewer.subscribe(
@@ -64,11 +69,11 @@ class ADViewerController:
             frame_callback=self._on_new_frame,
         )
 
-    def _on_new_frame(self, frame: np.ndarray) -> None:
+    def _on_new_frame(self, frame: FrameModel) -> None:
         """Deliver a detector frame to the view on the GUI thread, dropping frames if busy."""
         with self._pending_lock:
             already_pending = self._pending_frame is not None
-            self._pending_frame = frame
+            self._pending_frame = frame.image
         if not already_pending:
             wx.CallAfter(self._on_new_frame_gui)
 
@@ -194,6 +199,7 @@ class ADViewerController:
 
         if x1 is None or y1 is None or x2 is None or y2 is None or current_frame is None:
             self._view.ad_viewer.clear_integration_plot()
+            self._model.ad_viewer.clear_last_roi_max_intensity()
             return
 
         if self._model.integration.is_calibrated:
@@ -208,6 +214,16 @@ class ADViewerController:
             return
         self._run_line_integration(current_frame, x1, y1, x2, y2)
 
+    def _publish_max(self, ys: np.ndarray | None) -> None:
+        """Mirror the value rendered as 'max:' on the integration plot to the model."""
+        if ys is None or len(ys) == 0:
+            self._model.ad_viewer.clear_last_roi_max_intensity()
+            return
+        try:
+            self._model.ad_viewer.set_last_roi_max_intensity(float(np.asarray(ys).max()))
+        except (TypeError, ValueError):
+            self._model.ad_viewer.clear_last_roi_max_intensity()
+
     def _run_roi_fallback(self, frame: np.ndarray, x1: int, y1: int, x2: int, y2: int) -> None:
         """Compute column-sum integration over the ROI and push results to the view."""
         h, w = frame.shape[:2]
@@ -221,6 +237,7 @@ class ADViewerController:
         ys = roi.sum(axis=0)
         xs = np.arange(x1c, x1c + len(ys), dtype=np.float64)
         self._view.ad_viewer.set_integration_data(xs, ys, "Pixel")
+        self._publish_max(ys)
 
     def _run_line_integration(self, frame: np.ndarray, x1: int, y1: int, x2: int, y2: int) -> None:
         """Extract line profile via the model and push results to the view."""
@@ -231,6 +248,7 @@ class ADViewerController:
             _log.exception("integrate1d_line failed")
             return
         self._view.ad_viewer.set_integration_data(xs, ys, x_label)
+        self._publish_max(ys)
 
     def _run_integration(self, frame: np.ndarray) -> None:
         """Execute pyFAI azimuthal integration or line profile and push results to the view."""
@@ -250,3 +268,4 @@ class ADViewerController:
             return
 
         self._view.ad_viewer.set_integration_data(xs, ys, x_label)
+        self._publish_max(ys)

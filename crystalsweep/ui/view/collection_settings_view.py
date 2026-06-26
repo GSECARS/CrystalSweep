@@ -24,15 +24,18 @@ import wx
 from crystalsweep.model.collection_model import SCAN_TYPES, ScanType
 from crystalsweep.ui.view.custom.theme import (
     BG_CARD,
-    BG_ELEVATED,
-    BG_SURFACE,
+    BTN_DISABLED,
+    btn_font,
+    COMBO_SCHEME,
+    DEFAULT_SCHEME,
     DISABLED_FG,
-    FG_PRIMARY,
     FG_SECONDARY,
-    SEP_COLOUR,
+    MUTED_SCHEME,
     scaled_font,
+    TEXT_SCHEME,
+    TOGGLE_SCHEME,
 )
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle, FlatButton, MUTED_SCHEME
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatTableHeader, FlatTableRow
 
 __all__ = ["CollectionSettingsView"]
 
@@ -45,18 +48,17 @@ _MAP_PRESETS: tuple[tuple[int, int], ...] = (
     (50, 5),
 )
 
-_TABLE_ROW_H   = 28
-_TABLE_HDR_H   = 26
-_TABLE_BORDER  = wx.Colour(50, 50, 56)
-_TABLE_HDR_BG  = wx.Colour(22, 22, 26)
-_TABLE_ROW_ALT = wx.Colour(32, 32, 36)
-_BOX_S         = 12
-_BOX_R         = 3
-_CHECK_FG      = wx.Colour(72, 199, 116)
-_CHECK_BG      = wx.Colour(38, 38, 42)
-_CHECK_BORDER  = wx.Colour(80, 80, 92)
-_CHECK_W       = 26
-_PAD           = 5
+_TABLE_ROW_H = 28
+_TABLE_HDR_H = 26
+_TABLE_BORDER = wx.Colour(50, 50, 56)
+_TABLE_HDR_BG = wx.Colour(22, 22, 26)
+_BOX_S = 12
+_BOX_R = 3
+_CHECK_FG = wx.Colour(72, 199, 116)
+_CHECK_BG = wx.Colour(38, 38, 42)
+_CHECK_BORDER = wx.Colour(80, 80, 92)
+_CHECK_W = 26
+_PAD = 5
 
 
 def _draw_checkbox(gc: wx.GraphicsContext, cx: int, cy: int, checked: bool, grayed: bool = False) -> None:
@@ -77,85 +79,64 @@ def _draw_checkbox(gc: wx.GraphicsContext, cx: int, cy: int, checked: bool, gray
         gc.SetPen(wx.Pen(wx.Colour(255, 255, 255), 1))
         x, y = r.x, r.y
         s = _BOX_S
-        gc.StrokeLines([
-            wx.Point2D(x + s * 0.2, y + s * 0.5),
-            wx.Point2D(x + s * 0.42, y + s * 0.72),
-            wx.Point2D(x + s * 0.8, y + s * 0.28),
-        ])
+        gc.StrokeLines(
+            [
+                wx.Point2D(x + s * 0.2, y + s * 0.5),
+                wx.Point2D(x + s * 0.42, y + s * 0.72),
+                wx.Point2D(x + s * 0.8, y + s * 0.28),
+            ]
+        )
 
 
-class _MapHeaderRow(wx.Panel):
-    """Painted header for the map axes table."""
+_LABELS = ("", "Motor", "Start", "End", "Step", "#Pts")
+_PROPS = [1, 3, 2, 2, 2, 2]
+_TABLE_SCHEME = None  # resolved at paint time from palette + CS overrides
 
-    _LABELS = ("", "Motor", "Start", "End", "Step", "#Pts")
+
+def _cs_table_scheme():
+    return (_TABLE_HDR_BG, _TABLE_BORDER, FG_SECONDARY)
+
+
+class _MapHeaderRow(FlatTableHeader):
+    """Map axes table header — CS dark theme, checkbox in col 0."""
 
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, size=(-1, _TABLE_HDR_H), style=wx.BORDER_NONE)
-        self.SetBackgroundColour(_TABLE_HDR_BG)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, lambda _e: self.Refresh())
+        super().__init__(parent, list(_LABELS), _PROPS, height=_TABLE_HDR_H, scheme=_cs_table_scheme())
 
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(_TABLE_HDR_BG))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        widths = _col_widths(w)
-        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
-        gc.SetFont(font, FG_SECONDARY)
-        gc.SetPen(wx.Pen(_TABLE_BORDER, 1))
-        x = 0
-        for i, (label, cw) in enumerate(zip(self._LABELS, widths)):
-            if label:
-                tw, th = gc.GetTextExtent(label)
-                gc.DrawText(label, x + (cw - tw) / 2, (h - th) / 2)
-            if i < len(widths) - 1:
-                gc.StrokeLine(x + cw, 0, x + cw, h)
-            x += cw
-        gc.SetPen(wx.Pen(_TABLE_BORDER, 1))
-        gc.StrokeLine(0, h - 1, w, h - 1)
+    def _row_bg(self) -> wx.Colour:
+        return _TABLE_HDR_BG
 
 
-class _MapDataRow(wx.Panel):
-    """One painted data row in the map axes table with inline controls."""
+class _MapDataRow(FlatTableRow):
+    """One painted data row in the map axes table with inline controls and a toggle checkbox."""
 
-    def __init__(
-        self,
-        parent: wx.Window,
-        bg: wx.Colour,
-        row_index: int,
-    ) -> None:
-        super().__init__(parent, size=(-1, _TABLE_ROW_H), style=wx.BORDER_NONE)
-        self.SetBackgroundColour(bg)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+    def __init__(self, parent: wx.Window, row_index: int) -> None:
+        super().__init__(parent, _PROPS, height=_TABLE_ROW_H, scheme=_cs_table_scheme())
         self._row_index = row_index
         self._optional = row_index > 0
         self._enabled = not self._optional
 
-        self.motor_combo = DarkCombo(self, choices=[], selection=0)
-        self.start_ctrl = DarkTextCtrl(self, value="-0.0025", parent_bg=bg)
-        self.start_ctrl.set_restrict_to_float(True)
-        self.end_ctrl = DarkTextCtrl(self, value="0.0025", parent_bg=bg)
-        self.end_ctrl.set_restrict_to_float(True)
-        self.step_ctrl = DarkTextCtrl(self, value="0.001", parent_bg=bg)
-        self.step_ctrl.set_restrict_to_float(True)
-        self.points_ctrl = DarkTextCtrl(self, value="6", parent_bg=bg)
+        self.motor_combo = FlatCombo(self, choices=[], selection=0, combo_scheme=COMBO_SCHEME)
+        self.start_ctrl = FlatTextCtrl(self, value="-0.0025", text_scheme=TEXT_SCHEME)
+        self.start_ctrl.SetRestrictToFloat(True)
+        self.end_ctrl = FlatTextCtrl(self, value="0.0025", text_scheme=TEXT_SCHEME)
+        self.end_ctrl.SetRestrictToFloat(True)
+        self.step_ctrl = FlatTextCtrl(self, value="0.001", text_scheme=TEXT_SCHEME)
+        self.step_ctrl.SetRestrictToFloat(True)
+        self.points_ctrl = FlatTextCtrl(self, value="6", text_scheme=TEXT_SCHEME)
 
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, self._on_size)
         self.Bind(wx.EVT_LEFT_DOWN, self._on_click)
-
         self._reposition()
         self._apply_enabled()
+
+    def _row_bg(self) -> wx.Colour:
+        return BG_CARD
 
     def _on_paint(self, _: wx.PaintEvent) -> None:
         dc = wx.AutoBufferedPaintDC(self)
         gc = wx.GraphicsContext.Create(dc)
         w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(self.GetBackgroundColour()))
+        gc.SetBrush(wx.Brush(self._row_bg()))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
         cx = _CHECK_W // 2
@@ -163,11 +144,26 @@ class _MapDataRow(wx.Panel):
         _draw_checkbox(gc, cx, cy, self._enabled, grayed=not self._optional)
         gc.SetPen(wx.Pen(_TABLE_BORDER, 1))
         gc.StrokeLine(0, h - 1, w, h - 1)
-        widths = _col_widths(w)
+        widths = self._col_widths(w)
         x = 0
-        for i, cw in enumerate(widths[:-1]):
+        for cw in widths[:-1]:
             x += cw
             gc.StrokeLine(x, 0, x, h)
+
+    def _reposition(self) -> None:
+        w, _ = self.GetClientSize()
+        if w <= 0:
+            return
+        widths = self._col_widths(w)
+        ctrl_h = _TABLE_ROW_H - 8
+        y = 4
+        x = widths[0]
+        for ctrl, cw in zip(
+            (self.motor_combo, self.start_ctrl, self.end_ctrl, self.step_ctrl, self.points_ctrl),
+            widths[1:],
+        ):
+            ctrl.SetSize(x + _PAD, y, cw - _PAD * 2, ctrl_h)
+            x += cw
 
     def _on_size(self, event: wx.SizeEvent) -> None:
         self._reposition()
@@ -183,21 +179,6 @@ class _MapDataRow(wx.Panel):
             self.Refresh()
             wx.PostEvent(self, wx.CommandEvent(wx.EVT_CHECKBOX.typeId, self.GetId()))
         event.Skip()
-
-    def _reposition(self) -> None:
-        w, _ = self.GetClientSize()
-        if w <= 0:
-            return
-        widths = _col_widths(w)
-        ctrl_h = _TABLE_ROW_H - 8
-        y = 4
-        x = widths[0]
-        for ctrl, cw in zip(
-            (self.motor_combo, self.start_ctrl, self.end_ctrl, self.step_ctrl, self.points_ctrl),
-            widths[1:],
-        ):
-            ctrl.SetSize(x + _PAD, y, cw - _PAD * 2, ctrl_h)
-            x += cw
 
     def _apply_enabled(self) -> None:
         for ctrl in (self.motor_combo, self.start_ctrl, self.end_ctrl, self.step_ctrl, self.points_ctrl):
@@ -244,13 +225,6 @@ class _MapDataRow(wx.Panel):
         return self.motor_combo.GetStringSelection()
 
 
-def _col_widths(total_w: int) -> list[int]:
-    """Return pixel widths for [checkbox, motor, start, end, step, #pts] columns."""
-    remaining = max(0, total_w - _CHECK_W)
-    motor_w = max(60, remaining * 3 // 10)
-    field_w = max(30, (remaining - motor_w) // 4)
-    last_w = remaining - motor_w - field_w * 3
-    return [_CHECK_W, motor_w, field_w, field_w, field_w, last_w]
 
 
 class _MapTable(wx.Panel):
@@ -261,14 +235,15 @@ class _MapTable(wx.Panel):
         self.SetBackgroundColour(BG_CARD)
 
         self._header = _MapHeaderRow(self)
-        self.row1 = _MapDataRow(self, BG_CARD, row_index=0)
-        self.row2 = _MapDataRow(self, _TABLE_ROW_ALT, row_index=1)
+        self.row1 = _MapDataRow(self, row_index=0)
+        self.row2 = _MapDataRow(self, row_index=1)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self._header, 0, wx.EXPAND)
         sizer.Add(self.row1, 0, wx.EXPAND)
         sizer.Add(self.row2, 0, wx.EXPAND)
         self.SetSizer(sizer)
+
 
 _TYPE_COLOURS: dict[str, wx.Colour] = {
     "still": wx.Colour(99, 179, 237),
@@ -329,12 +304,12 @@ class CollectionSettingsView(wx.Panel):
         outer.AddSpacer(8)
 
         btn_row = wx.BoxSizer(wx.HORIZONTAL)
-        self._add_btn = FlatButton(self, "+ Add point")
+        self._add_btn = FlatButton(self, "+ Add point", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_btn.SetMinSize((-1, 28))
-        self._add_btn.set_action(self._on_add_clicked)
-        self._update_selected_btn = FlatButton(self, "Update selected", color_scheme=MUTED_SCHEME)
+        self._add_btn.SetAction(self._on_add_clicked)
+        self._update_selected_btn = FlatButton(self, "Update selected", color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._update_selected_btn.SetMinSize((-1, 28))
-        self._update_selected_btn.set_action(self._on_update_selected_clicked)
+        self._update_selected_btn.SetAction(self._on_update_selected_clicked)
         btn_row.Add(self._add_btn, 1, wx.EXPAND | wx.RIGHT, 4)
         btn_row.Add(self._update_selected_btn, 1, wx.EXPAND)
         outer.Add(btn_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
@@ -354,11 +329,12 @@ class CollectionSettingsView(wx.Panel):
 
         self._type_lbl = self._field_label("Type", label_font)
         type_lbl = self._type_lbl
-        self._type_combo = DarkCombo(
+        self._type_combo = FlatCombo(
             self,
             choices=list(SCAN_TYPES),
             selection=0,
             choice_colours=_TYPE_COLOURS,
+            combo_scheme=COMBO_SCHEME,
         )
         self._type_combo.Bind(wx.EVT_CHOICE, self._on_type_choice)
         row.Add(type_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -368,8 +344,8 @@ class CollectionSettingsView(wx.Panel):
 
         self._exp_lbl = self._field_label("Exp. (s)", label_font)
         exp_lbl = self._exp_lbl
-        self._exposure_ctrl = DarkTextCtrl(self, value="1.0", parent_bg=BG_CARD)
-        self._exposure_ctrl.set_restrict_to_float(True)
+        self._exposure_ctrl = FlatTextCtrl(self, value="1.0", text_scheme=TEXT_SCHEME)
+        self._exposure_ctrl.SetRestrictToFloat(True)
         self._exposure_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_exposure_enter)
         self._exposure_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_exposure_enter)
         row.Add(exp_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -378,8 +354,8 @@ class CollectionSettingsView(wx.Panel):
         row.AddSpacer(8)
 
         self._rot_range_lbl = self._field_label("Range", label_font)
-        self._rot_range_ctrl = DarkTextCtrl(self, value="180.0", parent_bg=BG_CARD)
-        self._rot_range_ctrl.set_restrict_to_float(True)
+        self._rot_range_ctrl = FlatTextCtrl(self, value="180.0", text_scheme=TEXT_SCHEME)
+        self._rot_range_ctrl.SetRestrictToFloat(True)
         self._rot_range_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_range_enter)
         self._rot_range_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_range_enter)
         row.Add(self._rot_range_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -388,8 +364,8 @@ class CollectionSettingsView(wx.Panel):
         row.AddSpacer(8)
 
         self._rot_start_lbl = self._field_label("Start", label_font)
-        self._rot_start_ctrl = DarkTextCtrl(self, value="0.0", parent_bg=BG_CARD)
-        self._rot_start_ctrl.set_restrict_to_float(True)
+        self._rot_start_ctrl = FlatTextCtrl(self, value="0.0", text_scheme=TEXT_SCHEME)
+        self._rot_start_ctrl.SetRestrictToFloat(True)
         self._rot_start_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_start_enter)
         self._rot_start_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_start_enter)
         row.Add(self._rot_start_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -398,8 +374,8 @@ class CollectionSettingsView(wx.Panel):
         row.AddSpacer(8)
 
         self._rot_end_lbl = self._field_label("End", label_font)
-        self._rot_end_ctrl = DarkTextCtrl(self, value="180.0", parent_bg=BG_CARD)
-        self._rot_end_ctrl.set_restrict_to_float(True)
+        self._rot_end_ctrl = FlatTextCtrl(self, value="180.0", text_scheme=TEXT_SCHEME)
+        self._rot_end_ctrl.SetRestrictToFloat(True)
         self._rot_end_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_rot_end_enter)
         self._rot_end_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_rot_end_enter)
         row.Add(self._rot_end_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -408,8 +384,8 @@ class CollectionSettingsView(wx.Panel):
         row.AddSpacer(8)
 
         self._step_lbl = self._field_label("Step (°)", label_font)
-        self._step_ctrl = DarkTextCtrl(self, value="1.0", parent_bg=BG_CARD)
-        self._step_ctrl.set_restrict_to_float(True)
+        self._step_ctrl = FlatTextCtrl(self, value="1.0", text_scheme=TEXT_SCHEME)
+        self._step_ctrl.SetRestrictToFloat(True)
         self._step_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_step_enter)
         self._step_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_step_enter)
         row.Add(self._step_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -417,15 +393,15 @@ class CollectionSettingsView(wx.Panel):
         row.Add(self._step_ctrl, 2, wx.EXPAND)
         row.AddSpacer(8)
 
-        self._flip_toggle = DarkToggle(self, "Flip", value=True)
+        self._flip_toggle = FlatCheckBox(self, "Flip", value=True, check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._flip_toggle.SetBackgroundColour(BG_CARD)
-        self._flip_toggle.Bind(wx.EVT_CHECKBOX, self._on_flip_toggle_changed)
+        self._flip_toggle.SetAction(lambda v: self._on_flip_toggle_changed(v))
         row.Add(self._flip_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(8)
 
-        self._map_toggle = DarkToggle(self, "Map")
+        self._map_toggle = FlatCheckBox(self, "Map", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._map_toggle.SetBackgroundColour(BG_CARD)
-        self._map_toggle.Bind(wx.EVT_CHECKBOX, self._on_map_toggle_changed)
+        self._map_toggle.SetAction(lambda v: self._on_map_toggle_changed(v))
         row.Add(self._map_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
 
         self._scan_row = row
@@ -444,9 +420,9 @@ class CollectionSettingsView(wx.Panel):
         for size_um, step_um in _MAP_PRESETS:
             pts = size_um // step_um + 1
             label = f"{size_um}×{size_um} / {step_um}µm"
-            btn = FlatButton(self._map_presets_panel, label, color_scheme=MUTED_SCHEME)
+            btn = FlatButton(self._map_presets_panel, label, color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
             btn.SetMinSize((-1, 22))
-            btn.set_action(lambda s=size_um, st=step_um, p=pts: self._apply_map_preset(s, st, p))
+            btn.SetAction(lambda _e, s=size_um, st=step_um, p=pts: self._apply_map_preset(s, st, p))
             row.Add(btn, 1, wx.EXPAND | wx.RIGHT, 4)
         self._map_presets_panel.SetSizer(row)
         return self._map_presets_panel
@@ -504,9 +480,7 @@ class CollectionSettingsView(wx.Panel):
         show_rotation = scan_type in ("wide", "step")
         show_step = scan_type == "step"
 
-        for w in (self._rot_start_lbl, self._rot_start_ctrl,
-                  self._rot_end_lbl, self._rot_end_ctrl,
-                  self._rot_range_lbl, self._rot_range_ctrl):
+        for w in (self._rot_start_lbl, self._rot_start_ctrl, self._rot_end_lbl, self._rot_end_ctrl, self._rot_range_lbl, self._rot_range_ctrl):
             w.Show(show_rotation)
 
         self._step_lbl.Show(show_step)
@@ -548,16 +522,20 @@ class CollectionSettingsView(wx.Panel):
 
     def set_enabled(self, enabled: bool) -> None:
         for ctrl in (
-            self._type_combo, self._exposure_ctrl,
-            self._rot_start_ctrl, self._rot_end_ctrl, self._rot_range_ctrl,
-            self._step_ctrl, self._add_btn, self._update_selected_btn,
+            self._type_combo,
+            self._exposure_ctrl,
+            self._rot_start_ctrl,
+            self._rot_end_ctrl,
+            self._rot_range_ctrl,
+            self._step_ctrl,
+            self._add_btn,
+            self._update_selected_btn,
         ):
             ctrl.Enable(enabled)
-        self._map_toggle.SetLocked(not enabled)
-        self._flip_toggle.SetLocked(not enabled)
+        self._map_toggle.Enable(enabled)
+        self._flip_toggle.Enable(enabled)
         lbl_colour = FG_SECONDARY if enabled else DISABLED_FG
-        for lbl in (self._type_lbl, self._exp_lbl,
-                    self._rot_start_lbl, self._rot_end_lbl, self._rot_range_lbl, self._step_lbl):
+        for lbl in (self._type_lbl, self._exp_lbl, self._rot_start_lbl, self._rot_end_lbl, self._rot_range_lbl, self._step_lbl):
             lbl.SetForegroundColour(lbl_colour)
             lbl.Refresh()
         if not self._map_table.IsShown():
@@ -757,17 +735,13 @@ class CollectionSettingsView(wx.Panel):
     def _on_map_step_enter(self, event: wx.Event) -> None:
         self._map_table.row1.sync_points_from_step()
         self._fire_float(self._map_table.row1.step_ctrl, self._on_map_step_changed_cb)
+        self._fire_int(self._map_table.row1.points_ctrl, self._on_map_points_changed_cb)
         event.Skip()
 
     def _on_map_points_enter(self, event: wx.Event) -> None:
         self._map_table.row1.sync_step_from_points()
-        if self._on_map_points_changed_cb is None:
-            event.Skip()
-            return
-        try:
-            self._on_map_points_changed_cb(int(self._map_table.row1.points_ctrl.GetValue()))
-        except ValueError:
-            pass
+        self._fire_int(self._map_table.row1.points_ctrl, self._on_map_points_changed_cb)
+        self._fire_float(self._map_table.row1.step_ctrl, self._on_map_step_changed_cb)
         event.Skip()
 
     def _on_map2_enable_changed(self, event: wx.Event) -> None:
@@ -787,24 +761,20 @@ class CollectionSettingsView(wx.Panel):
     def _on_map2_step_enter(self, event: wx.Event) -> None:
         self._map_table.row2.sync_points_from_step()
         self._fire_float(self._map_table.row2.step_ctrl, self._on_map2_step_changed_cb)
+        self._fire_int(self._map_table.row2.points_ctrl, self._on_map2_points_changed_cb)
         event.Skip()
 
     def _on_map2_points_enter(self, event: wx.Event) -> None:
         self._map_table.row2.sync_step_from_points()
-        if self._on_map2_points_changed_cb is None:
-            event.Skip()
-            return
-        try:
-            self._on_map2_points_changed_cb(int(self._map_table.row2.points_ctrl.GetValue()))
-        except ValueError:
-            pass
+        self._fire_int(self._map_table.row2.points_ctrl, self._on_map2_points_changed_cb)
+        self._fire_float(self._map_table.row2.step_ctrl, self._on_map2_step_changed_cb)
         event.Skip()
 
-    def _on_add_clicked(self) -> None:
+    def _on_add_clicked(self, _e=None) -> None:
         if self._on_add_point_cb is not None:
             self._on_add_point_cb()
 
-    def _on_update_selected_clicked(self) -> None:
+    def _on_update_selected_clicked(self, _e=None) -> None:
         if self._on_update_selected_cb is not None:
             self._on_update_selected_cb()
 
@@ -816,7 +786,15 @@ class CollectionSettingsView(wx.Panel):
         else:
             cb(value)
 
-    def _fire_float(self, ctrl: DarkTextCtrl, cb: Callable[[float], None] | None) -> None:
+    def _fire_int(self, ctrl: FlatTextCtrl, cb: Callable[[int], None] | None) -> None:
+        if cb is None:
+            return
+        try:
+            cb(int(ctrl.GetValue()))
+        except ValueError:
+            pass
+
+    def _fire_float(self, ctrl: FlatTextCtrl, cb: Callable[[float], None] | None) -> None:
         if cb is None:
             return
         try:

@@ -26,8 +26,9 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BG_SURFACE, DANGER, FG_PRIMARY, FG_SECONDARY, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, MUTED_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, MUTED_SCHEME, FG_SECONDARY, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME
+
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar
 
 __all__ = ["CollectionTableView"]
 
@@ -243,8 +244,8 @@ class _CollectionRow(wx.Panel):
 
         inner_h = _ROW_H - 8
 
-        def _text(value: str, commit_attr: str) -> DarkTextCtrl:
-            ctrl = DarkTextCtrl(self, value=value)
+        def _text(value: str, commit_attr: str) -> FlatTextCtrl:
+            ctrl = FlatTextCtrl(self, value=value, text_scheme=TEXT_SCHEME)
             ctrl.SetMinSize((-1, inner_h))
             handler = self._make_commit_handler(ctrl, commit_attr)
             ctrl.Bind(wx.EVT_KILL_FOCUS, handler)
@@ -254,58 +255,58 @@ class _CollectionRow(wx.Panel):
         self._label_ctrl = _text("", "_dispatch_label")
 
         self._motor_shorthands = list(motor_shorthands)
-        self._motor_ctrls: dict[str, DarkTextCtrl] = {}
+        self._motor_ctrls: dict[str, FlatTextCtrl] = {}
         for shorthand in motor_shorthands:
             precision = motor_precisions.get(shorthand, 4)
-            ctrl = DarkTextCtrl(self, value="")
+            ctrl = FlatTextCtrl(self, value="", text_scheme=TEXT_SCHEME)
             ctrl.SetMinSize((-1, inner_h))
             handler = self._make_motor_commit_handler(ctrl, shorthand)
             ctrl.Bind(wx.EVT_KILL_FOCUS, handler)
             ctrl.Bind(wx.EVT_TEXT_ENTER, handler)
-            ctrl.set_restrict_to_float(True)
-            ctrl.set_validator(self._make_motor_validator(precision))
+            ctrl.SetRestrictToFloat(True)
+            ctrl.SetValidator(self._make_motor_validator(precision))
             self._motor_ctrls[shorthand] = ctrl
 
         self._get_btn: FlatButton | None = None
         self._move_btn: FlatButton | None = None
         if motor_shorthands:
-            self._get_btn = FlatButton(self, "Get", color_scheme=MUTED_SCHEME)
+            self._get_btn = FlatButton(self, "Get", color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
             self._get_btn.SetMinSize((-1, inner_h))
             self._get_btn.SetToolTip("Get current motor positions")
-            self._get_btn.set_action(self._dispatch_get)
-            self._move_btn = FlatButton(self, "Move", color_scheme=MUTED_SCHEME)
+            self._get_btn.SetAction(self._dispatch_get)
+            self._move_btn = FlatButton(self, "Move", color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
             self._move_btn.SetMinSize((-1, inner_h))
             self._move_btn.SetToolTip("Move motors to stored positions")
-            self._move_btn.set_action(self._dispatch_move)
+            self._move_btn.SetAction(self._dispatch_move)
 
-        self._type_combo = DarkCombo(self, choices=list(SCAN_TYPES), choice_colours=_TYPE_COLOURS)
+        self._type_combo = FlatCombo(self, choices=list(SCAN_TYPES), choice_colours=_TYPE_COLOURS, combo_scheme=COMBO_SCHEME)
         self._type_combo.SetMinSize((-1, inner_h))
         self._type_combo.Bind(wx.EVT_CHOICE, self._on_type_commit)
 
         self._rot_start_ctrl = _text("", "_dispatch_rot_start")
-        self._rot_start_ctrl.set_restrict_to_float(True)
-        self._rot_start_ctrl.set_validator(self._make_motor_validator(rotation_precision))
+        self._rot_start_ctrl.SetRestrictToFloat(True)
+        self._rot_start_ctrl.SetValidator(self._make_motor_validator(rotation_precision))
 
         self._rot_end_ctrl = _text("", "_dispatch_rot_end")
-        self._rot_end_ctrl.set_restrict_to_float(True)
-        self._rot_end_ctrl.set_validator(self._make_motor_validator(rotation_precision))
+        self._rot_end_ctrl.SetRestrictToFloat(True)
+        self._rot_end_ctrl.SetValidator(self._make_motor_validator(rotation_precision))
 
         self._step_ctrl = _text("", "_dispatch_step")
-        self._step_ctrl.set_restrict_to_float(True)
-        self._step_ctrl.set_validator(self._make_motor_validator(4))
+        self._step_ctrl.SetRestrictToFloat(True)
+        self._step_ctrl.SetValidator(self._make_motor_validator(4))
 
         self._time_ctrl = _text("", "_dispatch_time")
-        self._time_ctrl.set_restrict_to_float(True)
-        self._time_ctrl.set_validator(self._make_motor_validator(4))
+        self._time_ctrl.SetRestrictToFloat(True)
+        self._time_ctrl.SetValidator(self._make_motor_validator(4))
 
         self._remove_btn_panel = wx.Panel(self, style=wx.BORDER_NONE)
         self._remove_btn_panel.SetBackgroundColour(BG_CARD)
         self._remove_btn_panel.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._remove_btn_panel.Bind(wx.EVT_PAINT, self._on_remove_panel_paint)
-        self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=DANGER_SCHEME)
+        self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._remove_btn.SetMinSize((inner_h, inner_h))
         self._remove_btn.SetToolTip("Remove row")
-        self._remove_btn.set_action(self._dispatch_remove)
+        self._remove_btn.SetAction(self._dispatch_remove)
         _btn_sizer = wx.BoxSizer(wx.VERTICAL)
         _btn_sizer.AddStretchSpacer()
         _btn_sizer.Add(self._remove_btn, 0, wx.ALIGN_CENTER_HORIZONTAL)
@@ -340,7 +341,7 @@ class _CollectionRow(wx.Panel):
         if self.GetBackgroundColour() != bg:
             self.SetBackgroundColour(bg)
 
-        # Programmatic value swap. DarkTextCtrl.SetValue updates the displayed
+        # Programmatic value swap. FlatTextCtrl.SetValue updates the displayed
         # text without firing EVT_TEXT_ENTER / EVT_KILL_FOCUS, so the commit
         # handlers (which would otherwise echo the swapped value back into the
         # model) do not run.
@@ -357,9 +358,9 @@ class _CollectionRow(wx.Panel):
         # Per-field limit error highlighting
         motor_errors, rot_start_error, rot_end_error = field_errors
         for shorthand, ctrl in self._motor_ctrls.items():
-            ctrl.set_limit_error(motor_errors.get(shorthand, False))
-        self._rot_start_ctrl.set_limit_error(rot_start_error)
-        self._rot_end_ctrl.set_limit_error(rot_end_error)
+            ctrl.SetLimitError(motor_errors.get(shorthand, False))
+        self._rot_start_ctrl.SetLimitError(rot_start_error)
+        self._rot_end_ctrl.SetLimitError(rot_end_error)
 
         self._apply_enabled_states(point.scan_type)
         self.Refresh()
@@ -408,15 +409,15 @@ class _CollectionRow(wx.Panel):
         if self._data_idx >= 0 and self._dispatcher.on_selection is not None:
             self._dispatcher.on_selection(self._data_idx, selected)
 
-    def _dispatch_remove(self) -> None:
+    def _dispatch_remove(self, _e=None) -> None:
         if self._data_idx >= 0 and self._dispatcher.on_remove is not None:
             self._dispatcher.on_remove(self._data_idx)
 
-    def _dispatch_get(self) -> None:
+    def _dispatch_get(self, _e=None) -> None:
         if self._data_idx >= 0 and self._dispatcher.on_get is not None:
             self._dispatcher.on_get(self._data_idx)
 
-    def _dispatch_move(self) -> None:
+    def _dispatch_move(self, _e=None) -> None:
         if self._data_idx >= 0 and self._dispatcher.on_move is not None:
             self._dispatcher.on_move(self._data_idx)
 
@@ -553,9 +554,9 @@ class _CollectionRow(wx.Panel):
 
     def _apply_enabled_states(self, scan_type: ScanType) -> None:
         disabled = self._collecting
-        self._label_ctrl.set_disabled(disabled or not self._label_enabled)
+        self._label_ctrl.Enable(not disabled or not self._label_enabled)
         for ctrl in self._motor_ctrls.values():
-            ctrl.set_disabled(disabled)
+            ctrl.Enable(not disabled)
         if self._get_btn is not None:
             self._get_btn.Enable(not disabled)
         if self._move_btn is not None:
@@ -564,15 +565,15 @@ class _CollectionRow(wx.Panel):
         still = scan_type == "still"
         wide = scan_type == "wide"
         if disabled:
-            self._rot_start_ctrl.set_disabled(True)
-            self._rot_end_ctrl.set_disabled(True)
-            self._step_ctrl.set_disabled(True)
-            self._time_ctrl.set_disabled(True)
+            self._rot_start_ctrl.Enable(False)
+            self._rot_end_ctrl.Enable(False)
+            self._step_ctrl.Enable(False)
+            self._time_ctrl.Enable(False)
         else:
-            self._rot_start_ctrl.set_disabled(still)
-            self._rot_end_ctrl.set_disabled(still)
-            self._step_ctrl.set_disabled(still or wide)
-            self._time_ctrl.set_disabled(False)
+            self._rot_start_ctrl.Enable(not still)
+            self._rot_end_ctrl.Enable(not still)
+            self._step_ctrl.Enable(not still or wide)
+            self._time_ctrl.Enable(True)
         self._remove_btn.Enable(not disabled)
 
     def _on_type_commit(self, value: str) -> None:
@@ -580,7 +581,7 @@ class _CollectionRow(wx.Panel):
             self._apply_enabled_states(value)
             self._dispatch_type(value)
 
-    def _make_commit_handler(self, ctrl: DarkTextCtrl, dispatcher_attr: str) -> Callable[[wx.Event], None]:
+    def _make_commit_handler(self, ctrl: FlatTextCtrl, dispatcher_attr: str) -> Callable[[wx.Event], None]:
         # Look up the dispatcher method by name at fire-time so re-binding the
         # row to a different point is automatic — the closure only captures the
         # ctrl reference and the bound-method name.
@@ -590,7 +591,7 @@ class _CollectionRow(wx.Panel):
 
         return _handler
 
-    def _make_motor_commit_handler(self, ctrl: DarkTextCtrl, shorthand: str) -> Callable[[wx.Event], None]:
+    def _make_motor_commit_handler(self, ctrl: FlatTextCtrl, shorthand: str) -> Callable[[wx.Event], None]:
         def _handler(event: wx.Event) -> None:
             self._dispatch_motor(shorthand, ctrl.GetValue().strip())
             event.Skip()
@@ -777,6 +778,7 @@ class CollectionTableView(wx.Panel):
         self._on_move_cb: Callable[[int], None] | None = None
         self._on_use_ext_changed_cb: Callable[[bool], None] | None = None
         self._on_keep_shutter_open_changed_cb: Callable[[bool], None] | None = None
+        self._on_snake_combine_changed_cb: Callable[[bool], None] | None = None
         self._on_min_width_changed_cb: Callable[[int], None] | None = None
 
         self._build_layout()
@@ -789,9 +791,10 @@ class CollectionTableView(wx.Panel):
         self._collecting = collecting
         self._delete_selected_btn.Enable(not collecting)
         self._clear_btn.Enable(not collecting)
-        self._slew_scan_toggle.SetLocked(collecting)
-        self._use_ext_toggle.SetLocked(collecting)
-        self._keep_shutter_open_toggle.SetLocked(collecting)
+        self._slew_scan_toggle.Enable(not collecting)
+        self._use_ext_toggle.Enable(not collecting)
+        self._keep_shutter_open_toggle.Enable(not collecting)
+        self._snake_combine_toggle.Enable(not collecting)
         self._header.set_collecting(collecting)
         if not collecting:
             self._active_index = None
@@ -820,7 +823,12 @@ class CollectionTableView(wx.Panel):
     def set_map_mode(self, is_map: bool) -> None:
         self._is_map = is_map
         self._header.set_map_mode(is_map)
+        self.Layout()
         self._repopulate_visible()
+
+    def set_snake_combine_visible(self, visible: bool) -> None:
+        self._snake_combine_toggle.Show(visible)
+        self.Layout()
 
     def bind_use_ext_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_use_ext_changed_cb = callback
@@ -828,17 +836,22 @@ class CollectionTableView(wx.Panel):
     def bind_keep_shutter_open_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_keep_shutter_open_changed_cb = callback
 
+    def bind_snake_combine_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_snake_combine_changed_cb = callback
+
+    def set_snake_combine(self, value: bool) -> None:
+        self._snake_combine_toggle.SetValue(value)
+
     def _on_use_ext_toggled(self, value: bool) -> None:
         self._repopulate_visible()
         if self._on_use_ext_changed_cb is not None:
             self._on_use_ext_changed_cb(value)
 
+    def _on_snake_combine_toggled(self, value: bool) -> None:
+        if self._on_snake_combine_changed_cb is not None:
+            self._on_snake_combine_changed_cb(value)
+
     def _on_trajectory_toggled(self, value: bool) -> None:
-        if not value:
-            self._keep_shutter_open_toggle.SetValue(False)
-            self._keep_shutter_open_toggle.Hide()
-        else:
-            self._keep_shutter_open_toggle.Show()
         self.Layout()
 
     def _on_keep_shutter_open_toggled(self, event: wx.Event) -> None:
@@ -880,32 +893,38 @@ class CollectionTableView(wx.Panel):
         return [_CHECK_W, ext_w] + [_MOTOR_W] * n_motor + motor_action_cols + [_TYPE_W, _ROT_W, _ROT_W, _STEP_W, _TIME_W, _REMOVE_W]
 
     def _build_layout(self) -> None:
-        self._delete_selected_btn = FlatButton(self, "Delete selected", color_scheme=DANGER_SCHEME)
+        self._delete_selected_btn = FlatButton(self, "Delete selected", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._delete_selected_btn.SetMinSize((100, 22))
-        self._delete_selected_btn.set_action(self._on_delete_selected_clicked)
+        self._delete_selected_btn.SetAction(self._on_delete_selected_clicked)
 
-        self._clear_btn = FlatButton(self, "Clear all", color_scheme=DANGER_SCHEME)
+        self._clear_btn = FlatButton(self, "Clear all", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._clear_btn.SetMinSize((70, 22))
-        self._clear_btn.set_action(self._on_clear_clicked)
+        self._clear_btn.SetAction(self._on_clear_clicked)
 
-        self._slew_scan_toggle = DarkToggle(self, "Trajectory scanning")
+        self._slew_scan_toggle = FlatCheckBox(self, "Trajectory scanning", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._slew_scan_toggle.SetBackgroundColour(BG_CARD)
         self._slew_scan_toggle.SetValue(True)
         self._slew_scan_toggle.Hide()
-        self._slew_scan_toggle.Bind(wx.EVT_CHECKBOX, self._on_trajectory_toggled)
+        self._slew_scan_toggle.SetAction(lambda v: self._on_trajectory_toggled(v))
 
-        self._use_ext_toggle = DarkToggle(self, "Use Ext.")
+        self._use_ext_toggle = FlatCheckBox(self, "Use Ext.", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._use_ext_toggle.SetBackgroundColour(BG_CARD)
         self._use_ext_toggle.SetValue(True)
-        self._use_ext_toggle.Bind(wx.EVT_CHECKBOX, self._on_use_ext_toggled)
+        self._use_ext_toggle.SetAction(lambda v: self._on_use_ext_toggled(v))
 
-        self._keep_shutter_open_toggle = DarkToggle(self, "Keep shutter open")
+        self._keep_shutter_open_toggle = FlatCheckBox(self, "Keep shutter open", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
         self._keep_shutter_open_toggle.SetBackgroundColour(BG_CARD)
-        self._keep_shutter_open_toggle.Bind(wx.EVT_CHECKBOX, self._on_keep_shutter_open_toggled)
+        self._keep_shutter_open_toggle.SetAction(lambda v: self._on_keep_shutter_open_toggled(v))
         self._keep_shutter_open_toggle.Hide()
+
+        self._snake_combine_toggle = FlatCheckBox(self, "Combine map", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
+        self._snake_combine_toggle.SetBackgroundColour(BG_CARD)
+        self._snake_combine_toggle.SetAction(lambda v: self._on_snake_combine_toggled(v))
+        self._snake_combine_toggle.Hide()
 
         title_row = wx.BoxSizer(wx.HORIZONTAL)
         title_row.AddStretchSpacer()
+        title_row.Add(self._snake_combine_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._keep_shutter_open_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._slew_scan_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._use_ext_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
@@ -926,7 +945,7 @@ class CollectionTableView(wx.Panel):
         header_border = wx.Panel(self, size=(-1, 1))
         header_border.SetBackgroundColour(_BORDER)
 
-        self._scrollbar = DarkScrollBar(self, on_scroll=self._on_sb_scroll)
+        self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll, scrollbar_scheme=SCROLLBAR_SCHEME)
         self._viewport = _RowsViewport(
             self,
             on_scroll_changed=self._on_scroll_changed,
@@ -976,6 +995,24 @@ class CollectionTableView(wx.Panel):
         self._viewport.set_virtual_height(0)
         self.Layout()
 
+        # Pre-warm the row pool so the very first add_row is as fast as later ones. Done on the next idle tick so it doesn't block this call.
+        wx.CallAfter(self._prewarm_pool)
+
+    def _prewarm_pool(self) -> None:
+        """Construct the row pool up front so the first add is faster."""
+        if self._pool:
+            return
+        vh = self._viewport.viewport_height()
+        if vh <= 0:
+            # Estimate the visible row count from own client area; if that is also zero, assume a small default so there is still a pool.
+            vh = self.GetClientSize().height or (_ROW_H * 10)
+        visible = max(1, (vh + _ROW_H - 1) // _ROW_H)
+        needed = visible + 2 * _OVERSCAN_ROWS
+        self._ensure_pool_capacity(needed)
+        # Newly built rows must start hidden until they get bound.
+        for row in self._pool:
+            row.clear_binding()
+
     def add_row(self, point: CollectionPoint) -> None:
         self.add_rows([point])
 
@@ -1007,6 +1044,40 @@ class CollectionTableView(wx.Panel):
                 self._active_index -= 1
         self._viewport.set_virtual_height(len(self._points) * _ROW_H)
         self._sync_header_checkbox()
+
+    def remove_rows(self, indices: list[int]) -> None:
+        """Remove multiple rows at once with a single virtual-height update."""
+        if not indices:
+            return
+        drop = {i for i in indices if 0 <= i < len(self._points)}
+        if not drop:
+            return
+        self._points = [p for i, p in enumerate(self._points) if i not in drop]
+        self._selected_flags = [f for i, f in enumerate(self._selected_flags) if i not in drop]
+        self._limit_error_flags = [f for i, f in enumerate(self._limit_error_flags) if i not in drop]
+        self._field_errors = [e for i, e in enumerate(self._field_errors) if i not in drop]
+        if self._active_index is not None:
+            if self._active_index in drop:
+                self._active_index = None
+            else:
+                shift = sum(1 for d in drop if d < self._active_index)
+                self._active_index -= shift
+        self._viewport.set_virtual_height(len(self._points) * _ROW_H)
+        self._sync_header_checkbox()
+        self._repopulate_visible()
+
+    def clear_rows(self) -> None:
+        """Remove all rows at once."""
+        if not self._points:
+            return
+        self._points = []
+        self._selected_flags = []
+        self._limit_error_flags = []
+        self._field_errors = []
+        self._active_index = None
+        self._viewport.set_virtual_height(0)
+        self._sync_header_checkbox()
+        self._repopulate_visible()
 
     def refresh_row(self, index: int, point: CollectionPoint) -> None:
         if 0 <= index < len(self._points):
@@ -1094,11 +1165,11 @@ class CollectionTableView(wx.Panel):
         if self._on_add_cb is not None:
             self._on_add_cb()
 
-    def _on_clear_clicked(self) -> None:
+    def _on_clear_clicked(self, _e=None) -> None:
         if self._on_clear_cb is not None:
             self._on_clear_cb()
 
-    def _on_delete_selected_clicked(self) -> None:
+    def _on_delete_selected_clicked(self, _e=None) -> None:
         if self._on_delete_selected_cb is not None:
             self._on_delete_selected_cb()
 
@@ -1115,7 +1186,7 @@ class CollectionTableView(wx.Panel):
         self._viewport.scroll_to(fraction)
 
     def _on_scroll_changed(self, pos: float, size: float) -> None:
-        self._scrollbar.update(pos, size)
+        self._scrollbar.Update(pos, size)
 
     def _on_size(self, event: wx.SizeEvent) -> None:
         widths = self._col_widths()
@@ -1234,9 +1305,9 @@ class CollectionTableView(wx.Panel):
 
     def _bind_pool_row(self, row: _CollectionRow, data_idx: int) -> None:
         point = self._points[data_idx]
-        bg = BG_CARD if data_idx % 2 == 0 else _ROW_ALT
+        bg = BG_CARD
         selected = self._selected_flags[data_idx]
-        active = (self._active_index == data_idx)
+        active = self._active_index == data_idx
         limit_error = self._limit_error_flags[data_idx]
         field_errors = self._field_errors[data_idx]
         label_enabled = (not self._is_map) and self._use_ext_toggle.GetValue()

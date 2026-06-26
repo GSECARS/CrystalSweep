@@ -14,16 +14,17 @@
 # ----------------------------------------------------------------------------------
 
 import sys
+import time
 from pathlib import Path
 from typing import Callable, Protocol
 
 import numpy as np
 import wx
 
-from crystalsweep.ui.view.custom import IconButton, ImageCanvas, ImageSettingsPopup, IntegrationPlot, IntensityHistogramWidget, LiveToggle
+from crystalsweep.ui.view.custom import ImageCanvas, ImageSettingsPopup, IntegrationPlot, IntensityHistogramWidget, LiveToggle
 from crystalsweep.ui.view.custom.icons import draw_chevron_left, draw_chevron_right, draw_cog, draw_folder
-from crystalsweep.ui.view.custom.theme import BG_SURFACE, FG_SECONDARY, PONI_LOADED, PONI_MISSING, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkTextCtrl
+from crystalsweep.ui.view.custom.theme import BG_SURFACE, FG_SECONDARY, PONI_LOADED, PONI_MISSING, TEXT_SCHEME, scaled_font, icon_scheme
+from wxutils import FlatTextCtrl, FlatIconButton
 
 __all__ = ["ADViewerView"]
 
@@ -57,6 +58,10 @@ class ADViewerView(wx.Panel):
         self._live_updates: bool = True
         self._auto_scale: bool = True
         self._filter_gaps: bool = True
+        # Throttle the intensity histogram + contrast-readback so they don't bottleneck the live image canvas
+        self._histogram_min_interval_s: float = 0.1
+        self._last_histogram_update: float = 0.0
+        self._last_pushed_levels: tuple[float, float] | None = None
         self._current_colormap: str = _DEFAULT_COLORMAP
         self._current_npt: int = _DEFAULT_NPT
         self._current_unit: str = _INTEGRATION_UNITS[0]
@@ -87,23 +92,23 @@ class ADViewerView(wx.Panel):
         # Parent overlay buttons to the VisPy native widget so they render above it on Windows
         overlay_parent = self._image_canvas.native
 
-        self._load_file_btn = IconButton(overlay_parent, draw_folder, tooltip="Load image file")
+        self._load_file_btn = FlatIconButton(overlay_parent, draw_folder, tooltip="Load image file", icon_scheme=icon_scheme(BG_SURFACE))
         self._load_file_btn.Bind(wx.EVT_BUTTON, lambda _: self._trigger_load_file())
 
-        self._prev_btn = IconButton(overlay_parent, draw_chevron_left, tooltip="Previous frame")
+        self._prev_btn = FlatIconButton(overlay_parent, draw_chevron_left, tooltip="Previous frame", icon_scheme=icon_scheme(BG_SURFACE))
         self._prev_btn.Bind(wx.EVT_BUTTON, self._on_prev_frame)
         self._prev_btn.Hide()
 
-        self._next_btn = IconButton(overlay_parent, draw_chevron_right, tooltip="Next frame")
+        self._next_btn = FlatIconButton(overlay_parent, draw_chevron_right, tooltip="Next frame", icon_scheme=icon_scheme(BG_SURFACE))
         self._next_btn.Bind(wx.EVT_BUTTON, self._on_next_frame)
         self._next_btn.Hide()
 
-        self._frame_ctrl = DarkTextCtrl(overlay_parent, value="0")
+        self._frame_ctrl = FlatTextCtrl(overlay_parent, value="0", text_scheme=TEXT_SCHEME)
         self._frame_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_frame_ctrl_enter)
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_ctrl_enter)
         self._frame_ctrl.Hide()
 
-        self._settings_btn = IconButton(overlay_parent, draw_cog, tooltip="Image settings")
+        self._settings_btn = FlatIconButton(overlay_parent, draw_cog, tooltip="Image settings", icon_scheme=icon_scheme(BG_SURFACE))
         self._settings_btn.Bind(wx.EVT_BUTTON, self._on_settings_btn)
 
         self._live_toggle = LiveToggle(overlay_parent, live=self._live_updates)
@@ -179,11 +184,21 @@ class ADViewerView(wx.Panel):
         self.display_frame(frame)
 
     def display_frame(self, frame: np.ndarray) -> None:
+        """Forward frame to the GPU every call and throttle the side widgets."""
         self._current_frame = frame
         self._image_canvas.set_image(frame)
+
+        now = time.perf_counter()
+        if now - self._last_histogram_update < self._histogram_min_interval_s:
+            return
+        self._last_histogram_update = now
         self._intensity_histogram.set_data(frame, auto_scale=False)
         lo, hi = self._image_canvas.get_contrast_range()
-        self._intensity_histogram.set_levels(lo, hi)
+        # Only push contrast levels when they actually moved
+        levels = (lo, hi)
+        if levels != self._last_pushed_levels:
+            self._intensity_histogram.set_levels(lo, hi)
+            self._last_pushed_levels = levels
 
     def set_live_updates(self, enabled: bool) -> None:
         self._live_updates = enabled
@@ -333,10 +348,12 @@ class ADViewerView(wx.Panel):
             filter_gaps=self._filter_gaps,
             contrast_min=lo,
             contrast_max=hi,
+            bin_method=self._image_canvas.bin_method,
             on_colormap_changed=self._apply_colormap,
             on_auto_scale_changed=self._apply_auto_scale,
             on_filter_gaps_changed=self._apply_filter_gaps,
             on_levels_changed=self._on_histogram_levels_changed,
+            on_bin_method_changed=self._apply_bin_method,
             on_reset_view=self._apply_reset_view,
         )
         btn_sz = self._settings_btn.GetSize()
@@ -389,6 +406,9 @@ class ADViewerView(wx.Panel):
             self._intensity_histogram.set_data(self._current_frame, auto_scale=False)
             lo, hi = self._image_canvas.get_contrast_range()
             self._intensity_histogram.set_levels(lo, hi)
+
+    def _apply_bin_method(self, method: str) -> None:
+        self._image_canvas.set_bin_method(method)
 
     def _apply_live_updates(self, enabled: bool) -> None:
         self._live_updates = enabled

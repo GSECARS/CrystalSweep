@@ -16,6 +16,8 @@ from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.beamline_config_view import (
     ControllersConfigDialog,
     ControllersConfigView,
+    CrysalisConfigDialog,
+    CrysalisConfigView,
     DetectorsConfigDialog,
     DetectorsConfigView,
     GeneralConfigDialog,
@@ -42,6 +44,8 @@ __all__ = [
     "CollectView",
     "ControllersConfigDialog",
     "ControllersConfigView",
+    "CrysalisConfigDialog",
+    "CrysalisConfigView",
     "DetectorsConfigDialog",
     "DetectorsConfigView",
     "GeneralConfigDialog",

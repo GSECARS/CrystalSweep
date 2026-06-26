@@ -20,6 +20,8 @@ from pathlib import Path
 
 import tomli_w
 
+from crystalsweep.paths import user_config_dir
+
 __all__ = ["BeamlineConfig", "BeamlineConfigModel", "ControllerConfig", "DetectorConfig", "MotorConfig"]
 
 _ACTIVE_FILE_NAME = ".active"
@@ -36,13 +38,14 @@ class ControllerConfig:
 
 @dataclass(frozen=True, slots=True)
 class MotorConfig:
-    """Single motor entry: shorthand, description, EPICS PV, decimal precision, mapping flag, and controller."""
+    """Single motor entry: shorthand, description, EPICS PV, decimal precision, mapping flag, centering flag, and controller."""
 
     shorthand: str
     description: str
     pv: str
     precision: int = 4
     mapping_enabled: bool = False
+    centering_enabled: bool = False
     controller: str = "epics"
     xps_group: str = ""
     xps_positioner: str = ""
@@ -65,33 +68,51 @@ class DetectorConfig:
     def file_number_width(self) -> int:
         """Extract the zero-padding width from the file template (e.g. %4.4d → 4). Defaults to 4."""
         import re
+
         m = re.search(r"%(\d+)\.(\d+)d", self.file_template)
         if m:
             return int(m.group(2))
         return 4
 
     def translate_path(self, local_path: str) -> str:
-        """Return *local_path* with the local prefix replaced by the remote prefix.
+        """Return *local_path* rewritten so the IOC receives a remote path.
 
-        If either prefix is empty the path is returned unchanged.
+        Behaviour:
+          * If the remote prefix is empty, the path is returned unchanged
+            (no remote root is known, nothing to translate).
+          * If the local prefix is set and *local_path* starts with it, the
+            local prefix is swapped for the remote prefix.
+          * Otherwise the path is anchored under the remote prefix using its
+            tail component, so a detector that only writes to a Linux remote
+            directory still gets a remote-style path instead of the raw
+            Windows path the user typed.
         """
         loc = self.path_prefix_local.strip()
         rem = self.path_prefix_remote.strip()
-        if not loc or not rem:
+        if not rem:
             return local_path
+
         norm = local_path.replace("\\", "/")
-        loc_norm = loc.replace("\\", "/").rstrip("/")
         rem_norm = rem.rstrip("/")
-        if norm.lower().startswith(loc_norm.lower()):
-            remainder = norm[len(loc_norm):]
-            return rem_norm + remainder
-        return local_path
+
+        if loc:
+            loc_norm = loc.replace("\\", "/").rstrip("/")
+            if norm.lower().startswith(loc_norm.lower()):
+                return rem_norm + norm[len(loc_norm):]
+
+        # No local mapping (or it doesn't match): anchor the user-picked
+        # folder under the remote root. We keep only the trailing path
+        # component so the IOC writes inside the configured remote dir.
+        tail = norm.rsplit("/", 1)[-1] if "/" in norm else norm
+        tail = tail.strip("/")
+        return f"{rem_norm}/{tail}" if tail else rem_norm
 
     def translate_path_reverse(self, remote_path: str) -> str:
         """Return *remote_path* with the remote prefix replaced by the local prefix.
 
-        Restores the Windows path from what the IOC reports back.
-        If either prefix is empty the path is returned unchanged.
+        Restores the Windows path from what the IOC reports back. If the
+        remote prefix is empty or the path doesn't sit under it, the value
+        is returned unchanged so the user sees what the IOC actually has.
         """
         loc = self.path_prefix_local.strip()
         rem = self.path_prefix_remote.strip()
@@ -101,7 +122,7 @@ class DetectorConfig:
         rem_norm = rem.rstrip("/")
         loc_norm = loc.replace("\\", "/").rstrip("/")
         if norm.lower().startswith(rem_norm.lower()):
-            remainder = norm[len(rem_norm):]
+            remainder = norm[len(rem_norm) :]
             return loc_norm + remainder
         return remote_path
 
@@ -130,11 +151,23 @@ class BeamlineConfig:
     abort_pvs: tuple[tuple[str, str], ...] = field(default_factory=tuple)
     restore_pvs: tuple[str, ...] = field(default_factory=tuple)
     crysalis_par_path: str = ""
+    crysalis_set_path: str = ""
+    crysalis_ccd_path: str = ""
     crysalis_load_on_startup: bool = False
+    crysalis_wavelength: float = 0.2952
+    crysalis_distance: float = 200.0
+    crysalis_center_x: float = 0.0
+    crysalis_center_y: float = 0.0
+    crysalis_alpha: float = 50.0
+    crysalis_polarization: float = 0.99
+    crysalis_pixel_size: float = 0.075
     shutter_pv: str = ""
     shutter_open_value: str = ""
     shutter_close_value: str = ""
     shutter_delay: float = 0.0
+    preview_exposure: float = 0.1
+    preview_timeout: float = 60.0
+    preview_num_images: int = 1000000
 
     @property
     def is_empty(self) -> bool:
@@ -154,8 +187,8 @@ class BeamlineConfig:
 class BeamlineConfigModel:
     """Loads, lists, and saves beamline configuration files (TOML) under a directory."""
 
-    def __init__(self, directory: Path | str = "configs") -> None:
-        self._directory = Path(directory)
+    def __init__(self, directory: Path | str | None = None) -> None:
+        self._directory = Path(directory) if directory is not None else user_config_dir()
         self._directory.mkdir(parents=True, exist_ok=True)
         self._active: BeamlineConfig = BeamlineConfig()
 
@@ -265,6 +298,7 @@ class BeamlineConfigModel:
                 pv=str(m.get("pv", "")),
                 precision=max(0, int(m.get("precision", 4))),
                 mapping_enabled=bool(m.get("mapping_enabled", False)),
+                centering_enabled=bool(m.get("centering_enabled", False)),
                 controller=str(m.get("controller", "epics")),
                 xps_group=str(m.get("xps_group", "")),
                 xps_positioner=str(m.get("xps_positioner", "")),
@@ -280,16 +314,14 @@ class BeamlineConfigModel:
                 description=str(rm_data.get("description", rm_data.get("name", ""))),
                 pv=str(rm_data.get("pv", "")),
                 precision=max(0, int(rm_data.get("precision", 4))),
+                centering_enabled=bool(rm_data.get("centering_enabled", False)),
                 controller=str(rm_data.get("controller", "epics")),
                 xps_group=str(rm_data.get("xps_group", "")),
                 xps_positioner=str(rm_data.get("xps_positioner", "")),
                 beam_angle=float(rm_data.get("beam_angle", 0.0)),
             )
 
-        abort_pvs = tuple(
-            (str(entry.get("pv", "")), str(entry.get("value", "")))
-            for entry in (data.get("abort_pvs", []) or [])
-        )
+        abort_pvs = tuple((str(entry.get("pv", "")), str(entry.get("value", ""))) for entry in (data.get("abort_pvs", []) or []))
 
         restore_pvs = tuple(
             str(entry.get("pv", "")) if isinstance(entry, dict) else str(entry)
@@ -308,11 +340,23 @@ class BeamlineConfigModel:
             abort_pvs=abort_pvs,
             restore_pvs=restore_pvs,
             crysalis_par_path=str(data.get("crysalis_par_path", "")),
+            crysalis_set_path=str(data.get("crysalis_set_path", "")),
+            crysalis_ccd_path=str(data.get("crysalis_ccd_path", "")),
             crysalis_load_on_startup=bool(data.get("crysalis_load_on_startup", False)),
+            crysalis_wavelength=float(data.get("crysalis_wavelength", 0.2952)),
+            crysalis_distance=float(data.get("crysalis_distance", 200.0)),
+            crysalis_center_x=float(data.get("crysalis_center_x", 0.0)),
+            crysalis_center_y=float(data.get("crysalis_center_y", 0.0)),
+            crysalis_alpha=float(data.get("crysalis_alpha", 50.0)),
+            crysalis_polarization=float(data.get("crysalis_polarization", 0.99)),
+            crysalis_pixel_size=float(data.get("crysalis_pixel_size", 0.075)),
             shutter_pv=str(data.get("shutter_pv", "")),
             shutter_open_value=str(data.get("shutter_open_value", "")),
             shutter_close_value=str(data.get("shutter_close_value", "")),
             shutter_delay=float(data.get("shutter_delay", 0.0)),
+            preview_exposure=max(0.0, float(data.get("preview_exposure", 0.1))),
+            preview_timeout=max(0.0, float(data.get("preview_timeout", 60.0))),
+            preview_num_images=max(1, int(data.get("preview_num_images", 1000000))),
         )
         self._active = cfg
         return cfg
@@ -325,37 +369,68 @@ class BeamlineConfigModel:
         payload: dict = {
             "beamline": config.beamline,
             "rotation_motor": (
-                {"shorthand": config.rotation_motor.shorthand, "description": config.rotation_motor.description, "pv": config.rotation_motor.pv, "precision": config.rotation_motor.precision, "controller": config.rotation_motor.controller, "xps_group": config.rotation_motor.xps_group, "xps_positioner": config.rotation_motor.xps_positioner, "beam_angle": config.rotation_motor.beam_angle}
+                {
+                    "shorthand": config.rotation_motor.shorthand,
+                    "description": config.rotation_motor.description,
+                    "pv": config.rotation_motor.pv,
+                    "precision": config.rotation_motor.precision,
+                    "centering_enabled": config.rotation_motor.centering_enabled,
+                    "controller": config.rotation_motor.controller,
+                    "xps_group": config.rotation_motor.xps_group,
+                    "xps_positioner": config.rotation_motor.xps_positioner,
+                    "beam_angle": config.rotation_motor.beam_angle,
+                }
                 if config.rotation_motor is not None
                 else {}
             ),
             "detectors": [
-                {"name": d.name, "pv_prefix": d.pv_prefix, "type": d.type, "file_format": d.file_format, "file_template": d.file_template, "path_prefix_local": d.path_prefix_local, "path_prefix_remote": d.path_prefix_remote, "active": idx == config.active_detector}
+                {
+                    "name": d.name,
+                    "pv_prefix": d.pv_prefix,
+                    "type": d.type,
+                    "file_format": d.file_format,
+                    "file_template": d.file_template,
+                    "path_prefix_local": d.path_prefix_local,
+                    "path_prefix_remote": d.path_prefix_remote,
+                    "active": idx == config.active_detector,
+                }
                 for idx, d in enumerate(config.detectors)
             ],
-            "controllers": [
-                {"name": c.name, "type": c.type, "params": c.params}
-                for c in config.controllers
-            ],
+            "controllers": [{"name": c.name, "type": c.type, "params": c.params} for c in config.controllers],
             "motors": [
-                {"shorthand": m.shorthand, "description": m.description, "pv": m.pv, "precision": m.precision, "mapping_enabled": m.mapping_enabled, "controller": m.controller, "xps_group": m.xps_group, "xps_positioner": m.xps_positioner}
+                {
+                    "shorthand": m.shorthand,
+                    "description": m.description,
+                    "pv": m.pv,
+                    "precision": m.precision,
+                    "mapping_enabled": m.mapping_enabled,
+                    "centering_enabled": m.centering_enabled,
+                    "controller": m.controller,
+                    "xps_group": m.xps_group,
+                    "xps_positioner": m.xps_positioner,
+                }
                 for m in config.motors
             ],
-            "abort_pvs": [
-                {"pv": pv, "value": value}
-                for pv, value in config.abort_pvs
-            ],
-            "restore_pvs": [
-                {"pv": pv}
-                for pv in config.restore_pvs
-                if pv
-            ],
+            "abort_pvs": [{"pv": pv, "value": value} for pv, value in config.abort_pvs],
+            "restore_pvs": [{"pv": pv} for pv in config.restore_pvs if pv],
             "crysalis_par_path": config.crysalis_par_path,
+            "crysalis_set_path": config.crysalis_set_path,
+            "crysalis_ccd_path": config.crysalis_ccd_path,
             "crysalis_load_on_startup": config.crysalis_load_on_startup,
+            "crysalis_wavelength": config.crysalis_wavelength,
+            "crysalis_distance": config.crysalis_distance,
+            "crysalis_center_x": config.crysalis_center_x,
+            "crysalis_center_y": config.crysalis_center_y,
+            "crysalis_alpha": config.crysalis_alpha,
+            "crysalis_polarization": config.crysalis_polarization,
+            "crysalis_pixel_size": config.crysalis_pixel_size,
             "shutter_pv": config.shutter_pv,
             "shutter_open_value": config.shutter_open_value,
             "shutter_close_value": config.shutter_close_value,
             "shutter_delay": config.shutter_delay,
+            "preview_exposure": config.preview_exposure,
+            "preview_timeout": config.preview_timeout,
+            "preview_num_images": config.preview_num_images,
         }
 
         path = self.path_for(config.name)

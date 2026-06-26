@@ -13,8 +13,12 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+import json
 import logging
 import multiprocessing
+import subprocess
+import sys
+import tempfile
 import threading
 import time as _time
 from typing import Callable
@@ -28,7 +32,8 @@ from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.model.motor_limits import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
 from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
-from crystalsweep.ui.view.custom.widgets import DarkAbortingDialog
+from wxutils import FlatWaitDialog
+from crystalsweep.ui.view.custom.theme import dialog_scheme
 
 __all__ = ["CollectController"]
 
@@ -45,7 +50,7 @@ class CollectController:
         self._model = model
         self._view = view
         self._abort_event = threading.Event()
-        self._engine = ScanEngine(script_model=model.scripts)
+        self._engine = ScanEngine(script_model=model.scripts, controllers=model.controllers)
         self._engine._abort_event = self._abort_event
         self._thread: threading.Thread | None = None
         self._start_time: float = 0.0
@@ -65,7 +70,7 @@ class CollectController:
 
         self._restore_pv_snapshot: dict[str, object] = {}
         self._monitored_limit_pvs: list[str] = []
-        self._aborting_dlg: DarkAbortingDialog | None = None
+        self._aborting_dlg: FlatWaitDialog | None = None
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
@@ -83,6 +88,28 @@ class CollectController:
         if config.rotation_motor and config.rotation_motor.pv.strip():
             pvs.append(config.rotation_motor.pv)
         self._monitored_limit_pvs = subscribe_limit_monitors(pvs, lambda **_: wx.CallAfter(self.validate_limits))
+        # Refresh button state for the new config so missing detectors/rotation
+        # motor / duplicate shorthands gate the Collect button immediately.
+        self.validate_limits()
+
+    def _config_readiness_error(self) -> str | None:
+        """Return a user-facing reason the active config is not ready for collection, or None."""
+        if not self._model.beamline.has_active:
+            return "No active beamline config."
+
+        config = self._model.beamline.active
+        if not config.detectors:
+            return "No detectors configured."
+        if config.active_detector_config is None:
+            return "No active detector selected."
+        if config.rotation_motor is None or not config.rotation_motor.pv.strip():
+            return "Rotation stage PV is required."
+
+        shorthands = [m.shorthand for m in config.motors if m.shorthand]
+        if len(shorthands) != len(set(shorthands)):
+            return "Motor shorthands must be unique."
+
+        return None
 
     def _on_collect(self) -> None:
         focused = self._view.FindFocus()
@@ -98,8 +125,9 @@ class CollectController:
             self._view.collect.set_status("No points selected.", wx.Colour(220, 160, 40))
             return
 
-        if not self._model.beamline.has_active:
-            self._view.collect.set_status("No active beamline config.", wx.Colour(220, 80, 40))
+        reason = self._config_readiness_error()
+        if reason is not None:
+            self._view.collect.set_status(reason, wx.Colour(220, 80, 40))
             return
 
         self._abort_event.clear()
@@ -124,8 +152,11 @@ class CollectController:
 
         Marks rows with red outlines and disables the Collect button when violations
         are found.  Clears all markers and re-enables the button when everything is OK.
+        Also gates the Collect button on overall config readiness so an incomplete
+        beamline config (no detector, no rotation stage, etc.) keeps Collect disabled.
         """
-        if not self._model.beamline.has_active:
+        if self._config_readiness_error() is not None:
+            self._view.collect.set_collect_enabled(False)
             return
 
         all_points = self._model.collection.points
@@ -181,19 +212,16 @@ class CollectController:
             self._view.collection_table.set_row_limit_error(idx, in_violation)
             motor_errors, rot_start_error, rot_end_error = field_errors.get(idx, ({}, False, False))
             self._view.collection_table.set_row_field_limit_errors(idx, motor_errors, rot_start_error, rot_end_error)
-        self._view.collect.set_collect_enabled(not violations)
+        ready = self._config_readiness_error() is None
+        self._view.collect.set_collect_enabled(ready and not violations)
 
     @staticmethod
     def _point_frame_weight(point: CollectionPoint) -> int:
         """Return the number of frames for a point (1 for still/wide, n_frames for step)."""
         if point.scan_type == "step":
-            try:
-                step = float(point.step) if point.step else 1.0
-                start = float(point.rotation_start) if point.rotation_start else 0.0
-                end = float(point.rotation_end) if point.rotation_end else 0.0
-                return max(1, round(abs(end - start) / step)) if step > 0 else 1
-            except (ValueError, ZeroDivisionError):
-                return 1
+            params = point.parse_step_params()
+            return params.n_frames if params is not None else 1
+
         return 1
 
     def _estimate_total_seconds(self, points: list[CollectionPoint]) -> float:
@@ -203,47 +231,44 @@ class CollectController:
         total = 0.0
         consumed_groups: set[str] = set()
         for point in points:
-            try:
-                exposure = float(point.time) if point.time else 1.0
-            except ValueError:
-                exposure = 1.0
+            exposure = point.parse_exposure()
+            if exposure is None:
+                continue
 
             if point.map_group:
                 if point.map_group in consumed_groups:
                     continue
                 consumed_groups.add(point.map_group)
                 group_points = [p for p in points if p.map_group == point.map_group]
+                n_points = len(group_points)
+                n_rows = len({p.map_row for p in group_points})
+                overhead = shutter_delay + 1.0
                 if point.scan_type == "still" and use_trajectory:
-                    n_rows = len({p.map_row for p in group_points})
                     n_cols = len({p.map_col for p in group_points})
-                    overhead = shutter_delay + 1.0
                     total += exposure * n_cols * n_rows + overhead * n_rows
+                elif point.scan_type == "step":
+                    params = point.parse_step_params()
+                    if params is None:
+                        continue
+                    total += params.exposure * params.n_frames * n_points + overhead * n_points + 1.0 * n_rows
+                elif point.scan_type == "wide":
+                    wp = point.parse_wide_params()
+                    if wp is None:
+                        continue
+                    total += wp.exposure * n_points + overhead * n_points + 1.0 * n_rows
                 else:
-                    n_points = len(group_points)
-                    if point.scan_type == "step":
-                        try:
-                            step = float(point.step) if point.step else 1.0
-                            start = float(point.rotation_start) if point.rotation_start else 0.0
-                            end = float(point.rotation_end) if point.rotation_end else 180.0
-                            n_frames = max(1, round(abs(end - start) / step))
-                        except (ValueError, ZeroDivisionError):
-                            n_frames = 1
-                        overhead = shutter_delay + 1.0
-                        total += exposure * n_frames * n_points + overhead * n_points
-                    else:
-                        total += exposure * n_points + 1.0 * n_points
+                    total += exposure * n_points + overhead * n_points + 1.0 * n_rows
             else:
                 if point.scan_type == "step":
-                    try:
-                        step = float(point.step) if point.step else 1.0
-                        start = float(point.rotation_start) if point.rotation_start else 0.0
-                        end = float(point.rotation_end) if point.rotation_end else 180.0
-                        n_frames = max(1, round(abs(end - start) / step))
-                    except (ValueError, ZeroDivisionError):
-                        n_frames = 1
-                    total += exposure * n_frames + shutter_delay + 1.0
+                    params = point.parse_step_params()
+                    if params is None:
+                        continue
+                    total += params.exposure * params.n_frames + shutter_delay + 1.0
                 elif point.scan_type == "wide":
-                    total += exposure + shutter_delay + 1.0
+                    wp = point.parse_wide_params()
+                    if wp is None:
+                        continue
+                    total += wp.exposure + shutter_delay + 1.0
                 else:
                     total += exposure + 1.0
         return total
@@ -251,14 +276,26 @@ class CollectController:
     def _show_aborting_dialog(self, elapsed_str: str) -> None:
         if self._aborting_dlg is not None:
             return
-        self._aborting_dlg = DarkAbortingDialog(self._view, elapsed=elapsed_str)
+        lines = [
+            "The collection was aborted. Motors are being restored,",
+            "the detector is being stopped, and abort PVs are being written.",
+        ]
+        if elapsed_str:
+            lines.append(f"\nElapsed time: {elapsed_str}")
+        self._aborting_dlg = FlatWaitDialog(
+            self._view,
+            title="Collection Aborted",
+            message="\n".join(lines),
+            status="Cleaning up, please wait\u2026",
+            scheme=dialog_scheme(),
+        )
         self._aborting_dlg.Show()
         self._aborting_dlg.Raise()
         self._aborting_dlg.SetFocus()
 
     def _ready_aborting_dialog(self) -> None:
         if self._aborting_dlg is not None:
-            self._aborting_dlg.ready()
+            self._aborting_dlg.Ready("Abort complete.")
         self._aborting_dlg = None
 
     def _on_file_number_updated(self, file_number: int) -> None:
@@ -345,6 +382,12 @@ class CollectController:
         file_settings = self._model.file_settings
         all_points = self._model.collection.points
         pre_scan_error: str | None = None
+        pre_collection_error: str | None = None
+
+        pre_collection_error = self._engine.pre_collection(points, config)
+        if pre_collection_error is not None:
+            _log.warning("Pre-collection failed: %s", pre_collection_error)
+            self._abort_event.set()
 
         self._restore_pv_snapshot = {}
         for pv in config.restore_pvs:
@@ -513,14 +556,18 @@ class CollectController:
                 _log.warning("Failed to restore PVs at collection end: %s", exc)
         self._restore_pv_snapshot = {}
 
-        if not self._abort_event.is_set() and pre_scan_error is None and self._model.file_settings.use_ext:
+        self._engine.post_collection(points, config)
+
+        if not self._abort_event.is_set() and pre_scan_error is None and pre_collection_error is None and self._model.file_settings.use_ext:
             self._on_file_number_updated(self._model.file_settings.frame_number + 1)
 
         wx.CallAfter(self._stop_elapsed_timer)
         if self._on_collecting_changed is not None:
             wx.CallAfter(self._on_collecting_changed, False)
         wx.CallAfter(self._ready_aborting_dialog)
-        if pre_scan_error is not None:
+        if pre_collection_error is not None:
+            wx.CallAfter(self._view.collect.set_status, f"Pre-collection error: {pre_collection_error}", wx.Colour(220, 80, 40))
+        elif pre_scan_error is not None:
             wx.CallAfter(self._view.collect.set_status, f"Pre-scan error: {pre_scan_error}", wx.Colour(220, 80, 40))
         elif self._abort_event.is_set():
             wx.CallAfter(self._view.collect.set_status, "Aborted", wx.Colour(220, 160, 40))
@@ -586,7 +633,7 @@ class CollectController:
 
             sorted_cols = sorted(row, key=lambda p: p.map_col)
             if use_trajectory:
-                snake_forward = (row_num % 2 == 0)
+                snake_forward = row_num % 2 == 0
                 row_points = sorted_cols if snake_forward else list(reversed(sorted_cols))
             else:
                 row_points = sorted_cols
@@ -618,7 +665,9 @@ class CollectController:
                     _log.warning("Failed to prepare motor2 move %s: %s", motor2, exc)
             if self._abort_event.is_set():
                 break
-            if motor1_cfg is not None:
+            # For still trajectory scans the trajectory don't caput to start positions
+            skip_motor1_seed = scan_type == "still" and use_trajectory and row_num > 0
+            if motor1_cfg is not None and not skip_motor1_seed:
                 try:
                     pos1_row = float(first_pt.motor_positions.get(motor1, "0") or "0")
                     limit_err = check_soft_limits(motor1_cfg.pv, pos1_row)
@@ -644,7 +693,21 @@ class CollectController:
             if scan_type == "still" and use_trajectory:
                 row_start_idx = start_idx + row_num * len(row_points)
                 row_weight = sum(weights[group_points.index(pt)] for pt in row_points if pt in group_points)
-                self._run_map_row_trajectory(row_points, row_num, n_rows, row_start_idx, total, motor1, config, file_settings, all_points, keep_shutter_open=keep_shutter_open, completed_weight=map_completed_weight, row_weight=row_weight, total_weight=total_weight)
+                self._run_map_row_trajectory(
+                    row_points,
+                    row_num,
+                    n_rows,
+                    row_start_idx,
+                    total,
+                    motor1,
+                    config,
+                    file_settings,
+                    all_points,
+                    keep_shutter_open=keep_shutter_open,
+                    completed_weight=map_completed_weight,
+                    row_weight=row_weight,
+                    total_weight=total_weight,
+                )
                 map_completed_weight += row_weight
             else:
                 for col_pt in row_points:
@@ -687,7 +750,7 @@ class CollectController:
                     pt_idx = start_idx + gidx
                     pt_weight = weights[gidx]
                     if scan_type == "still":
-                        self._run_still(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
+                        self._run_still(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open)
                     elif scan_type == "wide":
                         self._run_wide(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open)
                     elif scan_type == "step":
@@ -711,6 +774,9 @@ class CollectController:
             except Exception as exc:
                 _log.warning("Failed to restore map motor2 %s: %s", motor2, exc)
 
+        if not self._abort_event.is_set() and self._model.file_settings.use_snake_combine:
+            self._spawn_snake_combine_for_map(group_points)
+
         self._model.file_settings.reset_frame_number()
         wx.CallAfter(self._view.file_settings.set_frame_number, 0)
 
@@ -731,10 +797,15 @@ class CollectController:
         total_weight: int = 1,
     ) -> None:
         n_points = len(row_points)
-        try:
-            exposure = float(row_points[0].time) if row_points[0].time else 1.0
-        except ValueError:
-            exposure = 1.0
+        exposure = row_points[0].parse_exposure()
+        if exposure is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[map row {row_num}]: exposure time is required",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
 
         epics_positions = []
         for pt in row_points:
@@ -774,7 +845,7 @@ class CollectController:
             while not done_event.is_set():
                 current = int(caget(counter_pv) or 0)
                 if current > last:
-                    snake_reversed = (row_num % 2 == 1)
+                    snake_reversed = row_num % 2 == 1
                     for f in range(last + 1, current + 1):
                         pt_idx = start_idx + (f - 1)
                         pt_fraction = (completed_weight + row_weight * f / n_points) / max(1, total_weight)
@@ -841,6 +912,8 @@ class CollectController:
                 wx.Colour(220, 80, 40),
             )
             self._abort_event.set()
+        else:
+            self._spawn_format_conversion_for_trajectory_row(row_points)
 
     def _wait_for_eiger_triggering(self, pv_prefix: str, done_event: threading.Event | None = None) -> None:
         prefix = pv_prefix.strip()
@@ -867,6 +940,212 @@ class CollectController:
         msg = str(exc)
         if "Soft limit violation" in msg:
             wx.MessageBox(msg, "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+
+    def _selected_extras(self) -> tuple[str, list[str]] | None:
+        """Return (source_format, extras) when extra formats are enabled, else None."""
+        fs = self._model.file_settings
+        selected: list[str] = []
+        if fs.use_hdf5:
+            selected.append("hdf5")
+        if fs.use_cbf:
+            selected.append("cbf")
+        if fs.use_tif:
+            selected.append("tif")
+
+        config = self._model.beamline.active
+        det = config.active_detector_config if config else None
+        source_format = det.file_format if det else "hdf5"
+        extras = [fmt for fmt in selected if fmt != source_format]
+        if not extras:
+            return None
+        return source_format, extras
+
+    def _launch_format_converter(self, directory: str, basename: str, source_format: str, extras: list[str], width: int, output_dirs: dict[str, str]) -> None:
+        """Spawn the format converter as a detached subprocess."""
+        args = {
+            "directory": directory,
+            "basename": basename,
+            "source_format": source_format,
+            "target_formats": extras,
+            "file_number_width": width,
+            "output_dirs": output_dirs,
+        }
+        try:
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
+            try:
+                json.dump(args, tmp)
+            finally:
+                tmp.close()
+            subprocess.Popen(
+                [sys.executable, "-m", "crystalsweep.model.format_converter", tmp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception as exc:
+            _log.warning("Failed to spawn format conversion: %s", exc)
+
+    def _launch_snake_combiner(self, input_dir: str, output_path: str, pattern: str, first_row_reversed: bool, flipped_dir: str | None = None) -> None:
+        """Spawn the snake-map combiner as a detached subprocess."""
+        args = {
+            "input_dir": input_dir,
+            "output_path": output_path,
+            "pattern": pattern,
+            "first_row_reversed": first_row_reversed,
+            "flipped_dir": flipped_dir or "",
+        }
+        try:
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
+            try:
+                json.dump(args, tmp)
+            finally:
+                tmp.close()
+            subprocess.Popen(
+                [sys.executable, "-m", "crystalsweep.model.snake_combiner", tmp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception as exc:
+            _log.warning("Failed to spawn snake combiner: %s", exc)
+
+    def _spawn_snake_combine_for_map(self, group_points: list[CollectionPoint]) -> None:
+        """Spawn the snake combiner for a finished map collection.
+
+        Inputs are the per-row .h5 files the IOC wrote into the map's folder.
+        Output is a sibling ``<map_stem>_combined.h5`` next to that folder.
+        Snake convention matches ``_run_map_group``: row 0 forward, row 1
+        reversed, etc., so ``first_row_reversed`` is False here.
+        """
+        if not group_points:
+            return
+
+        fs = self._model.file_settings
+        base = fs.filename or ""
+        map_ext = fs.map_ext.strip()
+        folder_suffix = map_ext if map_ext else "map"
+        folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
+        input_dir = f"{str(fs.directory).rstrip('/')}/{folder_name}"
+        map_stem = folder_name
+        output_path = f"{input_dir}/{map_stem}.h5"
+        flipped_dir = f"{input_dir}/{map_stem}_flipped"
+        pattern = f"{map_stem}_*.h5"
+
+        self._launch_snake_combiner(
+            input_dir=input_dir,
+            output_path=output_path,
+            pattern=pattern,
+            first_row_reversed=False,
+            flipped_dir=flipped_dir,
+        )
+
+    def _spawn_format_conversion(self, point: CollectionPoint, frame_number: int | None = None) -> None:
+        """Spawn the format converter for a collection point.
+
+        Source detector files always stay where the IOC wrote them.
+        Converted files always land under a sibling ``_converted`` folder with
+        one subfolder per format (``cbf``, ``tif``).
+        - Single (non-map): ``<directory>/<basename>_converted/<fmt>/``
+        - Map: ``<map_dir>/<base>_<map_ext>_converted/<fmt>/`` (shared across
+          all points in the map).
+        """
+        result = self._selected_extras()
+        if result is None:
+            return
+        source_format, extras = result
+
+        fs = self._model.file_settings
+        config = self._model.beamline.active
+        det = config.active_detector_config
+        width = det.file_number_width if det else 4
+
+        label = point.label.strip() if fs.use_ext else ""
+        base = fs.filename or ""
+        map_ext = fs.map_ext.strip() if point.map_group else ""
+        directory = str(fs.directory)
+        if point.map_group:
+            folder_suffix = map_ext if map_ext else "map"
+            folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
+            directory = f"{directory.rstrip('/')}/{folder_name}"
+            effective_map_ext = map_ext if map_ext else "map"
+            parts = [p for p in [base, effective_map_ext] if p]
+            map_label = point.label.strip()
+            try:
+                filenumber = int(map_label.rsplit("_", 1)[-1])
+            except (ValueError, IndexError):
+                filenumber = frame_number if frame_number is not None else fs.frame_number
+            map_stem = "_".join(parts) if parts else base
+            basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
+            converted_root = f"{directory.rstrip('/')}/{map_stem}_converted"
+        else:
+            parts = [p for p in [base, label] if p]
+            filenumber = frame_number if frame_number is not None else fs.frame_number
+            stem = "_".join(parts) if parts else base
+            basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
+            converted_root = f"{directory.rstrip('/')}/{basename}_converted"
+
+        output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
+
+        self._launch_format_converter(
+            directory=directory,
+            basename=basename,
+            source_format=source_format,
+            extras=extras,
+            width=width,
+            output_dirs=output_dirs,
+        )
+
+    def _spawn_format_conversion_for_trajectory_row(
+        self,
+        row_points: list[CollectionPoint],
+        first_frame_number: int | None = None,
+    ) -> None:
+        """Spawn conversion for a still-trajectory map row.
+
+        The whole row is written to a single multi-frame HDF5 file with the
+        basename of the first point in the row. Converted frames join the
+        shared per-format folder inside the map's ``_converted`` directory.
+        """
+        if not row_points:
+            return
+        # Match scan_engine: name files from the forward-direction first point
+        # (lowest map_col), independent of snake direction.
+        ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
+        result = self._selected_extras()
+        if result is None:
+            return
+        source_format, extras = result
+
+        fs = self._model.file_settings
+        config = self._model.beamline.active
+        det = config.active_detector_config
+        width = det.file_number_width if det else 4
+
+        base = fs.filename or ""
+        map_ext = fs.map_ext.strip()
+        folder_suffix = map_ext if map_ext else "map"
+        folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
+        directory = f"{str(fs.directory).rstrip('/')}/{folder_name}"
+        effective_map_ext = map_ext if map_ext else "map"
+        parts = [p for p in [base, effective_map_ext] if p]
+        map_label = ref.label.strip()
+        try:
+            filenumber = int(map_label.rsplit("_", 1)[-1])
+        except (ValueError, IndexError):
+            filenumber = first_frame_number if first_frame_number is not None else fs.frame_number
+        map_stem = "_".join(parts) if parts else base
+        basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
+        converted_root = f"{directory.rstrip('/')}/{map_stem}_converted"
+        output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
+
+        self._launch_format_converter(
+            directory=directory,
+            basename=basename,
+            source_format=source_format,
+            extras=extras,
+            width=width,
+            output_dirs=output_dirs,
+        )
 
     def _spawn_crysalis_conversion(self, point: CollectionPoint, frame_number: int | None = None) -> None:
         if point.scan_type != "step":
@@ -901,28 +1180,39 @@ class CollectController:
             filenumber = frame_number if frame_number is not None else fs.frame_number
         basename = "_".join(parts) if parts else base
 
-        try:
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-        except ValueError:
+        # Crysalis output lives under a shared `_converted/crysalis/` folder.
+        # Single (non-map): `<dir>/<basename>_<NNNN>_converted/crysalis/` (flat).
+        # Map: `<map_dir>/<base>_<map_ext>_converted/crysalis/<basename>_<NNNN>/`
+        # (per-point subfolder since the map's `_converted` is shared).
+        det_width = det.file_number_width if det else 4
+        full_basename = f"{basename}_{int(filenumber):0{max(1, det_width)}d}"
+        if point.map_group:
+            converted_root = f"{directory.rstrip('/')}/{basename}_converted"
+            crysalis_output_dir = f"{converted_root}/crysalis/{full_basename}"
+        else:
+            converted_root = f"{directory.rstrip('/')}/{full_basename}_converted"
+            crysalis_output_dir = f"{converted_root}/crysalis"
+
+        step_p = point.parse_step_params()
+        wide_p = point.parse_wide_params()
+        exposure_time = point.parse_exposure() or 0.0
+        if step_p is not None:
+            omega_start = step_p.omega_start
+            omega_end = step_p.omega_end
+            step = step_p.step
+            count = step_p.n_frames
+        elif wide_p is not None:
+            omega_start = wide_p.omega_start
+            omega_end = wide_p.omega_end
+            step = abs(omega_end - omega_start)
+            count = 1
+        else:
             omega_start = 0.0
-        try:
-            omega_end = float(point.rotation_end) if point.rotation_end else omega_start
-        except ValueError:
-            omega_end = omega_start
-        try:
-            step = float(point.step) if point.step else abs(omega_end - omega_start)
-        except ValueError:
-            step = abs(omega_end - omega_start) or 1.0
-        try:
-            count = max(1, round(abs(omega_end - omega_start) / step)) if step > 0 else 1
-        except ZeroDivisionError:
+            omega_end = 0.0
+            step = 0.0
             count = 1
 
-        try:
-            exposure_time = float(point.time) if point.time else 1.0
-        except ValueError:
-            exposure_time = 1.0
-
+        wavelength = config.crysalis_wavelength
         scan_info = {
             "omega_start": omega_start,
             "omega_end": omega_end,
@@ -931,21 +1221,21 @@ class CollectController:
             "kappa": 0.0,
             "theta": 0.0,
             "phi": 0.0,
-            "alpha": 50.0,
-            "dist": 200.0,
-            "center_x": 0.0,
-            "center_y": 0.0,
-            "mono": 0.99,
-            "wavelength": 0.2952,
+            "alpha": config.crysalis_alpha,
+            "dist": config.crysalis_distance,
+            "center_x": config.crysalis_center_x,
+            "center_y": config.crysalis_center_y,
+            "mono": config.crysalis_polarization,
+            "wavelength": wavelength,
             "dtheta": 0.0,
             "dkappa": 0.0,
             "dphi": 0.0,
             "Exposure_time": exposure_time,
-            "pixel_size": 0.075,
-            "l1": 0.2952,
-            "l2": 0.2952,
-            "l12": 0.2952,
-            "b": 0.2952,
+            "pixel_size": config.crysalis_pixel_size,
+            "l1": wavelength,
+            "l2": wavelength,
+            "l12": wavelength,
+            "b": wavelength,
             "monotype": "SYNCHROTRON",
         }
 
@@ -954,25 +1244,45 @@ class CollectController:
             "basename": basename,
             "filenumber": filenumber,
             "par_file": str(fs.crysalis_calibration),
+            "set_file": str(fs.crysalis_set_file) if fs.crysalis_set_file is not None else "",
+            "ccd_file": str(fs.crysalis_ccd_file) if fs.crysalis_ccd_file is not None else "",
             "scan_info": scan_info,
             "file_format": file_format,
+            "output_dir": crysalis_output_dir,
         }
 
         try:
             from crystalsweep.model.crysalis_converter import run_conversion
+
             p = multiprocessing.Process(target=run_conversion, args=(args,), daemon=True)
             p.start()
         except Exception as exc:
             _log.warning("Failed to spawn crysalis conversion: %s", exc)
 
-    def _run_still(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
+    def _run_still(
+        self,
+        point: CollectionPoint,
+        idx: int,
+        total: int,
+        config,
+        file_settings=None,
+        completed_weight: int = 0,
+        point_weight: int = 1,
+        total_weight: int = 1,
+        keep_shutter_open: bool = False,
+    ) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
-        try:
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError:
-            exposure = 1.0
+        exposure = point.parse_exposure()
+        if exposure is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: exposure time is required",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
 
         def on_done() -> None:
             print(f"[collect] [{idx}/{total}] {point.label}: still scan complete")
@@ -989,7 +1299,16 @@ class CollectController:
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
-            self._engine.run_still(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
+            self._engine.run_still(
+                point,
+                config,
+                on_done=on_done,
+                on_error=on_error,
+                file_settings=file_settings,
+                on_file_number_updated=self._on_file_number_updated,
+                on_status=on_status,
+                keep_shutter_open=keep_shutter_open,
+            )
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -1013,25 +1332,24 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._spawn_format_conversion(point)
             self._spawn_crysalis_conversion(point)
 
     def _run_step(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
-        try:
-            exposure = float(point.time) if point.time else 1.0
-            step_size = float(point.step) if point.step else 1.0
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-            omega_end = float(point.rotation_end) if point.rotation_end else 0.0
-        except ValueError:
-            exposure = 1.0
-            step_size = 1.0
-            omega_start = 0.0
-            omega_end = 0.0
+        params = point.parse_step_params()
+        if params is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: step size is required for step scans",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
 
-        n_frames = max(1, round(abs(omega_end - omega_start) / step_size)) if step_size > 0 else 1
-        total_duration = exposure * n_frames
+        n_frames = params.n_frames
 
         frame_holder: list[tuple[int, int]] = [(0, n_frames)]
 
@@ -1044,8 +1362,10 @@ class CollectController:
             weighted = (completed_weight + inner * point_weight) / total_weight
             wx.CallAfter(
                 self._view.collect.set_progress,
-                idx, total,
-                frame, total_frames,
+                idx,
+                total,
+                frame,
+                total_frames,
                 weighted,
             )
 
@@ -1065,7 +1385,17 @@ class CollectController:
         wx.CallAfter(self._view.collect.set_progress, idx, total, 0, n_frames, completed_weight / total_weight)
 
         try:
-            self._engine.run_step(point, config, on_frame=on_frame, on_done=on_done, on_error=on_error, slew=use_slew, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status)
+            self._engine.run_step(
+                point,
+                config,
+                on_frame=on_frame,
+                on_done=on_done,
+                on_error=on_error,
+                slew=use_slew,
+                file_settings=file_settings,
+                on_file_number_updated=self._on_file_number_updated,
+                on_status=on_status,
+            )
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -1083,16 +1413,33 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._spawn_format_conversion(point, frame_number_before)
             self._spawn_crysalis_conversion(point, frame_number_before)
 
-    def _run_wide(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1, keep_shutter_open: bool = False) -> None:
+    def _run_wide(
+        self,
+        point: CollectionPoint,
+        idx: int,
+        total: int,
+        config,
+        file_settings=None,
+        completed_weight: int = 0,
+        point_weight: int = 1,
+        total_weight: int = 1,
+        keep_shutter_open: bool = False,
+    ) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
-        try:
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError:
-            exposure = 1.0
+        exposure = point.parse_exposure()
+        if exposure is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: exposure time is required",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
 
         def on_done() -> None:
             print(f"[collect] [{idx}/{total}] {point.label}: wide scan complete")
@@ -1109,7 +1456,16 @@ class CollectController:
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
-            self._engine.run_wide(point, config, on_done=on_done, on_error=on_error, file_settings=file_settings, on_file_number_updated=self._on_file_number_updated, on_status=on_status, keep_shutter_open=keep_shutter_open)
+            self._engine.run_wide(
+                point,
+                config,
+                on_done=on_done,
+                on_error=on_error,
+                file_settings=file_settings,
+                on_file_number_updated=self._on_file_number_updated,
+                on_status=on_status,
+                keep_shutter_open=keep_shutter_open,
+            )
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
             return
@@ -1134,4 +1490,5 @@ class CollectController:
             self._abort_event.set()
 
         else:
+            self._spawn_format_conversion(point)
             self._spawn_crysalis_conversion(point)

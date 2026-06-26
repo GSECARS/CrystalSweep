@@ -55,7 +55,12 @@ class ScanDriver(Protocol):
     """Common interface every motion controller scan driver must implement."""
 
     def prepare(self, spec: ScanSpec) -> None: ...
-    def run(self, spec: ScanSpec, on_point: Callable[[int, float], None]) -> None: ...
+    def run(
+        self,
+        spec: ScanSpec,
+        on_point: Callable[[int, float], None],
+        on_at_start: Callable[[], None] | None = None,
+    ) -> None: ...
     def abort(self) -> None: ...
 
 
@@ -86,5 +91,6 @@ def get_driver(controller: str) -> ScanDriver:
     if cls is None:
         _log.warning("Unknown scan controller %r, falling back to EpicsScanModel.", controller)
         from crystalsweep.model.epics_scan_model import EpicsScanModel
+
         cls = EpicsScanModel
     return cls()

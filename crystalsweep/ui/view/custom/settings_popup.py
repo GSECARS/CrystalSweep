@@ -17,14 +17,22 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.colormaps import COLORMAP_NAMES
-from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DarkCombo, DarkTextCtrl, DarkToggle, FlatButton
+from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font, COMBO_SCHEME
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME, TOGGLE_SCHEME
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo
 
 __all__ = ["ImageSettingsPopup"]
 
 
 class ImageSettingsPopup(wx.Frame):
     """Borderless settings popup that dismisses when focus is lost."""
+
+    # User-facing labels for the live binning method (one per `BIN_METHODS` entry from image_canvas)
+    _BIN_METHOD_LABELS: tuple[tuple[str, str], ...] = (
+        ("none", "None (full resolution)"),
+        ("stride", "Stride (fastest)"),
+        ("mean", "Mean (anti-aliased)"),
+    )
 
     def __init__(
         self,
@@ -34,10 +42,12 @@ class ImageSettingsPopup(wx.Frame):
         filter_gaps: bool,
         contrast_min: float,
         contrast_max: float,
+        bin_method: str,
         on_colormap_changed: Callable[[str], None],
         on_auto_scale_changed: Callable[[bool], None],
         on_filter_gaps_changed: Callable[[bool], None],
         on_levels_changed: Callable[[float, float], None],
+        on_bin_method_changed: Callable[[str], None],
         on_reset_view: Callable[[], None],
     ) -> None:
         super().__init__(
@@ -48,6 +58,7 @@ class ImageSettingsPopup(wx.Frame):
         self._on_auto_scale_changed = on_auto_scale_changed
         self._on_filter_gaps_changed = on_filter_gaps_changed
         self._on_levels_changed = on_levels_changed
+        self._on_bin_method_changed = on_bin_method_changed
         self._on_reset_view = on_reset_view
 
         self.SetBackgroundColour(SEP_COLOUR)
@@ -57,7 +68,7 @@ class ImageSettingsPopup(wx.Frame):
         panel.SetForegroundColour(POPUP_FG)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
-        self._build_section(panel, sizer, colormap, auto_scale, filter_gaps, contrast_min, contrast_max)
+        self._build_section(panel, sizer, colormap, auto_scale, filter_gaps, contrast_min, contrast_max, bin_method)
         sizer.AddSpacer(10)
         panel.SetSizer(sizer)
         sizer.Fit(panel)
@@ -92,6 +103,7 @@ class ImageSettingsPopup(wx.Frame):
         filter_gaps: bool,
         contrast_min: float,
         contrast_max: float,
+        bin_method: str,
     ) -> None:
         font = scaled_font(12)
 
@@ -104,7 +116,7 @@ class ImageSettingsPopup(wx.Frame):
 
         cmap_row = wx.BoxSizer(wx.HORIZONTAL)
         cmap_row.Add(_lbl("Colormap"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        self._cmap_choice = DarkCombo(parent, choices=COLORMAP_NAMES)
+        self._cmap_choice = FlatCombo(parent, choices=COLORMAP_NAMES, combo_scheme=COMBO_SCHEME)
         if colormap in COLORMAP_NAMES:
             self._cmap_choice.SetSelection(COLORMAP_NAMES.index(colormap))
         self._cmap_choice.Bind(wx.EVT_CHOICE, self._evt_colormap)
@@ -113,27 +125,40 @@ class ImageSettingsPopup(wx.Frame):
 
         levels_row = wx.BoxSizer(wx.HORIZONTAL)
         levels_row.Add(_lbl("Min"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4)
-        self._min_ctrl = DarkTextCtrl(parent, value=f"{contrast_min:.4g}")
+        self._min_ctrl = FlatTextCtrl(parent, value=f"{contrast_min:.4g}", text_scheme=TEXT_SCHEME)
         self._min_ctrl.Bind(wx.EVT_KEY_DOWN, self._evt_levels_key)
         self._min_ctrl.Bind(wx.EVT_KILL_FOCUS, self._evt_levels)
         levels_row.Add(self._min_ctrl, 1, wx.EXPAND | wx.RIGHT, 8)
         levels_row.Add(_lbl("Max"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4)
-        self._max_ctrl = DarkTextCtrl(parent, value=f"{contrast_max:.4g}")
+        self._max_ctrl = FlatTextCtrl(parent, value=f"{contrast_max:.4g}", text_scheme=TEXT_SCHEME)
         self._max_ctrl.Bind(wx.EVT_KEY_DOWN, self._evt_levels_key)
         self._max_ctrl.Bind(wx.EVT_KILL_FOCUS, self._evt_levels)
         levels_row.Add(self._max_ctrl, 1, wx.EXPAND)
         sizer.Add(levels_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
-        self._auto_scale_cb = DarkToggle(parent, label="Auto-scale contrast", value=auto_scale)
-        self._auto_scale_cb.Bind(wx.EVT_CHECKBOX, self._evt_auto_scale)
+        self._auto_scale_cb = FlatCheckBox(parent, label="Auto-scale contrast", value=auto_scale, check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
+        self._auto_scale_cb.SetAction(lambda v: self._evt_auto_scale(v))
         sizer.Add(self._auto_scale_cb, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
-        self._filter_gaps_cb = DarkToggle(parent, label="Filter gaps (zeros)", value=filter_gaps)
-        self._filter_gaps_cb.Bind(wx.EVT_CHECKBOX, self._evt_filter_gaps)
+        self._filter_gaps_cb = FlatCheckBox(parent, label="Filter gaps (zeros)", value=filter_gaps, check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
+        self._filter_gaps_cb.SetAction(lambda v: self._evt_filter_gaps(v))
         sizer.Add(self._filter_gaps_cb, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
-        reset_btn = FlatButton(parent, label="Reset View")
-        reset_btn.set_action(self._evt_reset_view)
+        bin_row = wx.BoxSizer(wx.HORIZONTAL)
+        bin_row.Add(_lbl("Live binning"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        self._bin_method_keys = [key for key, _ in self._BIN_METHOD_LABELS]
+        bin_labels = [label for _, label in self._BIN_METHOD_LABELS]
+        self._bin_choice = FlatCombo(parent, choices=bin_labels, combo_scheme=COMBO_SCHEME)
+        if bin_method in self._bin_method_keys:
+            self._bin_choice.SetSelection(self._bin_method_keys.index(bin_method))
+        else:
+            self._bin_choice.SetSelection(0)
+        self._bin_choice.Bind(wx.EVT_CHOICE, self._evt_bin_method)
+        bin_row.Add(self._bin_choice, 1, wx.EXPAND)
+        sizer.Add(bin_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
+
+        reset_btn = FlatButton(parent, label="Reset View", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        reset_btn.SetAction(self._evt_reset_view)
         sizer.Add(reset_btn, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
 
     def _evt_colormap(self, colormap: str) -> None:
@@ -144,6 +169,12 @@ class ImageSettingsPopup(wx.Frame):
 
     def _evt_filter_gaps(self, value: bool) -> None:
         self._on_filter_gaps_changed(value)
+
+    def _evt_bin_method(self, label: str) -> None:
+        for key, lbl in self._BIN_METHOD_LABELS:
+            if lbl == label:
+                self._on_bin_method_changed(key)
+                return
 
     def _evt_levels_key(self, event: wx.KeyEvent) -> None:
         if event.GetKeyCode() in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
@@ -160,7 +191,7 @@ class ImageSettingsPopup(wx.Frame):
             pass
         event.Skip()
 
-    def _evt_reset_view(self) -> None:
+    def _evt_reset_view(self, _e=None) -> None:
         self._on_reset_view()
         self.Hide()
         self.Destroy()

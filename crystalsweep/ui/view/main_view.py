@@ -17,13 +17,16 @@ from typing import Callable
 
 import wx
 
+from crystalsweep.assets import LOGO_PNG
 from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
-from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, SEP_COLOUR
-from crystalsweep.ui.view.custom.widgets import DarkConfirmDialog, DarkMenuBar, SectionDivider, ThemedSplitter
+from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font, SPLITTER_SCHEME, DIVIDER_FG, DIVIDER_LINE, dialog_scheme, DANGER_SCHEME, TAB_SCHEME
+from crystalsweep.ui.view.custom.widgets import CrystalMenuBar
+from wxutils import FlatConfirmDialog, FlatSplitter, FlatTabbedPanel, SectionDivider
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
+from crystalsweep.ui.view.preview_view import PreviewView
 
 __all__ = ["MainView"]
 
@@ -39,6 +42,7 @@ class MainView(wx.Frame):
 
         self._version = version
         self._open_general_cb: Callable[[], None] | None = None
+        self._open_crysalis_cb: Callable[[], None] | None = None
         self._open_detectors_cb: Callable[[], None] | None = None
         self._open_controllers_cb: Callable[[], None] | None = None
         self._open_positioners_cb: Callable[[], None] | None = None
@@ -49,7 +53,7 @@ class MainView(wx.Frame):
         self._abort_cb: Callable[[], None] | None = None
 
         self._collecting = False
-        self._splitter = ThemedSplitter(self)
+        self._splitter = FlatSplitter(self, splitter_scheme=SPLITTER_SCHEME)
         self._splitter.SetSashGravity(0.0)
         self._splitter.SetMinimumPaneSize(180)
 
@@ -61,21 +65,27 @@ class MainView(wx.Frame):
         self.collection_table = CollectionTableView(self._left_panel)
         self.collect = CollectView(self._left_panel)
 
-        _sep = lambda: wx.Panel(self._left_panel, size=(-1, 1))
+        def _sep() -> wx.Panel:
+            return wx.Panel(self._left_panel, size=(-1, 1))
 
         collect_sep = _sep()
         collect_sep.SetBackgroundColour(SEP_COLOUR)
 
         left_sizer = wx.BoxSizer(wx.VERTICAL)
-        left_sizer.Add(SectionDivider(self._left_panel, "File Settings"), 0, wx.EXPAND)
+        left_sizer.Add(SectionDivider(self._left_panel, "File Settings", fg=DIVIDER_FG, line_colour=DIVIDER_LINE), 0, wx.EXPAND)
         left_sizer.Add(self.file_settings, 0, wx.EXPAND)
         left_sizer.AddSpacer(25)
-        left_sizer.Add(SectionDivider(self._left_panel, "Collection Settings"), 0, wx.EXPAND)
+        left_sizer.Add(SectionDivider(self._left_panel, "Collection Settings", fg=DIVIDER_FG, line_colour=DIVIDER_LINE), 0, wx.EXPAND)
         left_sizer.Add(self.collection_settings, 0, wx.EXPAND)
         left_sizer.AddSpacer(25)
-        left_sizer.Add(SectionDivider(self._left_panel, "Collection Points"), 0, wx.EXPAND)
+        left_sizer.Add(SectionDivider(self._left_panel, "Collection Points", fg=DIVIDER_FG, line_colour=DIVIDER_LINE), 0, wx.EXPAND)
         left_sizer.Add(self.collection_table, 1, wx.EXPAND)
-        left_sizer.Add(collect_sep, 0, wx.EXPAND)
+        left_sizer.AddSpacer(25)
+        left_sizer.Add(SectionDivider(self._left_panel, "Single-Crystal Centering Tools", fg=DIVIDER_FG, line_colour=DIVIDER_LINE), 0, wx.EXPAND)
+        self.centering_tabs = self._build_centering_tabs()
+        left_sizer.Add(self.centering_tabs, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        left_sizer.AddSpacer(8)
+        left_sizer.Add(collect_sep, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
         left_sizer.Add(self.collect, 0, wx.EXPAND)
         self._left_panel.SetSizer(left_sizer)
 
@@ -97,6 +107,9 @@ class MainView(wx.Frame):
 
     def bind_open_general(self, callback: Callable[[], None]) -> None:
         self._open_general_cb = callback
+
+    def bind_open_crysalis(self, callback: Callable[[], None]) -> None:
+        self._open_crysalis_cb = callback
 
     def bind_open_detectors(self, callback: Callable[[], None]) -> None:
         self._open_detectors_cb = callback
@@ -140,7 +153,33 @@ class MainView(wx.Frame):
     def bind_abort(self, callback: Callable[[], None]) -> None:
         self._abort_cb = callback
 
-    def _build_menu_bar(self) -> DarkMenuBar | None:
+    def _build_centering_tabs(self) -> FlatTabbedPanel:
+        tabs = FlatTabbedPanel(self._left_panel, scheme=TAB_SCHEME)
+        tabs.SetMinSize((-1, 180))
+
+        self.preview = PreviewView(tabs)
+
+        xrd_page = wx.Panel(tabs)
+        xrd_page.SetBackgroundColour(BG_CARD)
+        xrd_label = wx.StaticText(xrd_page, label="Coming soon")
+        xrd_label.SetForegroundColour(FG_SECONDARY)
+        xrd_label.SetBackgroundColour(BG_CARD)
+        xrd_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
+        xrd_sizer = wx.BoxSizer(wx.VERTICAL)
+        xrd_sizer.AddStretchSpacer(1)
+        xrd_row = wx.BoxSizer(wx.HORIZONTAL)
+        xrd_row.AddStretchSpacer(1)
+        xrd_row.Add(xrd_label, 0, wx.ALIGN_CENTER_VERTICAL)
+        xrd_row.AddStretchSpacer(1)
+        xrd_sizer.Add(xrd_row, 0, wx.EXPAND)
+        xrd_sizer.AddStretchSpacer(1)
+        xrd_page.SetSizer(xrd_sizer)
+
+        tabs.AddPage("Preview", self.preview)
+        tabs.AddPage("XRD centering", xrd_page)
+        return tabs
+
+    def _build_menu_bar(self) -> CrystalMenuBar | None:
         if sys.platform == "darwin":
             menu_bar = wx.MenuBar()
 
@@ -156,16 +195,20 @@ class MainView(wx.Frame):
             general_item = general_menu.Append(wx.ID_ANY, "General\tCtrl+1")
             menu_bar.Append(general_menu, "&General")
 
+            crysalis_menu = wx.Menu()
+            crysalis_item = crysalis_menu.Append(wx.ID_ANY, "CrysAlis\tCtrl+2")
+            menu_bar.Append(crysalis_menu, "&CrysAlis")
+
             detectors_menu = wx.Menu()
-            detectors_item = detectors_menu.Append(wx.ID_ANY, "Detectors\tCtrl+2")
+            detectors_item = detectors_menu.Append(wx.ID_ANY, "Detectors\tCtrl+3")
             menu_bar.Append(detectors_menu, "&Detectors")
 
             controllers_menu = wx.Menu()
-            controllers_item = controllers_menu.Append(wx.ID_ANY, "Controllers\tCtrl+3")
+            controllers_item = controllers_menu.Append(wx.ID_ANY, "Controllers\tCtrl+4")
             menu_bar.Append(controllers_menu, "C&ontrollers")
 
             positioners_menu = wx.Menu()
-            positioners_item = positioners_menu.Append(wx.ID_ANY, "Positioners\tCtrl+4")
+            positioners_item = positioners_menu.Append(wx.ID_ANY, "Positioners\tCtrl+5")
             menu_bar.Append(positioners_menu, "&Positioners")
 
             self.SetMenuBar(menu_bar)
@@ -174,13 +217,14 @@ class MainView(wx.Frame):
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._save_config_as_cb), save_as_item)
             self.Bind(wx.EVT_MENU, lambda _e: self.Close(), exit_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_general_cb), general_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_crysalis_cb), crysalis_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_detectors_cb), detectors_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_controllers_cb), controllers_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_positioners_cb), positioners_item)
             return None
 
-        bar = DarkMenuBar(self)
-        bar.append_menu(
+        bar = CrystalMenuBar(self)
+        bar.AppendMenu(
             title="File",
             items=["Load config", "Save config", "Save config as", None, "Exit"],
             shortcuts=["Ctrl+O", "Ctrl+S", "Ctrl+Shift+S", None, "Ctrl+Q"],
@@ -192,11 +236,12 @@ class MainView(wx.Frame):
                 self._on_exit,
             ],
         )
-        bar.append_action("General", lambda: self._fire(self._open_general_cb))
-        bar.append_action("Detectors", lambda: self._fire(self._open_detectors_cb))
-        bar.append_action("Controllers", lambda: self._fire(self._open_controllers_cb))
-        bar.append_action("Positioners", lambda: self._fire(self._open_positioners_cb))
-        bar.append_action("Scripts", lambda: self._fire(self._open_scripts_cb))
+        bar.AppendAction("General", lambda: self._fire(self._open_general_cb))
+        bar.AppendAction("CrysAlis", lambda: self._fire(self._open_crysalis_cb))
+        bar.AppendAction("Detectors", lambda: self._fire(self._open_detectors_cb))
+        bar.AppendAction("Controllers", lambda: self._fire(self._open_controllers_cb))
+        bar.AppendAction("Positioners", lambda: self._fire(self._open_positioners_cb))
+        bar.AppendAction("Scripts", lambda: self._fire(self._open_scripts_cb))
 
         accel = wx.AcceleratorTable(
             [
@@ -219,6 +264,7 @@ class MainView(wx.Frame):
         """Configures the main wx Frame of the application."""
         self.SetTitle(f"CrystalSweep - {self._version}")
         self.SetBackgroundColour(BG_SURFACE)
+        self._apply_app_icon()
 
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         if self._menu_bar is not None:
@@ -228,6 +274,22 @@ class MainView(wx.Frame):
         self.SetSizer(main_sizer)
         self.SetSize(1600, 900)
         self.SetMinSize((800, 520))
+
+    def _apply_app_icon(self) -> None:
+        """Sets the window/taskbar icon from the bundled PNG logo."""
+        logo = LOGO_PNG
+        if not logo.is_file():
+            return
+        image = wx.Image(str(logo), wx.BITMAP_TYPE_PNG)
+        if not image.IsOk():
+            return
+        bundle = wx.IconBundle()
+        for size in (16, 24, 32, 48, 64, 128, 256):
+            scaled = image.Scale(size, size, wx.IMAGE_QUALITY_HIGH)
+            icon = wx.Icon()
+            icon.CopyFromBitmap(wx.Bitmap(scaled))
+            bundle.AddIcon(icon)
+        self.SetIcons(bundle)
 
     def _update_left_min_size(self) -> None:
         min_w = self.collection_table.min_content_width
@@ -256,12 +318,12 @@ class MainView(wx.Frame):
     def _close_event_handler(self, event: wx.CloseEvent) -> None:
         """Runs when trying to close the main window."""
         if self._collecting:
-            result = DarkConfirmDialog(self, "Collection is in progress. Abort and close?", "Collection in Progress").ShowModal()
+            result = FlatConfirmDialog(self, "Collection is in progress. Abort and close?", "Collection in Progress", yes_scheme=DANGER_SCHEME, scheme=dialog_scheme()).ShowModal()
             if result == wx.ID_YES:
                 self._fire(self._abort_cb)
                 event.Skip()
             else:
                 event.Veto()
             return
-        result = DarkConfirmDialog(self, "Are you sure you want to close the application?", "Close Application").ShowModal()
+        result = FlatConfirmDialog(self, "Are you sure you want to close the application?", "Close Application", yes_scheme=DANGER_SCHEME, scheme=dialog_scheme()).ShowModal()
         event.Skip() if result == wx.ID_YES else event.Veto()

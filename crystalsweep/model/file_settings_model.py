@@ -18,6 +18,7 @@ from pathlib import Path
 
 __all__ = ["FileSettingsModel"]
 
+
 @dataclass()
 class FileSettingsModel:
     """Holds state for the file settings section of the GUI."""
@@ -32,8 +33,12 @@ class FileSettingsModel:
     use_cbf: bool = field(default=False)
     use_tif: bool = field(default=False)
 
+    use_snake_combine: bool = field(default=False)
+
     use_crysalis: bool = field(default=False)
     crysalis_calibration: Path | None = field(default=None)
+    crysalis_set_file: Path | None = field(default=None)
+    crysalis_ccd_file: Path | None = field(default=None)
 
     use_apex: bool = field(default=False)
     apex_calibration: Path | None = field(default=None)

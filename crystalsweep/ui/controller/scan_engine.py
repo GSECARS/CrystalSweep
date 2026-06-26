@@ -38,15 +38,26 @@ class ScanEngine:
 
     Supported scan types
     --------------------
-    still  — move rotation motor to rotation_start, trigger one detector frame.
+    still  — trigger one detector frame without moving the rotation motor.
     """
 
-    def __init__(self, script_model: ScriptModel | None = None) -> None:
+    def __init__(self, script_model: ScriptModel | None = None, controllers=None) -> None:
         self._driver = None
         self._thread: threading.Thread | None = None
         self._scripts = script_model
+        self._controllers = controllers
         self._shutter_open = False
         self._abort_event: threading.Event = threading.Event()
+
+    def _inject_shared_connection(self, params: dict, controller_name: str) -> None:
+        if self._controllers is None or not controller_name:
+            return
+        try:
+            conn = self._controllers.get(controller_name)
+        except Exception:
+            conn = None
+        if conn is not None:
+            params["_connection"] = conn
 
     @staticmethod
     def _open_shutter(config: BeamlineConfig) -> None:
@@ -119,6 +130,22 @@ class ScanEngine:
         if self._scripts is not None:
             self._scripts.call("post_scan", point, config)
 
+    def pre_collection(self, points: list[CollectionPoint], config: BeamlineConfig) -> str | None:
+        """Run once before the entire collection starts. Delegates to the user script if available.
+
+        Returns an error string to abort the collection, or None to proceed.
+        """
+        if self._scripts is not None:
+            result = self._scripts.call("pre_collection", points, config)
+            if isinstance(result, str):
+                return result
+        return None
+
+    def post_collection(self, points: list[CollectionPoint], config: BeamlineConfig) -> None:
+        """Run once after the entire collection completes. Delegates to the user script if available."""
+        if self._scripts is not None:
+            self._scripts.call("post_collection", points, config)
+
     def run_still(
         self,
         point: CollectionPoint,
@@ -128,8 +155,9 @@ class ScanEngine:
         file_settings: FileSettingsModel | None = None,
         on_file_number_updated: Callable[[int], None] | None = None,
         on_status: Callable[[str], None] | None = None,
+        keep_shutter_open: bool = False,
     ) -> None:
-        """Move rotation motor to rotation_start and trigger one detector frame."""
+        """Trigger one detector frame at the current rotation position."""
         if self.is_running:
             raise RuntimeError("A scan is already in progress.")
 
@@ -143,18 +171,11 @@ class ScanEngine:
             on_error(ValueError("No active detector configured."))
             return
 
-        try:
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError as exc:
-            on_error(exc)
+        exposure = point.parse_exposure()
+        if exposure is None:
+            on_error(ValueError("Exposure time is required."))
             return
 
-        try:
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-        except ValueError:
-            omega_start = 0.0
-
-        pv_base = rotation_cfg.pv.removesuffix(".VAL")
         detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
 
         def _worker() -> None:
@@ -164,19 +185,14 @@ class ScanEngine:
                 if self._abort_event.is_set():
                     on_done()
                     return
-                limit_err = check_soft_limits(rotation_cfg.pv, omega_start)
-                if limit_err:
-                    on_error(ValueError(f"Soft limit violation — {limit_err}"))
-                    return
-                if on_status:
-                    on_status("moving")
-                caput(f"{pv_base}.VAL", omega_start, wait=True)
-                if self._abort_event.is_set():
-                    on_done()
-                    return
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
+                if keep_shutter_open:
+                    self._open_shutter_once(config)
                 if self._abort_event.is_set():
                     on_done()
                     return
@@ -228,23 +244,16 @@ class ScanEngine:
             on_error(ValueError("No active detector configured."))
             return
 
-        try:
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-            omega_end = float(point.rotation_end) if point.rotation_end else 0.0
-            step_size = float(point.step) if point.step else 1.0
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError as exc:
-            on_error(exc)
+        params_parsed = point.parse_step_params()
+        if params_parsed is None:
+            on_error(ValueError("Step scan requires valid exposure, step size, rotation_start, and rotation_end."))
             return
 
-        if step_size <= 0:
-            on_error(ValueError(f"Step size must be > 0, got {step_size}."))
-            return
-        if omega_start == omega_end:
-            on_error(ValueError("rotation_start and rotation_end must differ for a step scan."))
-            return
-
-        n_frames = max(1, round(abs(omega_end - omega_start) / step_size))
+        exposure = params_parsed.exposure
+        step_size = params_parsed.step
+        omega_start = params_parsed.omega_start
+        omega_end = params_parsed.omega_end
+        n_frames = params_parsed.n_frames
 
         controller_cfg = next((c for c in config.controllers if c.name == rotation_cfg.controller), None)
         params = dict(controller_cfg.params) if controller_cfg else {}
@@ -252,6 +261,7 @@ class ScanEngine:
             params["xps_group"] = rotation_cfg.xps_group
         if rotation_cfg.xps_positioner:
             params["xps_positioner"] = rotation_cfg.xps_positioner
+        self._inject_shared_connection(params, rotation_cfg.controller)
 
         controller_type = controller_cfg.type if controller_cfg else rotation_cfg.controller
 
@@ -302,6 +312,7 @@ class ScanEngine:
                     self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
                     if on_status:
                         on_status("collecting")
+                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
                     for frame_idx in range(n_frames):
                         if self._abort_event.is_set() or self._driver is None:
                             break
@@ -334,7 +345,7 @@ class ScanEngine:
             self._thread.start()
 
         else:
-            _PLUGIN_MAP = {"hdf5": "HDF1", "cbf": "CBF1", "tif": "TIFF1"}
+            _PLUGIN_MAP = {"hdf5": "HDF1", "cbf": "TIFF1", "tif": "TIFF1"}
             plugin = _PLUGIN_MAP.get(det.file_format, "HDF1")
             capture_pv = f"{prefix}{plugin}:Capture_RBV"
 
@@ -465,17 +476,14 @@ class ScanEngine:
             on_error(ValueError("No active detector configured."))
             return
 
-        try:
-            omega_start = float(point.rotation_start) if point.rotation_start else 0.0
-            omega_end = float(point.rotation_end) if point.rotation_end else 0.0
-            exposure = float(point.time) if point.time else 1.0
-        except ValueError as exc:
-            on_error(exc)
+        wp = point.parse_wide_params()
+        if wp is None:
+            on_error(ValueError("Wide scan requires valid exposure, rotation_start, and rotation_end."))
             return
 
-        if omega_start == omega_end:
-            on_error(ValueError("rotation_start and rotation_end must differ for a wide scan."))
-            return
+        omega_start = wp.omega_start
+        omega_end = wp.omega_end
+        exposure = wp.exposure
 
         controller_cfg = next((c for c in config.controllers if c.name == rotation_cfg.controller), None)
         params = dict(controller_cfg.params) if controller_cfg else {}
@@ -483,8 +491,8 @@ class ScanEngine:
             params["xps_group"] = rotation_cfg.xps_group
         if rotation_cfg.xps_positioner:
             params["xps_positioner"] = rotation_cfg.xps_positioner
+        self._inject_shared_connection(params, rotation_cfg.controller)
 
-        omega_range = abs(omega_end - omega_start)
         spec = ScanSpec(
             pv=rotation_cfg.pv,
             start=omega_start,
@@ -526,18 +534,28 @@ class ScanEngine:
                 if self._abort_event.is_set():
                     on_done()
                     return
-                if on_status:
-                    on_status("preparing")
-                driver.prepare(spec)
-                if self._abort_event.is_set():
-                    on_done()
-                    return
+                # 1. Move to omega_start at the motor's current (fast) velocity,
+                #    BEFORE driver.prepare applies the slew velocity for the
+                #    exposure-controlled sweep.
                 if on_status:
                     on_status("moving")
                 caput(f"{pv_base}.VAL", omega_start, wait=True)
                 if self._abort_event.is_set():
                     on_done()
                     return
+
+                # 2. Prepare the driver — for EpicsScanModel this sets the
+                #    motor velocity so the slew start→end takes exactly
+                #    `exposure` seconds. The original velocity is restored by
+                #    driver.run / driver.abort.
+                if on_status:
+                    on_status("preparing")
+                driver.prepare(spec)
+                if self._abort_event.is_set():
+                    on_done()
+                    return
+
+                # 3. Open the shutter, then arm the detector, then slew.
                 self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
                 if self._abort_event.is_set():
                     on_done()
@@ -554,6 +572,13 @@ class ScanEngine:
                 _log.exception("ScanEngine wide-scan error")
                 on_error(exc)
             finally:
+                # Make sure the driver tears down any state it applied during
+                # prepare (e.g. EpicsScanModel's slew velocity) even if the
+                # scan errored or was aborted mid-flight.
+                try:
+                    driver.abort()
+                except Exception:
+                    _log.debug("ScanEngine wide: driver.abort during cleanup raised", exc_info=True)
                 if not keep_shutter_open:
                     self._close_shutter(config)
                 if disable_inc:
@@ -596,6 +621,7 @@ class ScanEngine:
             params["xps_group"] = motor_cfg.xps_group
         if motor_cfg.xps_positioner:
             params["xps_positioner"] = motor_cfg.xps_positioner
+        self._inject_shared_connection(params, motor_cfg.controller)
 
         spec = ScanSpec(
             pv=motor_cfg.pv,
@@ -664,6 +690,7 @@ class ScanEngine:
 
         controller_cfg = next((c for c in config.controllers if c.name == motor_cfg.controller), None)
         params = dict(controller_cfg.params) if controller_cfg else {}
+        self._inject_shared_connection(params, motor_cfg.controller)
         controller_type = controller_cfg.type if controller_cfg else motor_cfg.controller
 
         detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
@@ -675,7 +702,10 @@ class ScanEngine:
             prefix += ":"
         acquire_pv = f"{prefix}cam1:Acquire"
 
-        ref_point = row_points[0] if row_points else None
+        # Always derive the file basename/number from the forward-direction first
+        # point of the row (lowest map_col), so snake-reversed rows do not pick the
+        # row's last label and produce gaps like 0001, 0012, 0013, 0024, ...
+        ref_point = min(row_points, key=lambda p: getattr(p, "map_col", 0)) if row_points else None
 
         xps_group = params.get("xps_group") or motor_cfg.xps_group or ""
         xps_positioner = params.get("xps_positioner") or motor_cfg.xps_positioner or ""
@@ -703,11 +733,6 @@ class ScanEngine:
                 if self._abort_event.is_set():
                     on_done()
                     return
-                detector.arm_plugin(n_points)
-                self._open_shutter_once(config) if keep_shutter_open else self._open_shutter(config)
-                if self._abort_event.is_set():
-                    on_done()
-                    return
                 detector.collect_step(exposure, n_points)
                 if self._abort_event.is_set():
                     on_done()
@@ -721,13 +746,20 @@ class ScanEngine:
                     if self._abort_event.is_set():
                         on_done()
                         return
-                    driver.run_array(lambda i, pos: on_frame(i + 1, n_points), n_points)
+
+                    def _open_shutter_at_start() -> None:
+                        if keep_shutter_open:
+                            self._open_shutter_once(config)
+                        else:
+                            self._open_shutter(config)
+
+                    driver.run_array(lambda i, pos: on_frame(i + 1, n_points), n_points, on_at_start=_open_shutter_at_start)
                 else:
                     driver.prepare(spec)
                     if self._abort_event.is_set():
                         on_done()
                         return
-                    driver.run(spec, lambda i, pos: on_frame(i + 1, n_points))
+                    driver.run(spec, lambda i, pos: on_frame(i + 1, n_points), on_at_start=_open_shutter_at_start)
                 while caget(acquire_pv) and not self._abort_event.is_set():
                     time.sleep(0.05)
                 on_done()

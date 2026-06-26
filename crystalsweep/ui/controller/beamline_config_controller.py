@@ -23,6 +23,7 @@ import wx
 from crystalsweep.model import BeamlineConfig, MainModel
 from crystalsweep.ui.view import (
     ControllersConfigDialog,
+    CrysalisConfigDialog,
     DetectorsConfigDialog,
     GeneralConfigDialog,
     MainView,
@@ -48,11 +49,13 @@ class BeamlineConfigController:
         self._on_config_applied = on_config_applied
 
         self._general_dlg: GeneralConfigDialog | None = None
+        self._crysalis_dlg: CrysalisConfigDialog | None = None
         self._detectors_dlg: DetectorsConfigDialog | None = None
         self._controllers_dlg: ControllersConfigDialog | None = None
         self._positioners_dlg: PositionersConfigDialog | None = None
 
         self._view.bind_open_general(self.open_general)
+        self._view.bind_open_crysalis(self.open_crysalis)
         self._view.bind_open_detectors(self.open_detectors)
         self._view.bind_open_controllers(self.open_controllers)
         self._view.bind_open_positioners(self.open_positioners)
@@ -64,7 +67,7 @@ class BeamlineConfigController:
         return self._model.beamline.has_active
 
     def set_collecting(self, collecting: bool) -> None:
-        for dlg in (self._general_dlg, self._detectors_dlg, self._controllers_dlg, self._positioners_dlg):
+        for dlg in (self._general_dlg, self._crysalis_dlg, self._detectors_dlg, self._controllers_dlg, self._positioners_dlg):
             if dlg is not None:
                 if collecting:
                     dlg.Hide()
@@ -84,17 +87,21 @@ class BeamlineConfigController:
 
     def save_config(self) -> None:
         cfg = self._model.beamline.active
+        _log.info("save_config invoked (active name=%r)", cfg.name)
         if not cfg.name:
             self.save_config_as()
             return
         self._save(self._build_updated_config(cfg.name))
 
     def save_config_as(self) -> None:
+        _log.info("save_config_as invoked")
         with wx.TextEntryDialog(self._view, "Configuration name (e.g. 2026-2):", "Save configuration as") as dlg:
             if dlg.ShowModal() != wx.ID_OK:
+                _log.info("save_config_as cancelled by user")
                 return
             name = dlg.GetValue().strip()
         if not name:
+            _log.info("save_config_as aborted: empty name")
             return
         self._save(self._build_updated_config(name))
 
@@ -106,6 +113,15 @@ class BeamlineConfigController:
 
         self._general_dlg.config_panel.load_config(self._model.beamline.active)
         self._show(self._general_dlg)
+
+    def open_crysalis(self) -> None:
+        if self._crysalis_dlg is None:
+            self._crysalis_dlg = CrysalisConfigDialog(self._view)
+            self._crysalis_dlg.config_panel.bind_save(self.save_config)
+            self._crysalis_dlg.Bind(wx.EVT_CLOSE, lambda e: self._hide_dialog(self._crysalis_dlg, e))
+
+        self._crysalis_dlg.config_panel.load_config(self._model.beamline.active)
+        self._show(self._crysalis_dlg)
 
     def open_detectors(self) -> None:
         if self._detectors_dlg is None:
@@ -163,6 +179,8 @@ class BeamlineConfigController:
     def _reload_all_open(self, cfg: BeamlineConfig) -> None:
         if self._general_dlg is not None:
             self._general_dlg.config_panel.load_config(cfg)
+        if self._crysalis_dlg is not None:
+            self._crysalis_dlg.config_panel.load_config(cfg)
         if self._detectors_dlg is not None:
             self._detectors_dlg.config_panel.load_config(cfg)
         if self._controllers_dlg is not None:
@@ -192,8 +210,17 @@ class BeamlineConfigController:
         beamline = self._general_dlg.config_panel.beamline_name() if self._general_dlg else base.beamline
         abort_pvs = self._general_dlg.config_panel.collect_abort_pvs() if self._general_dlg else base.abort_pvs
         restore_pvs = self._general_dlg.config_panel.collect_restore_pvs() if self._general_dlg else base.restore_pvs
-        crysalis_par_path = self._general_dlg.config_panel.crysalis_par_path() if self._general_dlg else base.crysalis_par_path
-        crysalis_load_on_startup = self._general_dlg.config_panel.crysalis_load_on_startup() if self._general_dlg else base.crysalis_load_on_startup
+        crysalis_par_path = self._crysalis_dlg.config_panel.crysalis_par_path() if self._crysalis_dlg else base.crysalis_par_path
+        crysalis_set_path = self._crysalis_dlg.config_panel.crysalis_set_path() if self._crysalis_dlg else base.crysalis_set_path
+        crysalis_ccd_path = self._crysalis_dlg.config_panel.crysalis_ccd_path() if self._crysalis_dlg else base.crysalis_ccd_path
+        crysalis_load_on_startup = self._crysalis_dlg.config_panel.crysalis_load_on_startup() if self._crysalis_dlg else base.crysalis_load_on_startup
+        crysalis_wavelength = self._crysalis_dlg.config_panel.crysalis_wavelength() if self._crysalis_dlg else base.crysalis_wavelength
+        crysalis_distance = self._crysalis_dlg.config_panel.crysalis_distance() if self._crysalis_dlg else base.crysalis_distance
+        crysalis_center_x = self._crysalis_dlg.config_panel.crysalis_center_x() if self._crysalis_dlg else base.crysalis_center_x
+        crysalis_center_y = self._crysalis_dlg.config_panel.crysalis_center_y() if self._crysalis_dlg else base.crysalis_center_y
+        crysalis_alpha = self._crysalis_dlg.config_panel.crysalis_alpha() if self._crysalis_dlg else base.crysalis_alpha
+        crysalis_polarization = self._crysalis_dlg.config_panel.crysalis_polarization() if self._crysalis_dlg else base.crysalis_polarization
+        crysalis_pixel_size = self._crysalis_dlg.config_panel.crysalis_pixel_size() if self._crysalis_dlg else base.crysalis_pixel_size
         shutter_pv = self._general_dlg.config_panel.shutter_pv() if self._general_dlg else base.shutter_pv
         shutter_open_value = self._general_dlg.config_panel.shutter_open_value() if self._general_dlg else base.shutter_open_value
         shutter_close_value = self._general_dlg.config_panel.shutter_close_value() if self._general_dlg else base.shutter_close_value
@@ -201,8 +228,12 @@ class BeamlineConfigController:
 
         if self._detectors_dlg:
             detectors, active_detector = self._detectors_dlg.config_panel.collect_detectors()
+            preview_exposure, preview_timeout, preview_num_images = self._detectors_dlg.config_panel.collect_preview()
         else:
             detectors, active_detector = base.detectors, base.active_detector
+            preview_exposure = base.preview_exposure
+            preview_timeout = base.preview_timeout
+            preview_num_images = base.preview_num_images
 
         controllers = self._controllers_dlg.config_panel.collect_controllers() if self._controllers_dlg else base.controllers
 
@@ -223,26 +254,34 @@ class BeamlineConfigController:
             abort_pvs=abort_pvs,
             restore_pvs=restore_pvs,
             crysalis_par_path=crysalis_par_path,
+            crysalis_set_path=crysalis_set_path,
+            crysalis_ccd_path=crysalis_ccd_path,
             crysalis_load_on_startup=crysalis_load_on_startup,
+            crysalis_wavelength=crysalis_wavelength,
+            crysalis_distance=crysalis_distance,
+            crysalis_center_x=crysalis_center_x,
+            crysalis_center_y=crysalis_center_y,
+            crysalis_alpha=crysalis_alpha,
+            crysalis_polarization=crysalis_polarization,
+            crysalis_pixel_size=crysalis_pixel_size,
             shutter_pv=shutter_pv,
             shutter_open_value=shutter_open_value,
             shutter_close_value=shutter_close_value,
             shutter_delay=shutter_delay,
+            preview_exposure=preview_exposure,
+            preview_timeout=preview_timeout,
+            preview_num_images=preview_num_images,
         )
 
     def _save(self, config: BeamlineConfig) -> None:
-        if not config.detectors:
-            self._set_status_all("At least one detector is required.", error=True)
-            return
-
-        if config.rotation_motor is None or not config.rotation_motor.pv.strip():
-            self._set_status_all("Rotation stage PV is required.", error=True)
-            return
-
-        shorthands = [m.shorthand for m in config.motors if m.shorthand]
-        if len(shorthands) != len(set(shorthands)):
-            self._set_status_all("Motor shorthands must be unique.", error=True)
-            return
+        _log.info(
+            "Save requested: name=%r dir=%s detectors=%d rotation_motor=%s motors=%d",
+            config.name,
+            self._model.beamline.directory,
+            len(config.detectors),
+            (config.rotation_motor.pv if config.rotation_motor else None),
+            len(config.motors),
+        )
 
         all_motors = [config.rotation_motor] + list(config.motors) if config.rotation_motor else list(config.motors)
         pvs = [m.pv.strip() for m in all_motors if m.pv.strip()]
@@ -252,14 +291,18 @@ class BeamlineConfigController:
             if offline:
                 wx.CallAfter(self._set_status_all, f"Warning: PV(s) unreachable: {', '.join(offline)}", True)
 
-        threading.Thread(target=_check_pvs, daemon=True).start()
+        if pvs:
+            threading.Thread(target=_check_pvs, daemon=True).start()
 
         try:
             path = self._model.beamline.save(config)
         except Exception as exc:
             _log.exception("Failed to save beamline config %s", config.name)
             self._set_status_all(f"Save failed: {exc}", error=True)
+            wx.MessageBox(f"Save failed: {exc}", "Save error", wx.OK | wx.ICON_ERROR)
             return
+
+        _log.info("Save succeeded: %s", path)
 
         if config.controllers:
             self._model.controllers.apply_config(config.controllers)
@@ -269,6 +312,6 @@ class BeamlineConfigController:
         self._apply(config)
 
     def _set_status_all(self, text: str, error: bool = False) -> None:
-        for dlg in (self._general_dlg, self._detectors_dlg, self._controllers_dlg, self._positioners_dlg):
+        for dlg in (self._general_dlg, self._crysalis_dlg, self._detectors_dlg, self._controllers_dlg, self._positioners_dlg):
             if dlg is not None:
                 dlg.config_panel.set_status(text, error)

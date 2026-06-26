@@ -13,7 +13,7 @@
 
 [project]
 name = "crystalsweep"
-version = "0.1.0"
+version = "0.1.2"
 authors = [
     {name = "Christofanis Skordas", email = "55315750+skordaschristofanis@users.noreply.github.com"}
 ]
@@ -44,12 +44,14 @@ dependencies = [
     "tomli-w>=1.2.0",
     "vispy>=0.14.3",
     "wxpython>=4.2.5",
+    "wxutils>=0.0.1",
     "lz4>=4.4.5",
     "blosc>=1.11.4",
     "bitshuffle>=0.5.2",
     "pyepics>=3.5.9",
     "pyautomation>=0.0.1",
     "newportxps>=2026.1.1",
+    "cryio>=2018.5.30",
 ]
 
 [dependency-groups]
@@ -72,6 +74,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["crystalsweep"]
+include = ["crystalsweep/assets/*.png", "crystalsweep/assets/*.svg"]
 
 [tool.ruff]
 exclude = [
@@ -87,7 +90,7 @@ exclude = [
 ]
 line-length = 160
 indent-width = 4
-target-version = "py314"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]

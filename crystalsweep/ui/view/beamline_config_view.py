@@ -20,12 +20,14 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.icons import draw_folder
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, DANGER, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font
-from crystalsweep.ui.view.custom.widgets import DANGER_SCHEME, DarkCombo, DarkScrollBar, DarkTextCtrl, DarkToggle, FlatButton, IconButton, RadioDot
+from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME, RADIO_SCHEME, icon_scheme
+from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar, FlatRadioButton, FlatIconButton, FlatScrolledPanel, FlatTableHeader, FlatTableRow
 
 __all__ = [
     "GeneralConfigView",
     "GeneralConfigDialog",
+    "CrysalisConfigView",
+    "CrysalisConfigDialog",
     "DetectorsConfigView",
     "DetectorsConfigDialog",
     "ControllersConfigView",
@@ -124,98 +126,32 @@ class _Section(wx.Panel):
         self.SetSizer(sizer)
 
 
-class _TableHeader(wx.Panel):
-    """Painted column-header bar matching the collection table style."""
-
+class _TableHeader(FlatTableHeader):
+    """CS table header — passes CS theme colors to the generic base."""
     def __init__(self, parent: wx.Window, labels: list[str], proportions: list[int]) -> None:
-        super().__init__(parent, size=(-1, _HEADER_H), style=wx.BORDER_NONE)
-        self.SetBackgroundColour(_HEADER_BG)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self._labels = labels
-        self._proportions = proportions
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, lambda _e: self.Refresh())
-
-    def _col_widths(self, total: int) -> list[int]:
-        total_parts = sum(self._proportions)
-        if total_parts == 0:
-            return [0] * len(self._proportions)
-        widths = [total * p // total_parts for p in self._proportions]
-        widths[-1] += total - sum(widths)
-        return widths
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(_HEADER_BG))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        widths = self._col_widths(w)
-        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
-        gc.SetFont(font, ACCENT)
-        gc.SetPen(wx.Pen(_BORDER, 1))
-        x = 0
-        for i, (label, cw) in enumerate(zip(self._labels, widths)):
-            if label:
-                tw, th = gc.GetTextExtent(label)
-                gc.DrawText(label, x + (cw - tw) / 2, (h - th) / 2)
-            if i < len(widths) - 1:
-                gc.StrokeLine(x + cw, 0, x + cw, h)
-            x += cw
-        gc.SetPen(wx.Pen(_BORDER, 1))
-        gc.StrokeLine(0, h - 1, w, h - 1)
+        from crystalsweep.ui.view.custom.theme import ACCENT, SEP_COLOUR
+        super().__init__(parent, labels, proportions, height=_HEADER_H,
+                         scheme=(wx.Colour(22, 22, 26), SEP_COLOUR, ACCENT))
 
 
-class _TableRow(wx.Panel):
-    """Base for a painted data row with absolute-positioned controls."""
+class _TableRow(FlatTableRow):
+    """CS table row base — passes CS theme colors to the generic base."""
+    def __init__(self, parent: wx.Window, proportions: list[int]) -> None:
+        from crystalsweep.ui.view.custom.theme import SEP_COLOUR
+        super().__init__(parent, proportions, height=_ROW_H,
+                         scheme=(wx.Colour(22, 22, 26), SEP_COLOUR, wx.Colour(0, 0, 0)))
 
-    def __init__(self, parent: wx.Window, bg: wx.Colour, proportions: list[int]) -> None:
-        super().__init__(parent, size=(-1, _ROW_H), style=wx.BORDER_NONE)
-        self.SetBackgroundColour(bg)
-        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self._proportions = proportions
-        self.Bind(wx.EVT_PAINT, self._on_paint)
-        self.Bind(wx.EVT_SIZE, self._on_size)
+    def _row_bg(self) -> wx.Colour:
+        return BG_CARD
 
-    def _col_widths(self, total: int) -> list[int]:
-        total_parts = sum(self._proportions)
-        if total_parts == 0:
-            return [0] * len(self._proportions)
-        widths = [total * p // total_parts for p in self._proportions]
-        widths[-1] += total - sum(widths)
-        return widths
-
-    def _reposition(self) -> None:
-        """Subclasses place controls using _col_widths(self.GetClientSize().width)."""
-
-    def _on_paint(self, _: wx.PaintEvent) -> None:
-        dc = wx.AutoBufferedPaintDC(self)
-        gc = wx.GraphicsContext.Create(dc)
-        w, h = self.GetClientSize()
-        gc.SetBrush(wx.Brush(self.GetBackgroundColour()))
-        gc.SetPen(wx.TRANSPARENT_PEN)
-        gc.DrawRectangle(0, 0, w, h)
-        gc.SetPen(wx.Pen(_BORDER, 1))
-        gc.StrokeLine(0, h - 1, w, h - 1)
-        widths = self._col_widths(w)
-        x = 0
-        for i, cw in enumerate(widths[:-1]):
-            x += cw
-            gc.StrokeLine(x, 0, x, h)
-
-    def _on_size(self, event: wx.SizeEvent) -> None:
-        self._reposition()
-        self.Refresh()
-        event.Skip()
-
-    def _place(self, ctrl: wx.Window, x: int, cw: int) -> None:
-        ctrl.SetSize(x + _PAD, 4, cw - _PAD * 2, _ROW_H - 8)
 
 
 _DET_ROW_H = _ROW_H * 3 + 2
 _PLACEHOLDER_PATH_LOCAL = "e.g. T:\\ (leave blank to send as-is)"
 _PLACEHOLDER_PATH_REMOTE = "e.g. /home/dac_user/cars6/Data"
+_PLACEHOLDER_PREVIEW_EXPOSURE = "seconds (e.g. 0.1)"
+_PLACEHOLDER_PREVIEW_TIMEOUT = "seconds (e.g. 60)"
+_PLACEHOLDER_PREVIEW_NUM = "e.g. 1000000"
 
 
 class _DetectorRow(_TableRow):
@@ -230,42 +166,41 @@ class _DetectorRow(_TableRow):
         on_make_active: Callable[["_DetectorRow"], None],
         on_remove: Callable[["_DetectorRow"], None],
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self.SetMinSize((-1, _DET_ROW_H))
         self._on_make_active = on_make_active
         self._on_remove = on_remove
 
-        self.active_dot = RadioDot(self, value=active, tooltip="Set as active detector")
-        self.active_dot.set_action(lambda: on_make_active(self))
-        self.name_ctrl = DarkTextCtrl(self, value=detector.name, placeholder=_PLACEHOLDER_DETECTOR_NAME)
+        self.active_dot = FlatRadioButton(self, value=active, tooltip="Set as active detector", radio_scheme=RADIO_SCHEME)
+        self.active_dot.SetAction(lambda _e: on_make_active(self))
+        self.name_ctrl = FlatTextCtrl(self, value=detector.name, placeholder=_PLACEHOLDER_DETECTOR_NAME, text_scheme=TEXT_SCHEME)
         det_display = _DET_TYPE_TO_LABEL.get(detector.type, _DETECTOR_DISPLAY_NAMES[0])
         det_sel = _DETECTOR_DISPLAY_NAMES.index(det_display) if det_display in _DETECTOR_DISPLAY_NAMES else 0
-        self.type_combo = DarkCombo(self, choices=_DETECTOR_DISPLAY_NAMES, selection=det_sel)
+        self.type_combo = FlatCombo(self, choices=_DETECTOR_DISPLAY_NAMES, selection=det_sel, combo_scheme=COMBO_SCHEME)
         fmt_display = _FMT_KEY_TO_LABEL.get(detector.file_format, _FILE_FORMAT_DISPLAY_NAMES[0])
         fmt_sel = _FILE_FORMAT_DISPLAY_NAMES.index(fmt_display) if fmt_display in _FILE_FORMAT_DISPLAY_NAMES else 0
-        self.format_combo = DarkCombo(self, choices=_FILE_FORMAT_DISPLAY_NAMES, selection=fmt_sel)
-        self.prefix_ctrl = DarkTextCtrl(self, value=detector.pv_prefix, placeholder=_PLACEHOLDER_DETECTOR_PREFIX)
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self.format_combo = FlatCombo(self, choices=_FILE_FORMAT_DISPLAY_NAMES, selection=fmt_sel, combo_scheme=COMBO_SCHEME)
+        self.prefix_ctrl = FlatTextCtrl(self, value=detector.pv_prefix, placeholder=_PLACEHOLDER_DETECTOR_PREFIX, text_scheme=TEXT_SCHEME)
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
 
         self._template_lbl = wx.StaticText(self, label="File template")
         self._template_lbl.SetForegroundColour(FG_SECONDARY)
-        self._template_lbl.SetBackgroundColour(bg)
+        self._template_lbl.SetBackgroundColour(self._row_bg())
         self._template_lbl.SetFont(scaled_font(11))
-        self.template_ctrl = DarkTextCtrl(self, value=detector.file_template, placeholder=_PLACEHOLDER_FILE_TEMPLATE)
+        self.template_ctrl = FlatTextCtrl(self, value=detector.file_template, placeholder=_PLACEHOLDER_FILE_TEMPLATE, text_scheme=TEXT_SCHEME)
 
         self._path_local_lbl = wx.StaticText(self, label="Local prefix")
         self._path_local_lbl.SetForegroundColour(FG_SECONDARY)
-        self._path_local_lbl.SetBackgroundColour(bg)
+        self._path_local_lbl.SetBackgroundColour(self._row_bg())
         self._path_local_lbl.SetFont(scaled_font(11))
-        self.path_local_ctrl = DarkTextCtrl(self, value=detector.path_prefix_local, placeholder=_PLACEHOLDER_PATH_LOCAL)
+        self.path_local_ctrl = FlatTextCtrl(self, value=detector.path_prefix_local, placeholder=_PLACEHOLDER_PATH_LOCAL, text_scheme=TEXT_SCHEME)
 
         self._path_remote_lbl = wx.StaticText(self, label="Remote prefix")
         self._path_remote_lbl.SetForegroundColour(FG_SECONDARY)
-        self._path_remote_lbl.SetBackgroundColour(bg)
+        self._path_remote_lbl.SetBackgroundColour(self._row_bg())
         self._path_remote_lbl.SetFont(scaled_font(11))
-        self.path_remote_ctrl = DarkTextCtrl(self, value=detector.path_prefix_remote, placeholder=_PLACEHOLDER_PATH_REMOTE)
+        self.path_remote_ctrl = FlatTextCtrl(self, value=detector.path_prefix_remote, placeholder=_PLACEHOLDER_PATH_REMOTE, text_scheme=TEXT_SCHEME)
 
         self._reposition()
 
@@ -332,7 +267,7 @@ class _DetectorRow(_TableRow):
         )
 
     def set_active_visual(self, active: bool) -> None:
-        self.active_dot.set_value(active)
+        self.active_dot.SetValue(active)
 
 
 class _ControllerRow(_TableRow):
@@ -346,29 +281,28 @@ class _ControllerRow(_TableRow):
         on_remove: Callable[["_ControllerRow"], None],
         on_name_changed: Callable[[], None] | None = None,
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self._on_remove = on_remove
         self._on_name_changed = on_name_changed
 
-        self.name_ctrl = DarkTextCtrl(self, value=controller.name, placeholder=_PLACEHOLDER_CONTROLLER_NAME)
+        self.name_ctrl = FlatTextCtrl(self, value=controller.name, placeholder=_PLACEHOLDER_CONTROLLER_NAME, text_scheme=TEXT_SCHEME)
         self.name_ctrl.Bind(wx.EVT_TEXT, self._on_name_text)
         self.name_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_name_text)
 
         display = _TYPE_TO_LABEL.get(controller.type, _CONTROLLER_DISPLAY_NAMES[0])
         sel = _CONTROLLER_DISPLAY_NAMES.index(display) if display in _CONTROLLER_DISPLAY_NAMES else 0
-        self.type_combo = DarkCombo(self, choices=_CONTROLLER_DISPLAY_NAMES, selection=sel)
+        self.type_combo = FlatCombo(self, choices=_CONTROLLER_DISPLAY_NAMES, selection=sel, combo_scheme=COMBO_SCHEME)
         self.type_combo.Bind(wx.EVT_CHOICE, self._on_type_changed)
 
         self._params_panel = wx.Panel(self)
         self._params_panel.SetBackgroundColour(self.GetBackgroundColour())
         self._params_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self._params_panel.SetSizer(self._params_sizer)
-        self._param_ctrls: dict[str, DarkTextCtrl] = {}
+        self._param_ctrls: dict[str, FlatTextCtrl] = {}
         self._build_params(controller.type, controller.params)
 
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
         self._reposition()
 
     def _reposition(self) -> None:
@@ -392,9 +326,9 @@ class _ControllerRow(_TableRow):
         for key, placeholder in _CONTROLLER_TYPE_PARAMS.get(controller_type, []):
             lbl = wx.StaticText(self._params_panel, label=f"{key}:")
             lbl.SetForegroundColour(FG_SECONDARY)
-            lbl.SetBackgroundColour(bg)
+            lbl.SetBackgroundColour(self._row_bg())
             lbl.SetFont(scaled_font(11))
-            ctrl = DarkTextCtrl(self._params_panel, value=str(existing.get(key, "")), placeholder=placeholder)
+            ctrl = FlatTextCtrl(self._params_panel, value=str(existing.get(key, "")), placeholder=placeholder, text_scheme=TEXT_SCHEME)
             self._params_sizer.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 2)
             self._params_sizer.Add(ctrl, 1, wx.EXPAND | wx.RIGHT, 6)
             self._param_ctrls[key] = ctrl
@@ -426,23 +360,26 @@ class _ControllerRow(_TableRow):
 
 
 class _RotationRow(_TableRow):
-    _PROPS = [3, 6, 10, 2, 3, 7]
+    _PROPS = [3, 6, 10, 2, 3, 2, 7]
 
     def __init__(self, parent: wx.Window, motor: MotorConfig | None) -> None:
-        super().__init__(parent, BG_CARD, self._PROPS)
+        super().__init__(parent, self._PROPS)
         rm = motor
         self._controller_types: dict[str, str] = {}
 
-        self.short_ctrl = DarkTextCtrl(self, value=rm.shorthand if rm else "", placeholder=_PLACEHOLDER_ROTATION_SHORT)
-        self.description_ctrl = DarkTextCtrl(self, value=rm.description if rm else "", placeholder=_PLACEHOLDER_ROTATION_DESCRIPTION)
-        self.pv_ctrl = DarkTextCtrl(self, value=rm.pv if rm else "", placeholder=_PLACEHOLDER_ROTATION_PV)
-        self.precision_ctrl = DarkTextCtrl(self, value=str(rm.precision) if rm else "4", placeholder=_PLACEHOLDER_MOTOR_PRECISION)
-        self.beam_angle_ctrl = DarkTextCtrl(self, value=str(rm.beam_angle) if rm else "0.0", placeholder="0.0")
-        self.controller_combo = DarkCombo(self, choices=["epics"], selection=0)
+        self.short_ctrl = FlatTextCtrl(self, value=rm.shorthand if rm else "", placeholder=_PLACEHOLDER_ROTATION_SHORT, text_scheme=TEXT_SCHEME)
+        self.description_ctrl = FlatTextCtrl(self, value=rm.description if rm else "", placeholder=_PLACEHOLDER_ROTATION_DESCRIPTION, text_scheme=TEXT_SCHEME)
+        self.pv_ctrl = FlatTextCtrl(self, value=rm.pv if rm else "", placeholder=_PLACEHOLDER_ROTATION_PV, text_scheme=TEXT_SCHEME)
+        self.precision_ctrl = FlatTextCtrl(self, value=str(rm.precision) if rm else "4", placeholder=_PLACEHOLDER_MOTOR_PRECISION, text_scheme=TEXT_SCHEME)
+        self.beam_angle_ctrl = FlatTextCtrl(self, value=str(rm.beam_angle) if rm else "0.0", placeholder="0.0", text_scheme=TEXT_SCHEME)
+        self.centering_toggle = FlatCheckBox(self, "", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
+        self.centering_toggle.SetBackgroundColour(BG_CARD)
+        self.centering_toggle.SetValue(rm.centering_enabled if rm else False)
+        self.controller_combo = FlatCombo(self, choices=["epics"], selection=0, combo_scheme=COMBO_SCHEME)
         self.controller_combo.Bind(wx.EVT_CHOICE, lambda _e: self._on_controller_changed())
 
-        self.xps_group_ctrl = DarkTextCtrl(self, value=rm.xps_group if rm else "", placeholder=_PLACEHOLDER_XPS_GROUP)
-        self.xps_positioner_ctrl = DarkTextCtrl(self, value=rm.xps_positioner if rm else "", placeholder=_PLACEHOLDER_XPS_POSITIONER)
+        self.xps_group_ctrl = FlatTextCtrl(self, value=rm.xps_group if rm else "", placeholder=_PLACEHOLDER_XPS_GROUP, text_scheme=TEXT_SCHEME)
+        self.xps_positioner_ctrl = FlatTextCtrl(self, value=rm.xps_positioner if rm else "", placeholder=_PLACEHOLDER_XPS_POSITIONER, text_scheme=TEXT_SCHEME)
         self._reposition()
 
     def _is_xps(self) -> bool:
@@ -465,8 +402,11 @@ class _RotationRow(_TableRow):
         ):
             self._place(ctrl, x, cw)
             x += cw
+        tw, th = self.centering_toggle.GetBestSize()
+        self.centering_toggle.SetSize(x + (widths[5] - tw) // 2, (_ROW_H - th) // 2, tw, th)
+        x += widths[5]
         xps = self._is_xps()
-        ctrl_w = widths[5]
+        ctrl_w = widths[6]
         if xps:
             third = ctrl_w // 3
             self._place(self.controller_combo, x, third)
@@ -490,7 +430,7 @@ class _RotationRow(_TableRow):
 
 
 class _MotorRow(_TableRow):
-    _PROPS = [3, 6, 10, 2, 2, 6, 2]
+    _PROPS = [3, 6, 10, 2, 2, 2, 6, 2]
 
     def __init__(
         self,
@@ -501,29 +441,32 @@ class _MotorRow(_TableRow):
         index: int,
         on_remove: Callable[["_MotorRow"], None],
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self._controller_types = controller_types
 
-        self.shorthand_ctrl = DarkTextCtrl(self, value=motor.shorthand, placeholder=_PLACEHOLDER_MOTOR_SHORT)
-        self.description_ctrl = DarkTextCtrl(self, value=motor.description, placeholder=_PLACEHOLDER_MOTOR_DESCRIPTION)
-        self.pv_ctrl = DarkTextCtrl(self, value=motor.pv, placeholder=_PLACEHOLDER_MOTOR_PV)
-        self.precision_ctrl = DarkTextCtrl(self, value=str(motor.precision), placeholder=_PLACEHOLDER_MOTOR_PRECISION)
+        self.shorthand_ctrl = FlatTextCtrl(self, value=motor.shorthand, placeholder=_PLACEHOLDER_MOTOR_SHORT, text_scheme=TEXT_SCHEME)
+        self.description_ctrl = FlatTextCtrl(self, value=motor.description, placeholder=_PLACEHOLDER_MOTOR_DESCRIPTION, text_scheme=TEXT_SCHEME)
+        self.pv_ctrl = FlatTextCtrl(self, value=motor.pv, placeholder=_PLACEHOLDER_MOTOR_PV, text_scheme=TEXT_SCHEME)
+        self.precision_ctrl = FlatTextCtrl(self, value=str(motor.precision), placeholder=_PLACEHOLDER_MOTOR_PRECISION, text_scheme=TEXT_SCHEME)
 
-        self.mapping_toggle = DarkToggle(self, "")
-        self.mapping_toggle.SetBackgroundColour(bg)
+        self.mapping_toggle = FlatCheckBox(self, "", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
+        self.mapping_toggle.SetBackgroundColour(self._row_bg())
         self.mapping_toggle.SetValue(motor.mapping_enabled)
+
+        self.centering_toggle = FlatCheckBox(self, "", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
+        self.centering_toggle.SetBackgroundColour(self._row_bg())
+        self.centering_toggle.SetValue(motor.centering_enabled)
 
         controller_choices = ["epics"] + controller_names
         sel = controller_choices.index(motor.controller) if motor.controller in controller_choices else 0
-        self.controller_combo = DarkCombo(self, choices=controller_choices, selection=sel)
+        self.controller_combo = FlatCombo(self, choices=controller_choices, selection=sel, combo_scheme=COMBO_SCHEME)
         self.controller_combo.Bind(wx.EVT_CHOICE, lambda _e: self._on_controller_changed())
 
-        self.xps_group_ctrl = DarkTextCtrl(self, value=motor.xps_group, placeholder=_PLACEHOLDER_XPS_GROUP)
-        self.xps_positioner_ctrl = DarkTextCtrl(self, value=motor.xps_positioner, placeholder=_PLACEHOLDER_XPS_POSITIONER)
+        self.xps_group_ctrl = FlatTextCtrl(self, value=motor.xps_group, placeholder=_PLACEHOLDER_XPS_GROUP, text_scheme=TEXT_SCHEME)
+        self.xps_positioner_ctrl = FlatTextCtrl(self, value=motor.xps_positioner, placeholder=_PLACEHOLDER_XPS_POSITIONER, text_scheme=TEXT_SCHEME)
 
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
         self._reposition()
 
     def _is_xps(self) -> bool:
@@ -549,8 +492,11 @@ class _MotorRow(_TableRow):
         tw, th = self.mapping_toggle.GetBestSize()
         self.mapping_toggle.SetSize(x + (widths[4] - tw) // 2, (_ROW_H - th) // 2, tw, th)
         x += widths[4]
+        ctw, cth = self.centering_toggle.GetBestSize()
+        self.centering_toggle.SetSize(x + (widths[5] - ctw) // 2, (_ROW_H - cth) // 2, ctw, cth)
+        x += widths[5]
         xps = self._is_xps()
-        ctrl_w = widths[5]
+        ctrl_w = widths[6]
         if xps:
             third = ctrl_w // 3
             self._place(self.controller_combo, x, third)
@@ -563,7 +509,7 @@ class _MotorRow(_TableRow):
             self.xps_group_ctrl.Hide()
             self.xps_positioner_ctrl.Hide()
         x += ctrl_w
-        self._place(self._remove_btn, x, widths[6])
+        self._place(self._remove_btn, x, widths[7])
 
     def update_controller_choices(self, controller_names: list[str], controller_types: dict[str, str] | None = None) -> None:
         if controller_types is not None:
@@ -587,6 +533,7 @@ class _MotorRow(_TableRow):
             pv=self.pv_ctrl.GetValue().strip(),
             precision=precision,
             mapping_enabled=self.mapping_toggle.GetValue(),
+            centering_enabled=self.centering_toggle.GetValue(),
             controller=self.controller_combo.GetStringSelection() or "epics",
             xps_group=self.xps_group_ctrl.GetValue().strip() if self._is_xps() else "",
             xps_positioner=self.xps_positioner_ctrl.GetValue().strip() if self._is_xps() else "",
@@ -607,94 +554,9 @@ def _status_label(parent: wx.Panel) -> wx.StaticText:
     return lbl
 
 
-class _DarkScrolledPanel(wx.Panel):
-    """A viewport + DarkScrollBar container that replaces wx.ScrolledWindow for
-    dark-themed table rows. Children are stacked in a vertical sizer inside a
-    plain panel; the DarkScrollBar keeps them in sync."""
 
-    def __init__(self, parent: wx.Window, row_height: int = _ROW_H) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
-        self.SetBackgroundColour(BG_CARD)
-        self._row_h = row_height
-        self._offset: int = 0
 
-        self._viewport = wx.Panel(self, style=wx.BORDER_NONE)
-        self._viewport.SetBackgroundColour(BG_CARD)
-
-        self.rows_sizer = wx.BoxSizer(wx.VERTICAL)
-        self._content = wx.Panel(self._viewport, style=wx.BORDER_NONE)
-        self._content.SetBackgroundColour(BG_CARD)
-        self._content.SetSizer(self.rows_sizer)
-
-        self._scrollbar = DarkScrollBar(self, on_scroll=self._on_sb_scroll)
-
-        outer = wx.BoxSizer(wx.HORIZONTAL)
-        outer.Add(self._viewport, 1, wx.EXPAND)
-        outer.Add(self._scrollbar, 0, wx.EXPAND)
-        self.SetSizer(outer)
-
-        self._viewport.Bind(wx.EVT_SIZE, self._on_viewport_size)
-        self._viewport.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
-        self._content.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
-
-    def add_row(self, row: wx.Window) -> None:
-        self.rows_sizer.Add(row, 0, wx.EXPAND)
-        self._content.Layout()
-        self._sync()
-
-    def remove_row(self, row: wx.Window) -> None:
-        self.rows_sizer.Detach(row)
-        self._content.Layout()
-        self._sync()
-
-    def clear_rows(self) -> None:
-        self.rows_sizer.Clear(delete_windows=False)
-        self._content.Layout()
-        self._sync()
-
-    def bind_mousewheel(self, window: wx.Window) -> None:
-        window.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
-
-    def _content_height(self) -> int:
-        return self._content.GetBestSize().height
-
-    def _viewport_height(self) -> int:
-        return self._viewport.GetClientSize().height
-
-    def _max_offset(self) -> int:
-        return max(0, self._content_height() - self._viewport_height())
-
-    def _apply_offset(self) -> None:
-        self._offset = max(0, min(self._offset, self._max_offset()))
-        w = self._viewport.GetClientSize().width
-        h = max(self._content_height(), self._viewport_height())
-        self._content.SetSize(0, -self._offset, w, h)
-        self._sync_scrollbar()
-
-    def _sync_scrollbar(self) -> None:
-        total = self._content_height()
-        visible = self._viewport_height()
-        if total <= visible:
-            self._scrollbar.update(0.0, 1.0)
-        else:
-            self._scrollbar.update(self._offset / (total - visible), visible / total)
-
-    def _sync(self) -> None:
-        self._apply_offset()
-
-    def _on_sb_scroll(self, fraction: float) -> None:
-        self._offset = int(fraction * self._max_offset())
-        self._apply_offset()
-
-    def _on_viewport_size(self, event: wx.SizeEvent) -> None:
-        event.Skip()
-        self._apply_offset()
-
-    def _on_wheel(self, event: wx.MouseEvent) -> None:
-        delta = event.GetWheelRotation() // event.GetWheelDelta()
-        self._offset = max(0, min(self._offset - delta * self._row_h, self._max_offset()))
-        self._apply_offset()
-        event.Skip()
+_DET_ROW_H = _ROW_H * 3 + 2
 
 
 class _AbortPvRow(_TableRow):
@@ -708,13 +570,12 @@ class _AbortPvRow(_TableRow):
         index: int,
         on_remove: Callable[["_AbortPvRow"], None],
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self._on_remove = on_remove
-        self.pv_ctrl = DarkTextCtrl(self, value=pv, placeholder="e.g. 13IDD:STOP")
-        self.value_ctrl = DarkTextCtrl(self, value=value, placeholder="e.g. 1")
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self.pv_ctrl = FlatTextCtrl(self, value=pv, placeholder="e.g. 13IDD:STOP", text_scheme=TEXT_SCHEME)
+        self.value_ctrl = FlatTextCtrl(self, value=value, placeholder="e.g. 1", text_scheme=TEXT_SCHEME)
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
         self._reposition()
 
     def _reposition(self) -> None:
@@ -743,12 +604,11 @@ class _RestorePvRow(_TableRow):
         index: int,
         on_remove: Callable[["_RestorePvRow"], None],
     ) -> None:
-        bg = BG_CARD if index % 2 == 0 else _ROW_ALT
-        super().__init__(parent, bg, self._PROPS)
+        super().__init__(parent, self._PROPS)
         self._on_remove = on_remove
-        self.pv_ctrl = DarkTextCtrl(self, value=pv, placeholder="e.g. 13IDD:SomePV.VAL")
-        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME)
-        self._remove_btn.set_action(lambda: on_remove(self))
+        self.pv_ctrl = FlatTextCtrl(self, value=pv, placeholder="e.g. 13IDD:SomePV.VAL", text_scheme=TEXT_SCHEME)
+        self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn.SetAction(lambda _e: on_remove(self))
         self._reposition()
 
     def _reposition(self) -> None:
@@ -780,39 +640,22 @@ class GeneralConfigView(wx.Panel):
     def _build_layout(self) -> None:
         self._beamline_section = _Section(self, "Beamline")
         b_body = self._beamline_section.body
-        self._beamline_ctrl = DarkTextCtrl(b_body, placeholder=_PLACEHOLDER_BEAMLINE)
+        self._beamline_ctrl = FlatTextCtrl(b_body, placeholder=_PLACEHOLDER_BEAMLINE, text_scheme=TEXT_SCHEME)
         self._beamline_ctrl.SetMinSize((-1, 28))
         b_sizer = wx.BoxSizer(wx.VERTICAL)
         b_sizer.Add(_label(b_body, "Name", secondary=True), 0, wx.BOTTOM, 4)
         b_sizer.Add(self._beamline_ctrl, 0, wx.EXPAND)
         b_body.SetSizer(b_sizer)
 
-        self._crysalis_section = _Section(self, "CrysAlis")
-        c_body = self._crysalis_section.body
-        self._crysalis_par_ctrl = DarkTextCtrl(c_body, placeholder="Path to .par calibration file")
-        self._crysalis_par_ctrl.SetMinSize((-1, 28))
-        self._crysalis_par_btn = IconButton(c_body, draw_folder, size=16, tooltip="Browse for .par file", bg=POPUP_BG)
-        self._crysalis_par_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_par())
-        par_row = wx.BoxSizer(wx.HORIZONTAL)
-        par_row.Add(self._crysalis_par_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        par_row.AddSpacer(4)
-        par_row.Add(self._crysalis_par_btn, 0, wx.ALIGN_CENTER_VERTICAL)
-        self._crysalis_startup_chk = DarkToggle(c_body, "Load on startup")
-        c_sizer = wx.BoxSizer(wx.VERTICAL)
-        c_sizer.Add(_label(c_body, "PAR file", secondary=True), 0, wx.BOTTOM, 4)
-        c_sizer.Add(par_row, 0, wx.EXPAND | wx.BOTTOM, 8)
-        c_sizer.Add(self._crysalis_startup_chk, 0)
-        c_body.SetSizer(c_sizer)
-
         self._scan_section = _Section(self, "Shutter")
         sc_body = self._scan_section.body
-        self._shutter_pv_ctrl = DarkTextCtrl(sc_body, placeholder="e.g. 13IDD:Unidig1Bo0")
+        self._shutter_pv_ctrl = FlatTextCtrl(sc_body, placeholder="e.g. 13IDD:Unidig1Bo0", text_scheme=TEXT_SCHEME)
         self._shutter_pv_ctrl.SetMinSize((-1, 28))
-        self._shutter_open_ctrl = DarkTextCtrl(sc_body, placeholder="e.g. 1")
+        self._shutter_open_ctrl = FlatTextCtrl(sc_body, placeholder="e.g. 1", text_scheme=TEXT_SCHEME)
         self._shutter_open_ctrl.SetMinSize((-1, 28))
-        self._shutter_close_ctrl = DarkTextCtrl(sc_body, placeholder="e.g. 0")
+        self._shutter_close_ctrl = FlatTextCtrl(sc_body, placeholder="e.g. 0", text_scheme=TEXT_SCHEME)
         self._shutter_close_ctrl.SetMinSize((-1, 28))
-        self._shutter_delay_ctrl = DarkTextCtrl(sc_body, value="0.0", placeholder="e.g. 0.2")
+        self._shutter_delay_ctrl = FlatTextCtrl(sc_body, value="0.0", placeholder="e.g. 0.2", text_scheme=TEXT_SCHEME)
         self._shutter_delay_ctrl.SetMinSize((-1, 28))
         sc_sizer = wx.BoxSizer(wx.VERTICAL)
         sc_sizer.Add(_label(sc_body, "PV", secondary=True), 0, wx.BOTTOM, 4)
@@ -834,13 +677,13 @@ class GeneralConfigView(wx.Panel):
         self._abort_section = _Section(self, "Abort PVs")
         a_body = self._abort_section.body
         self._abort_header = _TableHeader(a_body, ["PV", "Value", ""], [6, 3, 1])
-        self._abort_rows_panel = _DarkScrolledPanel(a_body)
+        self._abort_rows_panel = FlatScrolledPanel(a_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                    header=self._abort_header)
         self._abort_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_abort_btn = FlatButton(a_body, "+ Add abort PV")
+        self._add_abort_btn = FlatButton(a_body, "+ Add abort PV", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_abort_btn.SetMinSize((-1, 26))
-        self._add_abort_btn.set_action(self._on_add_abort_pv_clicked)
+        self._add_abort_btn.SetAction(self._on_add_abort_pv_clicked)
         a_sizer = wx.BoxSizer(wx.VERTICAL)
-        a_sizer.Add(self._abort_header, 0, wx.EXPAND)
         a_sizer.Add(self._abort_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         a_sizer.Add(self._add_abort_btn, 0, wx.EXPAND)
         a_body.SetSizer(a_sizer)
@@ -848,13 +691,13 @@ class GeneralConfigView(wx.Panel):
         self._restore_section = _Section(self, "Restore PVs")
         r_body = self._restore_section.body
         self._restore_header = _TableHeader(r_body, ["PV", ""], [9, 1])
-        self._restore_rows_panel = _DarkScrolledPanel(r_body)
+        self._restore_rows_panel = FlatScrolledPanel(r_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                      header=self._restore_header)
         self._restore_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_restore_btn = FlatButton(r_body, "+ Add restore PV")
+        self._add_restore_btn = FlatButton(r_body, "+ Add restore PV", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_restore_btn.SetMinSize((-1, 26))
-        self._add_restore_btn.set_action(self._on_add_restore_pv_clicked)
+        self._add_restore_btn.SetAction(self._on_add_restore_pv_clicked)
         r_sizer = wx.BoxSizer(wx.VERTICAL)
-        r_sizer.Add(self._restore_header, 0, wx.EXPAND)
         r_sizer.Add(self._restore_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         r_sizer.Add(self._add_restore_btn, 0, wx.EXPAND)
         r_body.SetSizer(r_sizer)
@@ -863,7 +706,6 @@ class GeneralConfigView(wx.Panel):
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(self._beamline_section, 0, wx.EXPAND | wx.ALL, 10)
-        outer.Add(self._crysalis_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._scan_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._abort_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._restore_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
@@ -876,8 +718,6 @@ class GeneralConfigView(wx.Panel):
 
     def load_config(self, config: BeamlineConfig) -> None:
         self._beamline_ctrl.SetValue(config.beamline)
-        self._crysalis_par_ctrl.SetValue(config.crysalis_par_path)
-        self._crysalis_startup_chk.SetValue(config.crysalis_load_on_startup)
         self._shutter_pv_ctrl.SetValue(config.shutter_pv)
         self._shutter_open_ctrl.SetValue(config.shutter_open_value)
         self._shutter_close_ctrl.SetValue(config.shutter_close_value)
@@ -893,12 +733,6 @@ class GeneralConfigView(wx.Panel):
     def beamline_name(self) -> str:
         return self._beamline_ctrl.GetValue().strip()
 
-    def crysalis_par_path(self) -> str:
-        return self._crysalis_par_ctrl.GetValue().strip()
-
-    def crysalis_load_on_startup(self) -> bool:
-        return self._crysalis_startup_chk.GetValue()
-
     def shutter_pv(self) -> str:
         return self._shutter_pv_ctrl.GetValue().strip()
 
@@ -913,17 +747,6 @@ class GeneralConfigView(wx.Panel):
             return float(self._shutter_delay_ctrl.GetValue())
         except ValueError:
             return 0.0
-
-    def _browse_crysalis_par(self) -> None:
-        with wx.FileDialog(
-            self,
-            "Select CrysAlis PAR calibration file",
-            wildcard="PAR files (*.par)|*.par" + ("|All files (*.*)|*.*" if sys.platform == "win32" else ""),
-            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
-        ) as dlg:
-            if dlg.ShowModal() == wx.ID_CANCEL:
-                return
-            self._crysalis_par_ctrl.SetValue(dlg.GetPath())
 
     def collect_abort_pvs(self) -> tuple[tuple[str, str], ...]:
         return tuple(row.to_abort_pv() for row in self._abort_pv_rows if row.to_abort_pv()[0])
@@ -942,7 +765,7 @@ class GeneralConfigView(wx.Panel):
 
     def _clear_abort_pv_rows(self) -> None:
         for row in self._abort_pv_rows:
-            self._abort_rows_panel.remove_row(row)
+            self._abort_rows_panel.RemoveRow(row)
             row.Destroy()
         self._abort_pv_rows.clear()
 
@@ -955,24 +778,24 @@ class GeneralConfigView(wx.Panel):
             index,
             on_remove=self._on_remove_abort_pv,
         )
-        self._abort_rows_panel.bind_mousewheel(row)
+        self._abort_rows_panel.BindMouseWheel(row)
         self._abort_pv_rows.append(row)
-        self._abort_rows_panel.add_row(row)
+        self._abort_rows_panel.AddRow(row)
 
-    def _on_add_abort_pv_clicked(self) -> None:
+    def _on_add_abort_pv_clicked(self, _e=None) -> None:
         self._append_abort_pv_row()
 
     def _on_remove_abort_pv(self, row: _AbortPvRow) -> None:
         if row not in self._abort_pv_rows:
             return
         self._abort_pv_rows.remove(row)
-        self._abort_rows_panel.remove_row(row)
-        row.Destroy()
+        self._abort_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         self.Layout()
 
     def _clear_restore_pv_rows(self) -> None:
         for row in self._restore_pv_rows:
-            self._restore_rows_panel.remove_row(row)
+            self._restore_rows_panel.RemoveRow(row)
             row.Destroy()
         self._restore_pv_rows.clear()
 
@@ -984,20 +807,225 @@ class GeneralConfigView(wx.Panel):
             index,
             on_remove=self._on_remove_restore_pv,
         )
-        self._restore_rows_panel.bind_mousewheel(row)
+        self._restore_rows_panel.BindMouseWheel(row)
         self._restore_pv_rows.append(row)
-        self._restore_rows_panel.add_row(row)
+        self._restore_rows_panel.AddRow(row)
 
-    def _on_add_restore_pv_clicked(self) -> None:
+    def _on_add_restore_pv_clicked(self, _e=None) -> None:
         self._append_restore_pv_row()
 
     def _on_remove_restore_pv(self, row: _RestorePvRow) -> None:
         if row not in self._restore_pv_rows:
             return
         self._restore_pv_rows.remove(row)
-        self._restore_rows_panel.remove_row(row)
-        row.Destroy()
+        self._restore_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         self.Layout()
+
+
+class CrysalisConfigView(wx.Panel):
+    """CrysAlis configuration: PAR, SET, and CCD calibration file paths."""
+
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent)
+        self.SetBackgroundColour(POPUP_BG)
+        self.SetForegroundColour(POPUP_FG)
+        self._on_save_cb: Callable[[], None] | None = None
+        self._build_layout()
+
+    def _build_layout(self) -> None:
+        self._crysalis_section = _Section(self, "CrysAlis")
+        c_body = self._crysalis_section.body
+
+        self._crysalis_par_ctrl = FlatTextCtrl(c_body, placeholder="Path to .par calibration file", text_scheme=TEXT_SCHEME)
+        self._crysalis_par_ctrl.SetMinSize((-1, 28))
+        self._crysalis_par_btn = FlatIconButton(c_body, draw_folder, icon_size=16, tooltip="Browse for .par file", icon_scheme=icon_scheme(POPUP_BG))
+        self._crysalis_par_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_par())
+        par_row = wx.BoxSizer(wx.HORIZONTAL)
+        par_row.Add(self._crysalis_par_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        par_row.AddSpacer(4)
+        par_row.Add(self._crysalis_par_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        self._crysalis_set_ctrl = FlatTextCtrl(c_body, placeholder="Path to .set file (optional, derived from PAR if blank)", text_scheme=TEXT_SCHEME)
+        self._crysalis_set_ctrl.SetMinSize((-1, 28))
+        self._crysalis_set_btn = FlatIconButton(c_body, draw_folder, icon_size=16, tooltip="Browse for .set file", icon_scheme=icon_scheme(POPUP_BG))
+        self._crysalis_set_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_set())
+        set_row = wx.BoxSizer(wx.HORIZONTAL)
+        set_row.Add(self._crysalis_set_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        set_row.AddSpacer(4)
+        set_row.Add(self._crysalis_set_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        self._crysalis_ccd_ctrl = FlatTextCtrl(c_body, placeholder="Path to .ccd file (optional, derived from PAR if blank)", text_scheme=TEXT_SCHEME)
+        self._crysalis_ccd_ctrl.SetMinSize((-1, 28))
+        self._crysalis_ccd_btn = FlatIconButton(c_body, draw_folder, icon_size=16, tooltip="Browse for .ccd file", icon_scheme=icon_scheme(POPUP_BG))
+        self._crysalis_ccd_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_crysalis_ccd())
+        ccd_row = wx.BoxSizer(wx.HORIZONTAL)
+        ccd_row.Add(self._crysalis_ccd_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        ccd_row.AddSpacer(4)
+        ccd_row.Add(self._crysalis_ccd_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        self._crysalis_startup_chk = FlatCheckBox(c_body, "Load on startup", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
+
+        c_sizer = wx.BoxSizer(wx.VERTICAL)
+        c_sizer.Add(_label(c_body, "PAR file", secondary=True), 0, wx.BOTTOM, 4)
+        c_sizer.Add(par_row, 0, wx.EXPAND | wx.BOTTOM, 8)
+        c_sizer.Add(_label(c_body, "SET file", secondary=True), 0, wx.BOTTOM, 4)
+        c_sizer.Add(set_row, 0, wx.EXPAND | wx.BOTTOM, 8)
+        c_sizer.Add(_label(c_body, "CCD file", secondary=True), 0, wx.BOTTOM, 4)
+        c_sizer.Add(ccd_row, 0, wx.EXPAND | wx.BOTTOM, 8)
+        c_sizer.Add(self._crysalis_startup_chk, 0)
+        c_body.SetSizer(c_sizer)
+
+        self._geometry_section = _Section(self, "Geometry")
+        g_body = self._geometry_section.body
+
+        self._wavelength_ctrl = FlatTextCtrl(g_body, value="0.2952", placeholder="e.g. 0.2952", text_scheme=TEXT_SCHEME)
+        self._wavelength_ctrl.SetRestrictToFloat(True)
+        self._wavelength_ctrl.SetMinSize((-1, 28))
+        self._distance_ctrl = FlatTextCtrl(g_body, value="200.0", placeholder="e.g. 200.0", text_scheme=TEXT_SCHEME)
+        self._distance_ctrl.SetRestrictToFloat(True)
+        self._distance_ctrl.SetMinSize((-1, 28))
+        self._center_x_ctrl = FlatTextCtrl(g_body, value="0.0", placeholder="e.g. 1556.0", text_scheme=TEXT_SCHEME)
+        self._center_x_ctrl.SetRestrictToFloat(True)
+        self._center_x_ctrl.SetMinSize((-1, 28))
+        self._center_y_ctrl = FlatTextCtrl(g_body, value="0.0", placeholder="e.g. 1634.0", text_scheme=TEXT_SCHEME)
+        self._center_y_ctrl.SetRestrictToFloat(True)
+        self._center_y_ctrl.SetMinSize((-1, 28))
+        self._alpha_ctrl = FlatTextCtrl(g_body, value="50.0", placeholder="e.g. 50.0", text_scheme=TEXT_SCHEME)
+        self._alpha_ctrl.SetRestrictToFloat(True)
+        self._alpha_ctrl.SetMinSize((-1, 28))
+        self._polarization_ctrl = FlatTextCtrl(g_body, value="0.99", placeholder="e.g. 0.99", text_scheme=TEXT_SCHEME)
+        self._polarization_ctrl.SetRestrictToFloat(True)
+        self._polarization_ctrl.SetMinSize((-1, 28))
+        self._pixel_size_ctrl = FlatTextCtrl(g_body, value="0.075", placeholder="e.g. 0.075", text_scheme=TEXT_SCHEME)
+        self._pixel_size_ctrl.SetRestrictToFloat(True)
+        self._pixel_size_ctrl.SetMinSize((-1, 28))
+
+        g_grid = wx.FlexGridSizer(rows=7, cols=2, vgap=6, hgap=8)
+        g_grid.AddGrowableCol(1, 1)
+        for label_text, ctrl in (
+            ("Wavelength (Å)", self._wavelength_ctrl),
+            ("Distance (mm)", self._distance_ctrl),
+            ("Beam center X (px)", self._center_x_ctrl),
+            ("Beam center Y (px)", self._center_y_ctrl),
+            ("Alpha (°)", self._alpha_ctrl),
+            ("Polarization", self._polarization_ctrl),
+            ("Pixel size (mm)", self._pixel_size_ctrl),
+        ):
+            lbl = wx.StaticText(g_body, label=label_text)
+            lbl.SetForegroundColour(FG_SECONDARY)
+            lbl.SetBackgroundColour(g_body.GetBackgroundColour())
+            lbl.SetFont(scaled_font(11))
+            g_grid.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+            g_grid.Add(ctrl, 0, wx.EXPAND)
+        g_body.SetSizer(g_grid)
+
+        self._status_label = _status_label(self)
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+        outer.Add(self._crysalis_section, 0, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._geometry_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.SetSizer(outer)
+        self.SetMinSize((400, -1))
+
+    def bind_save(self, callback: Callable[[], None]) -> None:
+        self._on_save_cb = callback
+
+    def load_config(self, config: BeamlineConfig) -> None:
+        self._crysalis_par_ctrl.SetValue(config.crysalis_par_path)
+        self._crysalis_set_ctrl.SetValue(config.crysalis_set_path)
+        self._crysalis_ccd_ctrl.SetValue(config.crysalis_ccd_path)
+        self._crysalis_startup_chk.SetValue(config.crysalis_load_on_startup)
+        self._wavelength_ctrl.SetValue(f"{config.crysalis_wavelength:g}")
+        self._distance_ctrl.SetValue(f"{config.crysalis_distance:g}")
+        self._center_x_ctrl.SetValue(f"{config.crysalis_center_x:g}")
+        self._center_y_ctrl.SetValue(f"{config.crysalis_center_y:g}")
+        self._alpha_ctrl.SetValue(f"{config.crysalis_alpha:g}")
+        self._polarization_ctrl.SetValue(f"{config.crysalis_polarization:g}")
+        self._pixel_size_ctrl.SetValue(f"{config.crysalis_pixel_size:g}")
+        self.set_status("")
+
+    def crysalis_par_path(self) -> str:
+        return self._crysalis_par_ctrl.GetValue().strip()
+
+    def crysalis_set_path(self) -> str:
+        return self._crysalis_set_ctrl.GetValue().strip()
+
+    def crysalis_ccd_path(self) -> str:
+        return self._crysalis_ccd_ctrl.GetValue().strip()
+
+    def crysalis_load_on_startup(self) -> bool:
+        return self._crysalis_startup_chk.GetValue()
+
+    def _float_val(self, ctrl: FlatTextCtrl, default: float) -> float:
+        try:
+            return float(ctrl.GetValue().strip())
+        except ValueError:
+            return default
+
+    def crysalis_wavelength(self) -> float:
+        return self._float_val(self._wavelength_ctrl, 0.2952)
+
+    def crysalis_distance(self) -> float:
+        return self._float_val(self._distance_ctrl, 200.0)
+
+    def crysalis_center_x(self) -> float:
+        return self._float_val(self._center_x_ctrl, 0.0)
+
+    def crysalis_center_y(self) -> float:
+        return self._float_val(self._center_y_ctrl, 0.0)
+
+    def crysalis_alpha(self) -> float:
+        return self._float_val(self._alpha_ctrl, 50.0)
+
+    def crysalis_polarization(self) -> float:
+        return self._float_val(self._polarization_ctrl, 0.99)
+
+    def crysalis_pixel_size(self) -> float:
+        return self._float_val(self._pixel_size_ctrl, 0.075)
+
+    def set_status(self, text: str, error: bool = False) -> None:
+        self._status_label.SetForegroundColour(DANGER if error else FG_SECONDARY)
+        self._status_label.SetLabel(text)
+        self.Layout()
+
+    def trigger_save(self) -> None:
+        if self._on_save_cb is not None:
+            self._on_save_cb()
+
+    def _browse_crysalis_par(self) -> None:
+        with wx.FileDialog(
+            self,
+            "Select CrysAlis PAR calibration file",
+            wildcard="PAR files (*.par)|*.par" + ("|All files (*.*)|*.*" if sys.platform == "win32" else ""),
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        ) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            self._crysalis_par_ctrl.SetValue(dlg.GetPath())
+
+    def _browse_crysalis_set(self) -> None:
+        with wx.FileDialog(
+            self,
+            "Select CrysAlis SET file",
+            wildcard="SET files (*.set)|*.set" + ("|All files (*.*)|*.*" if sys.platform == "win32" else ""),
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        ) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            self._crysalis_set_ctrl.SetValue(dlg.GetPath())
+
+    def _browse_crysalis_ccd(self) -> None:
+        with wx.FileDialog(
+            self,
+            "Select CrysAlis CCD file",
+            wildcard="CCD files (*.ccd)|*.ccd" + ("|All files (*.*)|*.*" if sys.platform == "win32" else ""),
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        ) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            self._crysalis_ccd_ctrl.SetValue(dlg.GetPath())
 
 
 class DetectorsConfigView(wx.Panel):
@@ -1015,21 +1043,44 @@ class DetectorsConfigView(wx.Panel):
         self._detectors_section = _Section(self, "Detectors")
         d_body = self._detectors_section.body
         self._det_header = _TableHeader(d_body, ["", "Name", "Type", "Format", "PV prefix", ""], [2, 7, 3, 3, 11, 2])
-        self._detector_rows_panel = _DarkScrolledPanel(d_body)
+        self._detector_rows_panel = FlatScrolledPanel(d_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                       header=self._det_header)
         self._detector_rows_panel.SetMinSize((-1, _DET_ROW_H * 3))
-        self._add_detector_btn = FlatButton(d_body, "+ Add detector")
+        self._add_detector_btn = FlatButton(d_body, "+ Add detector", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_detector_btn.SetMinSize((-1, 26))
-        self._add_detector_btn.set_action(self._on_add_detector_clicked)
+        self._add_detector_btn.SetAction(self._on_add_detector_clicked)
         d_sizer = wx.BoxSizer(wx.VERTICAL)
-        d_sizer.Add(self._det_header, 0, wx.EXPAND)
         d_sizer.Add(self._detector_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         d_sizer.Add(self._add_detector_btn, 0, wx.EXPAND)
         d_body.SetSizer(d_sizer)
+
+        self._preview_section = _Section(self, "Preview")
+        p_body = self._preview_section.body
+        self.preview_exposure_ctrl = FlatTextCtrl(p_body, value="0.1", placeholder=_PLACEHOLDER_PREVIEW_EXPOSURE, text_scheme=TEXT_SCHEME)
+        self.preview_exposure_ctrl.SetRestrictToFloat(True)
+        self.preview_timeout_ctrl = FlatTextCtrl(p_body, value="60", placeholder=_PLACEHOLDER_PREVIEW_TIMEOUT, text_scheme=TEXT_SCHEME)
+        self.preview_timeout_ctrl.SetRestrictToFloat(True)
+        self.preview_num_ctrl = FlatTextCtrl(p_body, value="1000000", placeholder=_PLACEHOLDER_PREVIEW_NUM, text_scheme=TEXT_SCHEME)
+        p_grid = wx.FlexGridSizer(rows=3, cols=2, vgap=6, hgap=8)
+        p_grid.AddGrowableCol(1, 1)
+        for label_text, ctrl in (
+            ("Exposure (s)", self.preview_exposure_ctrl),
+            ("Timeout (s)", self.preview_timeout_ctrl),
+            ("Images", self.preview_num_ctrl),
+        ):
+            lbl = wx.StaticText(p_body, label=label_text)
+            lbl.SetForegroundColour(FG_SECONDARY)
+            lbl.SetBackgroundColour(p_body.GetBackgroundColour())
+            lbl.SetFont(scaled_font(11))
+            p_grid.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+            p_grid.Add(ctrl, 0, wx.EXPAND)
+        p_body.SetSizer(p_grid)
 
         self._status_label = _status_label(self)
 
         outer = wx.BoxSizer(wx.VERTICAL)
         outer.Add(self._detectors_section, 1, wx.EXPAND | wx.ALL, 10)
+        outer.Add(self._preview_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
         self.SetMinSize((500, -1))
@@ -1041,8 +1092,27 @@ class DetectorsConfigView(wx.Panel):
         self._clear_detector_rows()
         for idx, detector in enumerate(config.detectors):
             self._append_detector_row(detector, active=idx == config.active_detector)
+        self.preview_exposure_ctrl.SetValue(f"{config.preview_exposure:g}")
+        self.preview_timeout_ctrl.SetValue(f"{config.preview_timeout:g}")
+        self.preview_num_ctrl.SetValue(str(config.preview_num_images))
         self.Layout()
         self.set_status("")
+
+    def collect_preview(self) -> tuple[float, float, int]:
+        """Return (exposure, timeout, num_images), coercing invalid input to defaults."""
+        try:
+            exposure = max(0.0, float(self.preview_exposure_ctrl.GetValue().strip() or "0"))
+        except ValueError:
+            exposure = 0.1
+        try:
+            timeout = max(0.0, float(self.preview_timeout_ctrl.GetValue().strip() or "0"))
+        except ValueError:
+            timeout = 60.0
+        try:
+            num_images = max(1, int(float(self.preview_num_ctrl.GetValue().strip() or "0")))
+        except ValueError:
+            num_images = 1000000
+        return exposure, timeout, num_images
 
     def collect_detectors(self) -> tuple[tuple[DetectorConfig, ...], int]:
         detectors: list[DetectorConfig] = []
@@ -1051,7 +1121,7 @@ class DetectorsConfigView(wx.Panel):
             det = row.to_detector()
             if not det.name and not det.pv_prefix:
                 continue
-            if row.active_dot.get_value() and active_index == -1:
+            if row.active_dot.GetValue() and active_index == -1:
                 active_index = len(detectors)
             detectors.append(det)
         if detectors and active_index == -1:
@@ -1069,7 +1139,7 @@ class DetectorsConfigView(wx.Panel):
 
     def _clear_detector_rows(self) -> None:
         for row in self._detector_rows:
-            self._detector_rows_panel.remove_row(row)
+            self._detector_rows_panel.RemoveRow(row)
             row.Destroy()
         self._detector_rows.clear()
 
@@ -1083,11 +1153,11 @@ class DetectorsConfigView(wx.Panel):
             on_make_active=self._on_make_detector_active,
             on_remove=self._on_remove_detector,
         )
-        self._detector_rows_panel.bind_mousewheel(row)
+        self._detector_rows_panel.BindMouseWheel(row)
         self._detector_rows.append(row)
-        self._detector_rows_panel.add_row(row)
+        self._detector_rows_panel.AddRow(row)
 
-    def _on_add_detector_clicked(self) -> None:
+    def _on_add_detector_clicked(self, _e=None) -> None:
         self._append_detector_row(DetectorConfig(), active=not self._detector_rows)
 
     def _on_make_detector_active(self, row: _DetectorRow) -> None:
@@ -1097,10 +1167,10 @@ class DetectorsConfigView(wx.Panel):
     def _on_remove_detector(self, row: _DetectorRow) -> None:
         if row not in self._detector_rows:
             return
-        was_active = row.active_dot.get_value()
+        was_active = row.active_dot.GetValue()
         self._detector_rows.remove(row)
-        self._detector_rows_panel.remove_row(row)
-        row.Destroy()
+        self._detector_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         if was_active and self._detector_rows:
             self._detector_rows[0].set_active_visual(True)
         _restripe(self._detector_rows, self._detector_rows_panel.rows_sizer)
@@ -1121,13 +1191,13 @@ class ControllersConfigView(wx.Panel):
         self._controllers_section = _Section(self, "Controllers")
         ctrl_body = self._controllers_section.body
         self._ctrl_header = _TableHeader(ctrl_body, ["Name", "Type", "Connection params", ""], [5, 5, 18, 2])
-        self._controller_rows_panel = _DarkScrolledPanel(ctrl_body)
+        self._controller_rows_panel = FlatScrolledPanel(ctrl_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                         header=self._ctrl_header)
         self._controller_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_controller_btn = FlatButton(ctrl_body, "+ Add controller")
+        self._add_controller_btn = FlatButton(ctrl_body, "+ Add controller", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_controller_btn.SetMinSize((-1, 26))
-        self._add_controller_btn.set_action(self._on_add_controller_clicked)
+        self._add_controller_btn.SetAction(self._on_add_controller_clicked)
         ctrl_sizer = wx.BoxSizer(wx.VERTICAL)
-        ctrl_sizer.Add(self._ctrl_header, 0, wx.EXPAND)
         ctrl_sizer.Add(self._controller_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         ctrl_sizer.Add(self._add_controller_btn, 0, wx.EXPAND)
         ctrl_body.SetSizer(ctrl_sizer)
@@ -1167,7 +1237,7 @@ class ControllersConfigView(wx.Panel):
 
     def _clear_controller_rows(self) -> None:
         for row in self._controller_rows:
-            self._controller_rows_panel.remove_row(row)
+            self._controller_rows_panel.RemoveRow(row)
             row.Destroy()
         self._controller_rows.clear()
 
@@ -1179,19 +1249,19 @@ class ControllersConfigView(wx.Panel):
             index,
             on_remove=self._on_remove_controller,
         )
-        self._controller_rows_panel.bind_mousewheel(row)
+        self._controller_rows_panel.BindMouseWheel(row)
         self._controller_rows.append(row)
-        self._controller_rows_panel.add_row(row)
+        self._controller_rows_panel.AddRow(row)
 
-    def _on_add_controller_clicked(self) -> None:
+    def _on_add_controller_clicked(self, _e=None) -> None:
         self._append_controller_row(ControllerConfig(name="", type=_CONTROLLER_TYPES[0]))
 
     def _on_remove_controller(self, row: _ControllerRow) -> None:
         if row not in self._controller_rows:
             return
         self._controller_rows.remove(row)
-        self._controller_rows_panel.remove_row(row)
-        row.Destroy()
+        self._controller_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         _restripe(self._controller_rows, self._controller_rows_panel.rows_sizer)
 
 
@@ -1211,7 +1281,7 @@ class PositionersConfigView(wx.Panel):
     def _build_layout(self) -> None:
         self._rotation_section = _Section(self, "Rotation Stage")
         r_body = self._rotation_section.body
-        self._rot_header = _TableHeader(r_body, ["Short", "Description", "PV", "Prec", "Beam °", "Controller"], [3, 6, 10, 2, 3, 7])
+        self._rot_header = _TableHeader(r_body, ["Short", "Description", "PV", "Prec", "Beam °", "Center", "Controller"], [3, 6, 10, 2, 3, 2, 7])
         self._rotation_row = _RotationRow(r_body, None)
         r_sizer = wx.BoxSizer(wx.VERTICAL)
         r_sizer.Add(self._rot_header, 0, wx.EXPAND)
@@ -1220,14 +1290,14 @@ class PositionersConfigView(wx.Panel):
 
         self._motors_section = _Section(self, "Motors")
         m_body = self._motors_section.body
-        self._mot_header = _TableHeader(m_body, ["Short", "Description", "PV", "Prec", "Map", "Controller", ""], [3, 6, 10, 2, 2, 6, 2])
-        self._motor_rows_panel = _DarkScrolledPanel(m_body)
+        self._mot_header = _TableHeader(m_body, ["Short", "Description", "PV", "Prec", "Map", "Center", "Controller", ""], [3, 6, 10, 2, 2, 2, 6, 2])
+        self._motor_rows_panel = FlatScrolledPanel(m_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
+                                                    header=self._mot_header)
         self._motor_rows_panel.SetMinSize((-1, _ROW_H * 3))
-        self._add_motor_btn = FlatButton(m_body, "+ Add motor")
+        self._add_motor_btn = FlatButton(m_body, "+ Add motor", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_motor_btn.SetMinSize((-1, 26))
-        self._add_motor_btn.set_action(self._on_add_motor_clicked)
+        self._add_motor_btn.SetAction(self._on_add_motor_clicked)
         m_sizer = wx.BoxSizer(wx.VERTICAL)
-        m_sizer.Add(self._mot_header, 0, wx.EXPAND)
         m_sizer.Add(self._motor_rows_panel, 1, wx.EXPAND | wx.BOTTOM, 6)
         m_sizer.Add(self._add_motor_btn, 0, wx.EXPAND)
         m_body.SetSizer(m_sizer)
@@ -1259,6 +1329,9 @@ class PositionersConfigView(wx.Panel):
         self._rotation_row.pv_ctrl.SetValue(rm.pv if rm else "")
         self._rotation_row.precision_ctrl.SetValue(str(rm.precision) if rm else "4")
         self._rotation_row.beam_angle_ctrl.SetValue(str(rm.beam_angle) if rm else "0.0")
+        self._rotation_row.centering_toggle.SetValue(rm.centering_enabled if rm else False)
+        self._rotation_row.xps_group_ctrl.SetValue(rm.xps_group if rm else "")
+        self._rotation_row.xps_positioner_ctrl.SetValue(rm.xps_positioner if rm else "")
         self._refresh_rotation_controller_choices(selected=rm.controller if rm else "epics")
 
         self._clear_motor_rows()
@@ -1286,6 +1359,7 @@ class PositionersConfigView(wx.Panel):
             description=self._rotation_row.description_ctrl.GetValue().strip(),
             pv=rot_pv,
             precision=rot_precision,
+            centering_enabled=self._rotation_row.centering_toggle.GetValue(),
             controller=self._rotation_row.controller_combo.GetStringSelection() or "epics",
             xps_group=self._rotation_row.xps_group_ctrl.GetValue().strip() if is_xps else "",
             xps_positioner=self._rotation_row.xps_positioner_ctrl.GetValue().strip() if is_xps else "",
@@ -1306,26 +1380,26 @@ class PositionersConfigView(wx.Panel):
 
     def _clear_motor_rows(self) -> None:
         for row in self._motor_rows:
-            self._motor_rows_panel.remove_row(row)
+            self._motor_rows_panel.RemoveRow(row)
             row.Destroy()
         self._motor_rows.clear()
 
     def _append_motor_row(self, motor: MotorConfig) -> None:
         index = len(self._motor_rows)
         row = _MotorRow(self._motor_rows_panel._content, motor, self._controller_names, self._controller_types, index, on_remove=self._on_remove_motor)
-        self._motor_rows_panel.bind_mousewheel(row)
+        self._motor_rows_panel.BindMouseWheel(row)
         self._motor_rows.append(row)
-        self._motor_rows_panel.add_row(row)
+        self._motor_rows_panel.AddRow(row)
 
-    def _on_add_motor_clicked(self) -> None:
+    def _on_add_motor_clicked(self, _e=None) -> None:
         self._append_motor_row(MotorConfig(shorthand="", description="", pv=""))
 
     def _on_remove_motor(self, row: _MotorRow) -> None:
         if row not in self._motor_rows:
             return
         self._motor_rows.remove(row)
-        self._motor_rows_panel.remove_row(row)
-        row.Destroy()
+        self._motor_rows_panel.RemoveRow(row)
+        wx.CallAfter(row.Destroy)
         _restripe(self._motor_rows, self._motor_rows_panel.rows_sizer)
 
     def _refresh_rotation_controller_choices(self, selected: str | None = None) -> None:
@@ -1337,14 +1411,14 @@ class PositionersConfigView(wx.Panel):
 class _ConfigDialog(wx.Dialog):
     """Generic scrollable dialog wrapper; pressing Enter triggers save."""
 
-    def __init__(self, parent: wx.Window, title: str, size: tuple[int, int] = (680, 500)) -> None:
+    def __init__(self, parent: wx.Window, title: str, size: tuple[int, int] = (820, 620)) -> None:
         super().__init__(parent, title=title, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
         self.SetBackgroundColour(BG_SURFACE)
         self._viewport = wx.Panel(self, style=wx.BORDER_NONE)
         self._viewport.SetBackgroundColour(BG_SURFACE)
         self._scroll_offset: int = 0
         self.config_panel = self._make_panel(self._viewport)
-        self._scrollbar = DarkScrollBar(self, on_scroll=self._on_sb_scroll)
+        self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll, scrollbar_scheme=SCROLLBAR_SCHEME)
         self._viewport.Bind(wx.EVT_SIZE, self._on_viewport_size)
         self._viewport.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
         self.config_panel.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
@@ -1354,7 +1428,7 @@ class _ConfigDialog(wx.Dialog):
         outer.Add(self._scrollbar, 0, wx.EXPAND)
         self.SetSizer(outer)
         self.SetSize(*size)
-        self.SetMinSize((420, 320))
+        self.SetMinSize((520, 420))
         self.CentreOnParent()
 
     def _make_panel(self, viewport: wx.Panel) -> wx.Panel:
@@ -1387,9 +1461,9 @@ class _ConfigDialog(wx.Dialog):
         total = self._content_height()
         visible = self._viewport_height()
         if total <= visible:
-            self._scrollbar.update(0.0, 1.0)
+            self._scrollbar.Update(0.0, 1.0)
         else:
-            self._scrollbar.update(self._scroll_offset / (total - visible), visible / total)
+            self._scrollbar.Update(self._scroll_offset / (total - visible), visible / total)
 
     def _on_sb_scroll(self, fraction: float) -> None:
         self._scroll_offset = int(fraction * self._max_offset())
@@ -1408,15 +1482,23 @@ class _ConfigDialog(wx.Dialog):
 
 class GeneralConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "General configuration", size=(520, 400))
+        super().__init__(parent, "General configuration", size=(660, 520))
 
     def _make_panel(self, viewport: wx.Panel) -> GeneralConfigView:
         return GeneralConfigView(viewport)
 
 
+class CrysalisConfigDialog(_ConfigDialog):
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent, "CrysAlis configuration", size=(660, 620))
+
+    def _make_panel(self, viewport: wx.Panel) -> CrysalisConfigView:
+        return CrysalisConfigView(viewport)
+
+
 class DetectorsConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "Detectors configuration", size=(620, 380))
+        super().__init__(parent, "Detectors configuration", size=(760, 500))
 
     def _make_panel(self, viewport: wx.Panel) -> DetectorsConfigView:
         return DetectorsConfigView(viewport)
@@ -1424,7 +1506,7 @@ class DetectorsConfigDialog(_ConfigDialog):
 
 class ControllersConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "Controllers configuration", size=(700, 380))
+        super().__init__(parent, "Controllers configuration", size=(840, 500))
 
     def _make_panel(self, viewport: wx.Panel) -> ControllersConfigView:
         return ControllersConfigView(viewport)
@@ -1432,7 +1514,7 @@ class ControllersConfigDialog(_ConfigDialog):
 
 class PositionersConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, "Positioners configuration", size=(680, 500))
+        super().__init__(parent, "Positioners configuration", size=(900, 620))
 
     def _make_panel(self, viewport: wx.Panel) -> PositionersConfigView:
         return PositionersConfigView(viewport)
