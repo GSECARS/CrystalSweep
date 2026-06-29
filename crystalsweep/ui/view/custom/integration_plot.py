@@ -118,6 +118,7 @@ class IntegrationPlot(wx.Panel):
             parent=self,
             app="wx",
             vsync=True,
+            size=(100, 100),
             bgcolor=(6 / 255, 6 / 255, 8 / 255, 1.0),
             config={"double_buffer": True, "depth_size": 0, "stencil_size": 0},
         )
