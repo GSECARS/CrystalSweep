@@ -80,6 +80,7 @@ class ImageSettingsPopup(wx.Frame):
 
         self.Bind(wx.EVT_KILL_FOCUS, lambda e: e.Skip())
         self.Bind(wx.EVT_ACTIVATE, self._on_activate)
+        self._dismiss_timer = wx.CallLater(150, self._check_dismiss)
 
     def Popup(self) -> None:
         self.Show()
@@ -89,10 +90,21 @@ class ImageSettingsPopup(wx.Frame):
         self.SetPosition(pt)
 
     def _on_activate(self, event: wx.ActivateEvent) -> None:
+        """Schedule a deferred dismiss check when the frame loses activation."""
         if not event.GetActive():
+            self._dismiss_timer.Start(150)
+        else:
+            self._dismiss_timer.Stop()
+        event.Skip()
+
+    def _check_dismiss(self) -> None:
+        """Dismiss the popup only if focus is genuinely outside this frame and all its children."""
+        if not self or not self.IsShown():
+            return
+        focused = wx.Window.FindFocus()
+        if focused is None or not self.IsDescendant(focused):
             self.Hide()
             self.Destroy()
-        event.Skip()
 
     def _build_section(
         self,
