@@ -43,7 +43,18 @@ nav:
   - Usage: usage.md
   - API Reference:
     - paths: api/paths.md
-    - model: api/model.md
+    - Model:
+      - Collection: api/model/collection.md
+      - Scan: api/model/scan.md
+      - Detector: api/model/detector.md
+      - EPICS: api/model/epics.md
+      - Integration: api/model/integration.md
+      - Hardware Controllers: api/model/hardware.md
+      - File & Settings: api/model/settings.md
+      - Utilities: api/model/utilities.md
+    - UI:
+      - Controllers: api/ui/controllers.md
+      - Views: api/ui/views.md
 
 markdown_extensions:
   - admonition
