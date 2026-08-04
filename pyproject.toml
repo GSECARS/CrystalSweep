@@ -51,8 +51,8 @@ dependencies = [
     "pyautomation>=0.0.1",
     "newportxps>=2026.1.1",
     "cryio>=2018.5.30",
-    "wxmplot",
-    "wxutils",
+    "wxmplot>=2026.2.1",
+    "wxutils>=2026.3.0",
 ]
 
 [dependency-groups]
@@ -76,10 +76,6 @@ Issues = "https://github.com/GSECARS/CrystalSweep/issues"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.uv.sources]
-wxutils = { path = "../wxutils", editable = true }
-wxmplot = { path = "../wxmplot", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["crystalsweep"]
