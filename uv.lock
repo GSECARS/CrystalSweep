@@ -366,9 +366,9 @@ requires-dist = [
     { name = "pyopengl-accelerate", specifier = ">=3.1.10" },
     { name = "tomli-w", specifier = ">=1.2.0" },
     { name = "vispy", specifier = ">=0.14.3" },
-    { name = "wxmplot", editable = "../wxmplot" },
+    { name = "wxmplot", specifier = ">=2026.2.1" },
     { name = "wxpython", specifier = ">=4.2.5" },
-    { name = "wxutils", editable = "../wxutils" },
+    { name = "wxutils", specifier = ">=2026.3.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -1708,7 +1708,8 @@ wheels = [
 
 [[package]]
 name = "wxmplot"
-source = { editable = "../wxmplot" }
+version = "2026.2.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "darkdetect" },
     { name = "matplotlib" },
@@ -1724,34 +1725,10 @@ dependencies = [
     { name = "wxpython" },
     { name = "wxutils" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "build", marker = "extra == 'dev'" },
-    { name = "coverage", marker = "extra == 'test'" },
-    { name = "darkdetect" },
-    { name = "jupyter-sphinx", marker = "extra == 'doc'" },
-    { name = "matplotlib", specifier = ">=3.9.0" },
-    { name = "numpy", specifier = ">=1.26" },
-    { name = "pillow", specifier = ">=7.0" },
-    { name = "pyobjc-framework-cocoa", marker = "sys_platform == 'darwin'" },
-    { name = "pyopengl", specifier = ">=3.1.10" },
-    { name = "pyopengl-accelerate", specifier = ">=3.1.10" },
-    { name = "pyshortcuts", specifier = ">=1.9.5" },
-    { name = "pytest", marker = "extra == 'test'" },
-    { name = "pytest-cov", marker = "extra == 'test'" },
-    { name = "pytz" },
-    { name = "pyyaml", specifier = ">=5.0" },
-    { name = "sphinx", marker = "extra == 'doc'" },
-    { name = "sphinx-copybutton", marker = "extra == 'doc'" },
-    { name = "sphinxcontrib-video", marker = "extra == 'doc'" },
-    { name = "twine", marker = "extra == 'dev'" },
-    { name = "vispy", specifier = ">=0.16.2" },
-    { name = "wxmplot", extras = ["dev", "doc", "test"], marker = "extra == 'all'" },
-    { name = "wxpython", specifier = ">=4.2.0" },
-    { name = "wxutils", editable = "../wxutils" },
+sdist = { url = "https://files.pythonhosted.org/packages/d2/88/389ba44a2554bb2c2428f0f4caab2831c67dca795af5a326738f1e7354ac/wxmplot-2026.2.1.tar.gz", hash = "sha256:303f8cb15589146641e464793c051bd348822ffc26ba6cf37a03d9d8b832081e", size = 2257219, upload-time = "2026-07-30T04:18:32.011Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3a/ae/a7707c131c48ecb9087386cbfdd4d2f3545e1ed3fa8c8dc2078773535c4b/wxmplot-2026.2.1-py3-none-any.whl", hash = "sha256:c0ad98f29afa1f5be2bb4e2c6a4aded0039a2391a10431218d8cccf31d000d34", size = 119229, upload-time = "2026-07-30T04:18:30.727Z" },
 ]
-provides-extras = ["dev", "doc", "test", "all"]
 
 [[package]]
 name = "wxpython"
@@ -1768,7 +1745,8 @@ wheels = [
 
 [[package]]
 name = "wxutils"
-source = { editable = "../wxutils" }
+version = "2026.3.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "darkdetect" },
     { name = "jeepney", marker = "sys_platform == 'linux'" },
@@ -1777,21 +1755,7 @@ dependencies = [
     { name = "pyshortcuts" },
     { name = "wxpython" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "build", marker = "extra == 'dev'" },
-    { name = "coverage", marker = "extra == 'test'" },
-    { name = "darkdetect" },
-    { name = "jeepney", marker = "sys_platform == 'linux'" },
-    { name = "packaging", specifier = ">=26.2" },
-    { name = "pyobjc-framework-cocoa", marker = "sys_platform == 'darwin'" },
-    { name = "pyshortcuts" },
-    { name = "pytest", marker = "extra == 'test'" },
-    { name = "pytest-cov", marker = "extra == 'test'" },
-    { name = "sphinx", marker = "extra == 'doc'" },
-    { name = "twine", marker = "extra == 'dev'" },
-    { name = "wxpython", specifier = ">=4.2.0" },
-    { name = "wxutils", extras = ["dev", "doc", "test"], marker = "extra == 'all'" },
+sdist = { url = "https://files.pythonhosted.org/packages/1e/77/bc615911ae043f540caed1bc72f97395f979bc61c08e3cea5a8aa6412fed/wxutils-2026.3.0.tar.gz", hash = "sha256:dc2582cbea88262f3451dbec606f54454e90184573db550556bda80cfc29735a", size = 180830, upload-time = "2026-07-24T02:59:24.843Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/6c/abddbf7c6c8247df246b70cf3b19582232bf2b64733b32e6b1cda6bb35b1/wxutils-2026.3.0-py3-none-any.whl", hash = "sha256:3703d370ba2fc29b638f75488257c85f55c13be4e0f2a539f60d8304c19d3581", size = 113914, upload-time = "2026-07-24T02:59:23.675Z" },
 ]
-provides-extras = ["dev", "doc", "test", "all"]
