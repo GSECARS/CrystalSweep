@@ -16,7 +16,7 @@ from typing import Callable
 
 import wx
 
-from crystalsweep.ui.view.custom.colormaps import COLORMAP_NAMES
+from wxmplot.colors import get_colormap_names
 from crystalsweep.ui.view.custom.theme import FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, scaled_font, COMBO_SCHEME
 from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME, TOGGLE_SCHEME
 from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo
@@ -80,6 +80,7 @@ class ImageSettingsPopup(wx.Frame):
 
         self.Bind(wx.EVT_KILL_FOCUS, lambda e: e.Skip())
         self.Bind(wx.EVT_ACTIVATE, self._on_activate)
+        self._dismiss_timer = wx.CallLater(150, self._check_dismiss)
 
     def Popup(self) -> None:
         self.Show()
@@ -89,10 +90,21 @@ class ImageSettingsPopup(wx.Frame):
         self.SetPosition(pt)
 
     def _on_activate(self, event: wx.ActivateEvent) -> None:
+        """Schedule a deferred dismiss check when the frame loses activation."""
         if not event.GetActive():
+            self._dismiss_timer.Start(150)
+        else:
+            self._dismiss_timer.Stop()
+        event.Skip()
+
+    def _check_dismiss(self) -> None:
+        """Dismiss the popup only if focus is genuinely outside this frame and all its children."""
+        if not self or not self.IsShown():
+            return
+        focused = wx.Window.FindFocus()
+        if focused is None or not self.IsDescendant(focused):
             self.Hide()
             self.Destroy()
-        event.Skip()
 
     def _build_section(
         self,
@@ -116,9 +128,10 @@ class ImageSettingsPopup(wx.Frame):
 
         cmap_row = wx.BoxSizer(wx.HORIZONTAL)
         cmap_row.Add(_lbl("Colormap"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        self._cmap_choice = FlatCombo(parent, choices=COLORMAP_NAMES, combo_scheme=COMBO_SCHEME)
-        if colormap in COLORMAP_NAMES:
-            self._cmap_choice.SetSelection(COLORMAP_NAMES.index(colormap))
+        colormap_names = get_colormap_names()
+        self._cmap_choice = FlatCombo(parent, choices=colormap_names, combo_scheme=COMBO_SCHEME)
+        if colormap in colormap_names:
+            self._cmap_choice.SetSelection(colormap_names.index(colormap))
         self._cmap_choice.Bind(wx.EVT_CHOICE, self._evt_colormap)
         cmap_row.Add(self._cmap_choice, 1, wx.EXPAND)
         sizer.Add(cmap_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
