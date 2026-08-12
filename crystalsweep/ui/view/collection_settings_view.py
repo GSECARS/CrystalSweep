@@ -225,8 +225,6 @@ class _MapDataRow(FlatTableRow):
         return self.motor_combo.GetStringSelection()
 
 
-
-
 class _MapTable(wx.Panel):
     """Compact two-row table for map axes, styled like the collection table."""
 
@@ -422,7 +420,7 @@ class CollectionSettingsView(wx.Panel):
             label = f"{size_um}×{size_um} / {step_um}µm"
             btn = FlatButton(self._map_presets_panel, label, color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
             btn.SetMinSize((-1, 22))
-            btn.SetAction(lambda _e, s=size_um, st=step_um, p=pts: self._apply_map_preset(s, st, p))
+            btn.SetAction(lambda s=size_um, st=step_um, p=pts: self._apply_map_preset(s, st, p))
             row.Add(btn, 1, wx.EXPAND | wx.RIGHT, 4)
         self._map_presets_panel.SetSizer(row)
         return self._map_presets_panel

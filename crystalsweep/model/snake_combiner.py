@@ -204,9 +204,7 @@ def _build_combined(flipped_files: list[Path], combined_path: Path, frame_count:
                     src = fin[name]
                     dst = out[name]
                     if src.shape[0] != frame_count:
-                        raise RuntimeError(
-                            f"{fpath}: dataset {name} has leading dim {src.shape[0]}, expected {frame_count}"
-                        )
+                        raise RuntimeError(f"{fpath}: dataset {name} has leading dim {src.shape[0]}, expected {frame_count}")
                     if src.ndim == 1:
                         dst[start:stop] = src[...]
                     else:

@@ -96,7 +96,12 @@ class NewportXPSModel:
 
         _log.debug(
             "NewportXPSModel prepare: group=%s axis=%s stop=%.4f step=%.4f scantime=%.4f points=%d",
-            group, axis_name, signed_range, step, scantime, spec.points,
+            group,
+            axis_name,
+            signed_range,
+            step,
+            scantime,
+            spec.points,
         )
 
     def run(
@@ -159,7 +164,7 @@ class NewportXPSModel:
     @staticmethod
     def _axis_name(positioner: str, group: str) -> str:
         if positioner.startswith(group):
-            return positioner[len(group):].lstrip("-.")
+            return positioner[len(group) :].lstrip("-.")
         return positioner
 
     @staticmethod
@@ -194,15 +199,18 @@ class NewportXPSModel:
             verbose=False,
         )
         if ret is False:
-            raise RuntimeError(
-                f"define_line_trajectories failed — check positioner '{axis_name}' in XPS group '{group_name}'."
-            )
+            raise RuntimeError(f"define_line_trajectories failed — check positioner '{axis_name}' in XPS group '{group_name}'.")
         traj = self._xps.trajectories.get(self._TRAJ_NAME, {})
         if traj:
             _log.info(
                 "NewportXPSModel line trajectory: group=%s axis=%s stop=%.4f step=%.4f scantime=%.4f -> pixeltime=%s npulses=%s",
-                group_name, axis_name, stop_xps, step, scantime,
-                traj.get("pixeltime"), traj.get("npulses"),
+                group_name,
+                axis_name,
+                stop_xps,
+                step,
+                scantime,
+                traj.get("pixeltime"),
+                traj.get("npulses"),
             )
 
     def _define_array_trajectory(
@@ -237,9 +245,7 @@ class NewportXPSModel:
             verbose=False,
         )
         if result is None:
-            raise RuntimeError(
-                f"define_array_trajectory failed — check positioner name '{axis_name}' against XPS group '{group_name}' axes."
-            )
+            raise RuntimeError(f"define_array_trajectory failed — check positioner name '{axis_name}' against XPS group '{group_name}' axes.")
 
     def abort(self) -> None:
         self._aborted = True

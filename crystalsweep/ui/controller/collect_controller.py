@@ -750,9 +750,13 @@ class CollectController:
                     pt_idx = start_idx + gidx
                     pt_weight = weights[gidx]
                     if scan_type == "still":
-                        self._run_still(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open)
+                        self._run_still(
+                            col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open
+                        )
                     elif scan_type == "wide":
-                        self._run_wide(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open)
+                        self._run_wide(
+                            col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open
+                        )
                     elif scan_type == "step":
                         self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     map_completed_weight += pt_weight
@@ -1335,7 +1339,9 @@ class CollectController:
             self._spawn_format_conversion(point)
             self._spawn_crysalis_conversion(point)
 
-    def _run_step(self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
+    def _run_step(
+        self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1
+    ) -> None:
         done_event = threading.Event()
         error_holder: list[Exception] = []
 
