@@ -15,12 +15,7 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from vispy.color.colormap import Colormap
-from wxmplot.colors import colormap_color, get_colormap_names, lookup_colormap, register_colormap
+from epicsapps.pva_adviewer.colormaps import register_colormaps as register_cs_colormaps
+from wxmplot.colors import colormap_color, get_colormap_names, lookup_colormap
 
 __all__ = ["register_cs_colormaps", "colormap_color", "get_colormap_names", "lookup_colormap"]
-
-
-def register_cs_colormaps() -> None:
-    """Register CrystalSweep custom colormaps with the wxmplot registry."""
-    register_colormap("grays_reverse", Colormap(["white", "black"]))

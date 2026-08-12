@@ -388,7 +388,7 @@ class PreviewView(wx.Panel):
             btn.SetToolTip(f"Set step to {self._format_um_label(value_um)} um")
             btn.SetMinSize((preset_btn_size, preset_btn_size))
             btn.SetMaxSize((preset_btn_size, preset_btn_size))
-            btn.SetAction(lambda _e, v=value_um / _UM_PER_MM: self._apply_preset(v))
+            btn.SetAction(lambda v=value_um / _UM_PER_MM: self._apply_preset(v))
             preset_row.Add(btn, 0, wx.LEFT if i > 0 else 0, preset_gap)
         col.Add(preset_row, 0)
 
@@ -471,7 +471,7 @@ class PreviewView(wx.Panel):
 
         self._originals_empty_label.Hide()
         on_go_all = self._make_go_invoker("original", None)
-        self._originals_go_btn.SetAction(lambda _e: on_go_all())
+        self._originals_go_btn.SetAction(lambda: on_go_all())
         self._originals_go_btn.Enable(True)
 
         self._add_motor_pair_rows(
@@ -682,7 +682,7 @@ class PreviewView(wx.Panel):
 
         self._currents_empty_label.Hide()
         on_go_all = self._make_go_invoker("current", None)
-        self._currents_go_btn.SetAction(lambda _e: on_go_all())
+        self._currents_go_btn.SetAction(lambda: on_go_all())
         self._currents_go_btn.Enable(True)
 
         self._add_motor_pair_rows(
@@ -753,7 +753,7 @@ class PreviewView(wx.Panel):
 
         self._bests_empty_label.Hide()
         on_go_all = self._make_go_invoker("best", None)
-        self._bests_go_btn.SetAction(lambda _e: on_go_all())
+        self._bests_go_btn.SetAction(lambda: on_go_all())
         self._bests_go_btn.Enable(True)
 
         self._add_motor_pair_rows(

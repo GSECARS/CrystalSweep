@@ -14,15 +14,16 @@
 
 from dataclasses import dataclass, field
 
-from crystalsweep.model.ad_viewer_model import ADViewerModel
+from epicsapps.pva_adviewer.ad_viewer_model import ADViewerModel
+from epicsapps.pva_adviewer.image_loader_model import ImageLoaderModel
+from epicsapps.pva_adviewer.integration_model import IntegrationModel
+
 from crystalsweep.model.beamline_config_model import BeamlineConfigModel
 from crystalsweep.model.collection_model import CollectionTableModel
 from crystalsweep.model.collection_settings_model import CollectionSettingsModel
 from crystalsweep.model.controller_connection_model import ControllerConnectionModel
 from crystalsweep.model.epics_model import EpicsModel
 from crystalsweep.model.file_settings_model import FileSettingsModel
-from crystalsweep.model.image_loader_model import ImageLoaderModel
-from crystalsweep.model.integration_model import IntegrationModel
 from crystalsweep.model.script_model import ScriptModel
 
 __all__ = ["MainModel"]

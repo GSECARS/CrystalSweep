@@ -172,7 +172,7 @@ class _DetectorRow(_TableRow):
         self._on_remove = on_remove
 
         self.active_dot = FlatRadioButton(self, value=active, tooltip="Set as active detector", radio_scheme=RADIO_SCHEME)
-        self.active_dot.SetAction(lambda _e: on_make_active(self))
+        self.active_dot.SetAction(lambda: on_make_active(self))
         self.name_ctrl = FlatTextCtrl(self, value=detector.name, placeholder=_PLACEHOLDER_DETECTOR_NAME, text_scheme=TEXT_SCHEME)
         det_display = _DET_TYPE_TO_LABEL.get(detector.type, _DETECTOR_DISPLAY_NAMES[0])
         det_sel = _DETECTOR_DISPLAY_NAMES.index(det_display) if det_display in _DETECTOR_DISPLAY_NAMES else 0
@@ -182,7 +182,7 @@ class _DetectorRow(_TableRow):
         self.format_combo = FlatCombo(self, choices=_FILE_FORMAT_DISPLAY_NAMES, selection=fmt_sel, combo_scheme=COMBO_SCHEME)
         self.prefix_ctrl = FlatTextCtrl(self, value=detector.pv_prefix, placeholder=_PLACEHOLDER_DETECTOR_PREFIX, text_scheme=TEXT_SCHEME)
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
-        self._remove_btn.SetAction(lambda _e: on_remove(self))
+        self._remove_btn.SetAction(lambda: on_remove(self))
 
         self._template_lbl = wx.StaticText(self, label="File template")
         self._template_lbl.SetForegroundColour(FG_SECONDARY)
@@ -302,7 +302,7 @@ class _ControllerRow(_TableRow):
         self._build_params(controller.type, controller.params)
 
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
-        self._remove_btn.SetAction(lambda _e: on_remove(self))
+        self._remove_btn.SetAction(lambda: on_remove(self))
         self._reposition()
 
     def _reposition(self) -> None:
@@ -466,7 +466,7 @@ class _MotorRow(_TableRow):
         self.xps_positioner_ctrl = FlatTextCtrl(self, value=motor.xps_positioner, placeholder=_PLACEHOLDER_XPS_POSITIONER, text_scheme=TEXT_SCHEME)
 
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
-        self._remove_btn.SetAction(lambda _e: on_remove(self))
+        self._remove_btn.SetAction(lambda: on_remove(self))
         self._reposition()
 
     def _is_xps(self) -> bool:
@@ -575,7 +575,7 @@ class _AbortPvRow(_TableRow):
         self.pv_ctrl = FlatTextCtrl(self, value=pv, placeholder="e.g. 13IDD:STOP", text_scheme=TEXT_SCHEME)
         self.value_ctrl = FlatTextCtrl(self, value=value, placeholder="e.g. 1", text_scheme=TEXT_SCHEME)
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
-        self._remove_btn.SetAction(lambda _e: on_remove(self))
+        self._remove_btn.SetAction(lambda: on_remove(self))
         self._reposition()
 
     def _reposition(self) -> None:
@@ -608,7 +608,7 @@ class _RestorePvRow(_TableRow):
         self._on_remove = on_remove
         self.pv_ctrl = FlatTextCtrl(self, value=pv, placeholder="e.g. 13IDD:SomePV.VAL", text_scheme=TEXT_SCHEME)
         self._remove_btn = FlatButton(self, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
-        self._remove_btn.SetAction(lambda _e: on_remove(self))
+        self._remove_btn.SetAction(lambda: on_remove(self))
         self._reposition()
 
     def _reposition(self) -> None:

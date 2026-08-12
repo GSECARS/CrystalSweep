@@ -16,15 +16,15 @@ import sys
 from typing import Callable
 
 import wx
+from epicsapps.pva_adviewer.ad_viewer_view import ADViewerView
+from wxutils import FlatConfirmDialog, FlatSplitter, FlatTabbedPanel, SectionDivider
 
 from crystalsweep.assets import LOGO_PNG
-from crystalsweep.ui.view.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import BG_CARD, BG_SURFACE, FG_SECONDARY, SEP_COLOUR, scaled_font, SPLITTER_SCHEME, DIVIDER_FG, DIVIDER_LINE, dialog_scheme, DANGER_SCHEME, TAB_SCHEME
 from crystalsweep.ui.view.custom.widgets import CrystalMenuBar
-from wxutils import FlatConfirmDialog, FlatSplitter, FlatTabbedPanel, SectionDivider
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.preview_view import PreviewView
 

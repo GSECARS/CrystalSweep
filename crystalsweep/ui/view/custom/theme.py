@@ -87,7 +87,7 @@ def cs_dark_theme() -> ColorTheme:
         blue=wx.Colour(99, 179, 237),            # ACCENT
         magenta=wx.Colour(86, 156, 214),         # keyword fg (VS Code blue)
         cyan=wx.Colour(78, 201, 176),            # keyword2 / def name fg
-        white=wx.Colour(55, 55, 55),             # BTN_HOVER_BG / secondary text proxy
+        white=wx.Colour(230, 230, 235),          # FG_PRIMARY — epicsapps uses t.white as text fg
         bright_black=wx.Colour(38, 38, 42),      # BG_ELEVATED — btn idle bg, border, sep
         bright_red=wx.Colour(210, 55, 55),       # DANGER_HOVER
         bright_green=wx.Colour(206, 145, 120),   # string fg (warm orange)
@@ -122,7 +122,7 @@ FG_SECONDARY = wx.Colour(140, 140, 150)
 ACCENT       = _T.blue                 # (99,179,237)
 ACCENT_HOVER = _T.bright_blue          # (130,200,255)
 SEP_COLOUR   = wx.Colour(55, 55, 60)
-BTN_HOVER_BG = _T.white                # (55,55,55)
+BTN_HOVER_BG = wx.Colour(55, 55, 55)   # button/icon hover bg (not tied to theme.white)
 BTN_PRESS_BG = wx.Colour(80, 80, 80)
 
 POPUP_BG       = BG_CARD

@@ -47,8 +47,6 @@ class MainController:
                 ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
         self._app = wx.App(False)
-        from crystalsweep.ui.view.custom.theme import apply_cs_theme
-        apply_cs_theme()
         self._model = MainModel()
         self._view = MainView(version=version)
 

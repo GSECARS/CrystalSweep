@@ -12,7 +12,7 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from crystalsweep.ui.view.ad_viewer_view import ADViewerView
+from epicsapps.pva_adviewer.ad_viewer_view import ADViewerView
 from crystalsweep.ui.view.beamline_config_view import (
     ControllersConfigDialog,
     ControllersConfigView,
@@ -31,7 +31,6 @@ from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom import (
     ImageCanvas,
     IntegrationPlot,
-    IntensityHistogramWidget,
     colormap_color,
     get_colormap_names,
 )
@@ -58,6 +57,5 @@ __all__ = [
     "FileSettingsView",
     "ImageCanvas",
     "IntegrationPlot",
-    "IntensityHistogramWidget",
     "MainView",
 ]
