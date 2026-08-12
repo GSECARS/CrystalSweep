@@ -26,7 +26,23 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_ELEVATED, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, MUTED_SCHEME, FG_SECONDARY, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME
+from crystalsweep.ui.view.custom.theme import (
+    ACCENT,
+    BG_CARD,
+    BG_ELEVATED,
+    BTN_DISABLED,
+    btn_font,
+    DANGER,
+    DANGER_SCHEME,
+    MUTED_SCHEME,
+    FG_SECONDARY,
+    SEP_COLOUR,
+    TEXT_SCHEME,
+    scaled_font,
+    TOGGLE_SCHEME,
+    COMBO_SCHEME,
+    SCROLLBAR_SCHEME,
+)
 
 from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar
 
@@ -967,7 +983,9 @@ class CollectionTableView(wx.Panel):
 
     # ---------------- Public API: columns and row mutation ----------------
 
-    def set_columns(self, motor_shorthands: list[str], rotation_shorthand: str = "", motor_precisions: dict[str, int] | None = None, rotation_precision: int = 4) -> None:
+    def set_columns(
+        self, motor_shorthands: list[str], rotation_shorthand: str = "", motor_precisions: dict[str, int] | None = None, rotation_precision: int = 4
+    ) -> None:
         self._motor_shorthands = list(motor_shorthands)
         self._motor_precisions = motor_precisions or {}
         self._rotation_precision = rotation_precision

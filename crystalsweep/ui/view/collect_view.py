@@ -27,7 +27,7 @@ from crystalsweep.ui.view.custom.theme import (
     PONI_LOADED,
     scaled_font,
 )
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TOGGLE_SCHEME, PROGRESS_SCHEME
+from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, TOGGLE_SCHEME, PROGRESS_SCHEME
 from wxutils import FlatButton, FlatCheckBox, FlatProgressBar
 
 __all__ = ["CollectView"]

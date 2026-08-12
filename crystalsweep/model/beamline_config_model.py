@@ -98,7 +98,7 @@ class DetectorConfig:
         if loc:
             loc_norm = loc.replace("\\", "/").rstrip("/")
             if norm.lower().startswith(loc_norm.lower()):
-                return rem_norm + norm[len(loc_norm):]
+                return rem_norm + norm[len(loc_norm) :]
 
         # No local mapping (or it doesn't match): anchor the user-picked
         # folder under the remote root. We keep only the trailing path

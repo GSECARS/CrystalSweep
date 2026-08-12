@@ -20,8 +20,40 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.icons import draw_folder
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_CARD, BG_SURFACE, BTN_DISABLED, btn_font, DANGER, DANGER_SCHEME, DEFAULT_SCHEME, FG_PRIMARY, FG_SECONDARY, POPUP_BG, POPUP_FG, SEP_COLOUR, TEXT_SCHEME, scaled_font, TOGGLE_SCHEME, COMBO_SCHEME, SCROLLBAR_SCHEME, RADIO_SCHEME, icon_scheme
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar, FlatRadioButton, FlatIconButton, FlatScrolledPanel, FlatTableHeader, FlatTableRow
+from crystalsweep.ui.view.custom.theme import (
+    ACCENT,
+    BG_CARD,
+    BG_SURFACE,
+    BTN_DISABLED,
+    btn_font,
+    DANGER,
+    DANGER_SCHEME,
+    DEFAULT_SCHEME,
+    FG_PRIMARY,
+    FG_SECONDARY,
+    POPUP_BG,
+    POPUP_FG,
+    SEP_COLOUR,
+    TEXT_SCHEME,
+    scaled_font,
+    TOGGLE_SCHEME,
+    COMBO_SCHEME,
+    SCROLLBAR_SCHEME,
+    RADIO_SCHEME,
+    icon_scheme,
+)
+from wxutils import (
+    FlatButton,
+    FlatCheckBox,
+    FlatTextCtrl,
+    FlatCombo,
+    FlatScrollBar,
+    FlatRadioButton,
+    FlatIconButton,
+    FlatScrolledPanel,
+    FlatTableHeader,
+    FlatTableRow,
+)
 
 __all__ = [
     "GeneralConfigView",
@@ -128,22 +160,23 @@ class _Section(wx.Panel):
 
 class _TableHeader(FlatTableHeader):
     """CS table header — passes CS theme colors to the generic base."""
+
     def __init__(self, parent: wx.Window, labels: list[str], proportions: list[int]) -> None:
-        from crystalsweep.ui.view.custom.theme import ACCENT, SEP_COLOUR
-        super().__init__(parent, labels, proportions, height=_HEADER_H,
-                         scheme=(wx.Colour(22, 22, 26), SEP_COLOUR, ACCENT))
+        from crystalsweep.ui.view.custom.theme import SEP_COLOUR
+
+        super().__init__(parent, labels, proportions, height=_HEADER_H, scheme=(wx.Colour(22, 22, 26), SEP_COLOUR, ACCENT))
 
 
 class _TableRow(FlatTableRow):
     """CS table row base — passes CS theme colors to the generic base."""
+
     def __init__(self, parent: wx.Window, proportions: list[int]) -> None:
         from crystalsweep.ui.view.custom.theme import SEP_COLOUR
-        super().__init__(parent, proportions, height=_ROW_H,
-                         scheme=(wx.Colour(22, 22, 26), SEP_COLOUR, wx.Colour(0, 0, 0)))
+
+        super().__init__(parent, proportions, height=_ROW_H, scheme=(wx.Colour(22, 22, 26), SEP_COLOUR, wx.Colour(0, 0, 0)))
 
     def _row_bg(self) -> wx.Colour:
         return BG_CARD
-
 
 
 _DET_ROW_H = _ROW_H * 3 + 2
@@ -322,7 +355,6 @@ class _ControllerRow(_TableRow):
     def _build_params(self, controller_type: str, existing: dict) -> None:
         self._params_sizer.Clear(delete_windows=True)
         self._param_ctrls.clear()
-        bg = self.GetBackgroundColour()
         for key, placeholder in _CONTROLLER_TYPE_PARAMS.get(controller_type, []):
             lbl = wx.StaticText(self._params_panel, label=f"{key}:")
             lbl.SetForegroundColour(FG_SECONDARY)
@@ -554,8 +586,6 @@ def _status_label(parent: wx.Panel) -> wx.StaticText:
     return lbl
 
 
-
-
 _DET_ROW_H = _ROW_H * 3 + 2
 
 
@@ -677,8 +707,7 @@ class GeneralConfigView(wx.Panel):
         self._abort_section = _Section(self, "Abort PVs")
         a_body = self._abort_section.body
         self._abort_header = _TableHeader(a_body, ["PV", "Value", ""], [6, 3, 1])
-        self._abort_rows_panel = FlatScrolledPanel(a_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
-                                                    header=self._abort_header)
+        self._abort_rows_panel = FlatScrolledPanel(a_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME, header=self._abort_header)
         self._abort_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_abort_btn = FlatButton(a_body, "+ Add abort PV", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_abort_btn.SetMinSize((-1, 26))
@@ -691,8 +720,7 @@ class GeneralConfigView(wx.Panel):
         self._restore_section = _Section(self, "Restore PVs")
         r_body = self._restore_section.body
         self._restore_header = _TableHeader(r_body, ["PV", ""], [9, 1])
-        self._restore_rows_panel = FlatScrolledPanel(r_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
-                                                      header=self._restore_header)
+        self._restore_rows_panel = FlatScrolledPanel(r_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME, header=self._restore_header)
         self._restore_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_restore_btn = FlatButton(r_body, "+ Add restore PV", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_restore_btn.SetMinSize((-1, 26))
@@ -1043,8 +1071,7 @@ class DetectorsConfigView(wx.Panel):
         self._detectors_section = _Section(self, "Detectors")
         d_body = self._detectors_section.body
         self._det_header = _TableHeader(d_body, ["", "Name", "Type", "Format", "PV prefix", ""], [2, 7, 3, 3, 11, 2])
-        self._detector_rows_panel = FlatScrolledPanel(d_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
-                                                       header=self._det_header)
+        self._detector_rows_panel = FlatScrolledPanel(d_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME, header=self._det_header)
         self._detector_rows_panel.SetMinSize((-1, _DET_ROW_H * 3))
         self._add_detector_btn = FlatButton(d_body, "+ Add detector", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_detector_btn.SetMinSize((-1, 26))
@@ -1191,8 +1218,7 @@ class ControllersConfigView(wx.Panel):
         self._controllers_section = _Section(self, "Controllers")
         ctrl_body = self._controllers_section.body
         self._ctrl_header = _TableHeader(ctrl_body, ["Name", "Type", "Connection params", ""], [5, 5, 18, 2])
-        self._controller_rows_panel = FlatScrolledPanel(ctrl_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
-                                                         header=self._ctrl_header)
+        self._controller_rows_panel = FlatScrolledPanel(ctrl_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME, header=self._ctrl_header)
         self._controller_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_controller_btn = FlatButton(ctrl_body, "+ Add controller", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_controller_btn.SetMinSize((-1, 26))
@@ -1291,8 +1317,7 @@ class PositionersConfigView(wx.Panel):
         self._motors_section = _Section(self, "Motors")
         m_body = self._motors_section.body
         self._mot_header = _TableHeader(m_body, ["Short", "Description", "PV", "Prec", "Map", "Center", "Controller", ""], [3, 6, 10, 2, 2, 2, 6, 2])
-        self._motor_rows_panel = FlatScrolledPanel(m_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME,
-                                                    header=self._mot_header)
+        self._motor_rows_panel = FlatScrolledPanel(m_body, bg=BG_CARD, scrollbar_scheme=SCROLLBAR_SCHEME, header=self._mot_header)
         self._motor_rows_panel.SetMinSize((-1, _ROW_H * 3))
         self._add_motor_btn = FlatButton(m_body, "+ Add motor", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
         self._add_motor_btn.SetMinSize((-1, 26))

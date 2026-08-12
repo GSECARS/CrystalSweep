@@ -225,8 +225,6 @@ class _MapDataRow(FlatTableRow):
         return self.motor_combo.GetStringSelection()
 
 
-
-
 class _MapTable(wx.Panel):
     """Compact two-row table for map axes, styled like the collection table."""
 

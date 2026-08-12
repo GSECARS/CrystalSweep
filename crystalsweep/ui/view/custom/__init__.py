@@ -12,7 +12,7 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from epicsapps.pva_adviewer.image_canvas import BinMethod, ImageCanvas
+from epicsapps.pva_adviewer.image_canvas import ImageCanvas
 from epicsapps.pva_adviewer.integration_plot import IntegrationPlot
 from epicsapps.pva_adviewer.settings_popup import ImageSettingsPopup
 from wxmplot.colors import colormap_color, get_colormap_names, lookup_colormap

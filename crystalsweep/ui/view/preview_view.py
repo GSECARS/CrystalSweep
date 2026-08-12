@@ -82,10 +82,14 @@ class _CenteringRow(wx.Panel):
         self._label.SetForegroundColour(FG_SECONDARY)
         self._label.SetBackgroundColour(BG_CARD)
 
-        self._left_btn = FlatIconButton(self, draw_chevron_left, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} − step", icon_scheme=icon_scheme(BG_CARD))
+        self._left_btn = FlatIconButton(
+            self, draw_chevron_left, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} − step", icon_scheme=icon_scheme(BG_CARD)
+        )
         self._left_btn.Bind(wx.EVT_BUTTON, lambda _e: self._fire(self._on_left_cb))
 
-        self._right_btn = FlatIconButton(self, draw_chevron_right, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} + step", icon_scheme=icon_scheme(BG_CARD))
+        self._right_btn = FlatIconButton(
+            self, draw_chevron_right, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} + step", icon_scheme=icon_scheme(BG_CARD)
+        )
         self._right_btn.Bind(wx.EVT_BUTTON, lambda _e: self._fire(self._on_right_cb))
 
         self._value_box = StatusField(self, height=self._ROW_H, bg=STATUS_SCHEME[0], fg=STATUS_SCHEME[1])
@@ -474,9 +478,7 @@ class PreviewView(wx.Panel):
         self._originals_go_btn.SetAction(lambda: on_go_all())
         self._originals_go_btn.Enable(True)
 
-        self._add_motor_pair_rows(
-            self._originals_panel, self._originals_sizer, positions, self._original_rows, None
-        )
+        self._add_motor_pair_rows(self._originals_panel, self._originals_sizer, positions, self._original_rows, None)
 
         max_text = f"{max_intensity:.4g}" if max_intensity is not None else "—"
         row, _, _ = self._make_snapshot_row(self._originals_panel, "Max intensity", max_text, None)
@@ -551,18 +553,14 @@ class PreviewView(wx.Panel):
             pair_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
             l_key, l_label, l_value, l_prec = left
-            l_cell, l_val_lbl, _ = self._make_snapshot_row(
-                pair, l_label, self._format_original_position(l_value, l_prec), None
-            )
+            l_cell, l_val_lbl, _ = self._make_snapshot_row(pair, l_label, self._format_original_position(l_value, l_prec), None)
             pair_sizer.Add(l_cell, 1, wx.EXPAND)
             if key_map is not None:
                 key_map[l_key] = (l_cell, l_val_lbl, l_prec)
 
             if right is not None:
                 r_key, r_label, r_value, r_prec = right
-                r_cell, r_val_lbl, _ = self._make_snapshot_row(
-                    pair, r_label, self._format_original_position(r_value, r_prec), None
-                )
+                r_cell, r_val_lbl, _ = self._make_snapshot_row(pair, r_label, self._format_original_position(r_value, r_prec), None)
                 pair_sizer.AddSpacer(12)
                 pair_sizer.Add(r_cell, 1, wx.EXPAND)
                 if key_map is not None:
@@ -686,8 +684,11 @@ class PreviewView(wx.Panel):
         self._currents_go_btn.Enable(True)
 
         self._add_motor_pair_rows(
-            self._currents_panel, self._currents_sizer, positions,
-            self._current_pair_rows, self._current_motor_rows,
+            self._currents_panel,
+            self._currents_sizer,
+            positions,
+            self._current_pair_rows,
+            self._current_motor_rows,
         )
 
         max_text = self._format_max(max_intensity)
@@ -757,8 +758,11 @@ class PreviewView(wx.Panel):
         self._bests_go_btn.Enable(True)
 
         self._add_motor_pair_rows(
-            self._bests_panel, self._bests_sizer, positions,
-            self._best_pair_rows, self._best_motor_rows,
+            self._bests_panel,
+            self._bests_sizer,
+            positions,
+            self._best_pair_rows,
+            self._best_motor_rows,
         )
 
         row, value_label, _ = self._make_snapshot_row(self._bests_panel, "Max intensity", self._format_max(max_intensity), None)
