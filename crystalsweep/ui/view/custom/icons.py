@@ -5,9 +5,7 @@
 # ----------------------------------------------------------------------------------
 # Purpose:
 # Icon draw functions for use with IconButton and FlatIconButton.
-# Thin wrappers around wxutils.icons that inject CS-specific colours so
-# icons match the dark theme (ICON_FG stroke, BG_SURFACE hole-punch,
-# ACCENT fill for folder shapes).
+# Colors are pulled from app_theme at draw time so icons follow dark/light mode.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -19,7 +17,7 @@ import math
 
 import wx
 
-from crystalsweep.ui.view.custom.theme import ACCENT, BG_SURFACE, ICON_FG
+from crystalsweep.ui.view.custom.theme import app_theme
 
 __all__ = [
     "draw_chevron_left",
@@ -33,7 +31,7 @@ __all__ = [
 
 
 def _pen(s: float) -> wx.Pen:
-    return wx.Pen(ICON_FG, max(1, int(s * 0.1)))
+    return wx.Pen(app_theme.foreground, max(1, int(s * 0.1)))
 
 
 def draw_chevron_left(gc: wx.GraphicsContext, s: int) -> None:
@@ -62,6 +60,7 @@ def draw_chevron_right(gc: wx.GraphicsContext, s: int) -> None:
 
 def draw_cog(gc: wx.GraphicsContext, s: int) -> None:
     """Gear / settings icon."""
+    t = app_theme
     cx, cy = s / 2.0, s / 2.0
     outer_r, inner_r = s * 0.38, s * 0.22
     tooth_n = 8
@@ -82,21 +81,23 @@ def draw_cog(gc: wx.GraphicsContext, s: int) -> None:
             cy + r * math.sin(angle + half_angle),
         )
     path.CloseSubpath()
-    gc.SetBrush(wx.Brush(ICON_FG))
+    gc.SetBrush(wx.Brush(t.foreground))
     gc.SetPen(wx.TRANSPARENT_PEN)
     gc.FillPath(path)
     hole = gc.CreatePath()
     hole.AddCircle(cx, cy, inner_r)
-    gc.SetBrush(wx.Brush(BG_SURFACE))
+    gc.SetBrush(wx.Brush(t.background))
     gc.FillPath(hole)
 
 
 def draw_folder(gc: wx.GraphicsContext, s: int) -> None:
     """Folder icon with an upward arrow."""
+    t = app_theme
+    accent = t.blue
     m, tab_w, tab_h, r = s * 0.12, s * 0.38, s * 0.16, s * 0.08
     body = gc.CreatePath()
     body.AddRoundedRectangle(m, m + tab_h, s - 2 * m, s - 2 * m - tab_h, r)
-    gc.SetBrush(wx.Brush(wx.Colour(ACCENT.Red(), ACCENT.Green(), ACCENT.Blue(), 200)))
+    gc.SetBrush(wx.Brush(wx.Colour(accent.Red(), accent.Green(), accent.Blue(), 200)))
     gc.SetPen(wx.TRANSPARENT_PEN)
     gc.FillPath(body)
     tab = gc.CreatePath()
@@ -110,22 +111,24 @@ def draw_folder(gc: wx.GraphicsContext, s: int) -> None:
     arrow.MoveToPoint(cx - aw * 0.45, cy - ah * 0.04)
     arrow.AddLineToPoint(cx, cy - ah * 0.5)
     arrow.AddLineToPoint(cx + aw * 0.45, cy - ah * 0.04)
-    gc.SetPen(wx.Pen(BG_SURFACE, max(1, int(s * 0.1))))
+    gc.SetPen(wx.Pen(t.background, max(1, int(s * 0.1))))
     gc.StrokePath(arrow)
 
 
 def draw_folder_open(gc: wx.GraphicsContext, s: int) -> None:
     """Open folder / browse directory icon."""
+    t = app_theme
+    accent = t.blue
     m, r = s * 0.1, s * 0.07
     body = gc.CreatePath()
     body.AddRoundedRectangle(m, m + s * 0.18, s - 2 * m, s - 2 * m - s * 0.18, r)
-    gc.SetBrush(wx.Brush(wx.Colour(ACCENT.Red(), ACCENT.Green(), ACCENT.Blue(), 200)))
+    gc.SetBrush(wx.Brush(wx.Colour(accent.Red(), accent.Green(), accent.Blue(), 200)))
     gc.SetPen(wx.TRANSPARENT_PEN)
     gc.FillPath(body)
     tab = gc.CreatePath()
     tab.AddRoundedRectangle(m, m, s * 0.38, s * 0.18 + r, r * 0.8)
     gc.FillPath(tab)
-    gc.SetPen(wx.Pen(BG_SURFACE, max(1, int(s * 0.09))))
+    gc.SetPen(wx.Pen(t.background, max(1, int(s * 0.09))))
     cx, cy, aw = s * 0.62, s * 0.6, s * 0.18
     path = gc.CreatePath()
     path.MoveToPoint(cx - aw, cy)
@@ -135,9 +138,9 @@ def draw_folder_open(gc: wx.GraphicsContext, s: int) -> None:
 
 def draw_refresh(gc: wx.GraphicsContext, s: int) -> None:
     """Circular refresh / reset icon."""
-    cx, cy, r = s * 0.5, s * 0.5, s * 0.32
     gc.SetPen(_pen(s))
     gc.SetBrush(wx.TRANSPARENT_BRUSH)
+    cx, cy, r = s * 0.5, s * 0.5, s * 0.32
     path = gc.CreatePath()
     path.AddArc(cx, cy, r, math.radians(30), math.radians(330), True)
     gc.StrokePath(path)
@@ -153,10 +156,11 @@ def draw_refresh(gc: wx.GraphicsContext, s: int) -> None:
 
 def draw_update(gc: wx.GraphicsContext, s: int) -> None:
     """Upward arrow / apply / update icon."""
+    fg = app_theme.foreground
     cx = s * 0.5
     stem_top, stem_bot = s * 0.22, s * 0.78
     stem_w, head_w = s * 0.1, s * 0.28
-    gc.SetBrush(wx.Brush(ICON_FG))
+    gc.SetBrush(wx.Brush(fg))
     gc.SetPen(wx.TRANSPARENT_PEN)
     stem = gc.CreatePath()
     stem.AddRectangle(cx - stem_w / 2, stem_top + s * 0.14, stem_w, stem_bot - stem_top - s * 0.14)

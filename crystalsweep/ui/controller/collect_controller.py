@@ -33,7 +33,6 @@ from crystalsweep.model.motor_limits import check_soft_limits, clear_limit_monit
 from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
 from wxutils import FlatWaitDialog
-from crystalsweep.ui.view.custom.theme import dialog_scheme
 
 __all__ = ["CollectController"]
 
@@ -287,7 +286,6 @@ class CollectController:
             title="Collection Aborted",
             message="\n".join(lines),
             status="Cleaning up, please wait\u2026",
-            scheme=dialog_scheme(),
         )
         self._aborting_dlg.Show()
         self._aborting_dlg.Raise()

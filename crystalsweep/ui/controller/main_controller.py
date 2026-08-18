@@ -29,6 +29,7 @@ from crystalsweep.ui.controller.file_settings_controller import FileSettingsCont
 from crystalsweep.ui.controller.preview_controller import PreviewController
 from crystalsweep.ui.controller.script_editor_controller import ScriptEditorController
 from crystalsweep.ui.view import MainView
+from crystalsweep.ui.view.custom.theme import AppTheme
 
 __all__ = ["MainController"]
 
@@ -47,6 +48,7 @@ class MainController:
                 ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
         self._app = wx.App(False)
+        self._app_theme = AppTheme()
         self._model = MainModel()
         self._view = MainView(version=version)
 

@@ -26,24 +26,7 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.theme import (
-    ACCENT,
-    BG_CARD,
-    BG_ELEVATED,
-    BTN_DISABLED,
-    btn_font,
-    DANGER,
-    DANGER_SCHEME,
-    MUTED_SCHEME,
-    FG_SECONDARY,
-    SEP_COLOUR,
-    TEXT_SCHEME,
-    scaled_font,
-    TOGGLE_SCHEME,
-    COMBO_SCHEME,
-    SCROLLBAR_SCHEME,
-)
-
+from crystalsweep.ui.view.custom.theme import app_theme
 from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatScrollBar
 
 __all__ = ["CollectionTableView"]
@@ -90,15 +73,12 @@ class _RowsViewport(wx.Panel):
 
     def __init__(self, parent: wx.Window, on_scroll_changed: Callable[[float, float], None], on_repopulate: Callable[[], None]) -> None:
         super().__init__(parent, style=wx.BORDER_NONE)
-        self.SetBackgroundColour(BG_CARD)
-
         self._on_scroll_changed = on_scroll_changed
         self._on_repopulate = on_repopulate
         self._scroll_offset: int = 0
         self._virtual_height: int = 0
 
         self._rows_panel = wx.Panel(self, style=wx.BORDER_NONE)
-        self._rows_panel.SetBackgroundColour(BG_CARD)
 
         self.Bind(wx.EVT_SIZE, self._on_size)
         self.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
@@ -242,7 +222,6 @@ class _CollectionRow(wx.Panel):
     ) -> None:
         super().__init__(parent, size=(-1, _ROW_H), style=wx.BORDER_NONE)
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
-        self.SetBackgroundColour(BG_CARD)
 
         self._dispatcher = dispatcher
         self._data_idx: int = -1
@@ -261,7 +240,7 @@ class _CollectionRow(wx.Panel):
         inner_h = _ROW_H - 8
 
         def _text(value: str, commit_attr: str) -> FlatTextCtrl:
-            ctrl = FlatTextCtrl(self, value=value, text_scheme=TEXT_SCHEME)
+            ctrl = FlatTextCtrl(self, value=value)
             ctrl.SetMinSize((-1, inner_h))
             handler = self._make_commit_handler(ctrl, commit_attr)
             ctrl.Bind(wx.EVT_KILL_FOCUS, handler)
@@ -274,7 +253,7 @@ class _CollectionRow(wx.Panel):
         self._motor_ctrls: dict[str, FlatTextCtrl] = {}
         for shorthand in motor_shorthands:
             precision = motor_precisions.get(shorthand, 4)
-            ctrl = FlatTextCtrl(self, value="", text_scheme=TEXT_SCHEME)
+            ctrl = FlatTextCtrl(self, value="")
             ctrl.SetMinSize((-1, inner_h))
             handler = self._make_motor_commit_handler(ctrl, shorthand)
             ctrl.Bind(wx.EVT_KILL_FOCUS, handler)
@@ -286,16 +265,16 @@ class _CollectionRow(wx.Panel):
         self._get_btn: FlatButton | None = None
         self._move_btn: FlatButton | None = None
         if motor_shorthands:
-            self._get_btn = FlatButton(self, "Get", color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+            self._get_btn = FlatButton(self, "Get", font=app_theme.btn_font())
             self._get_btn.SetMinSize((-1, inner_h))
             self._get_btn.SetToolTip("Get current motor positions")
             self._get_btn.SetAction(self._dispatch_get)
-            self._move_btn = FlatButton(self, "Move", color_scheme=MUTED_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+            self._move_btn = FlatButton(self, "Move", font=app_theme.btn_font())
             self._move_btn.SetMinSize((-1, inner_h))
             self._move_btn.SetToolTip("Move motors to stored positions")
             self._move_btn.SetAction(self._dispatch_move)
 
-        self._type_combo = FlatCombo(self, choices=list(SCAN_TYPES), choice_colours=_TYPE_COLOURS, combo_scheme=COMBO_SCHEME)
+        self._type_combo = FlatCombo(self, choices=list(SCAN_TYPES), choice_colours=_TYPE_COLOURS)
         self._type_combo.SetMinSize((-1, inner_h))
         self._type_combo.Bind(wx.EVT_CHOICE, self._on_type_commit)
 
@@ -316,10 +295,9 @@ class _CollectionRow(wx.Panel):
         self._time_ctrl.SetValidator(self._make_motor_validator(4))
 
         self._remove_btn_panel = wx.Panel(self, style=wx.BORDER_NONE)
-        self._remove_btn_panel.SetBackgroundColour(BG_CARD)
         self._remove_btn_panel.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._remove_btn_panel.Bind(wx.EVT_PAINT, self._on_remove_panel_paint)
-        self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=app_theme.danger_scheme(), font=app_theme.btn_font())
         self._remove_btn.SetMinSize((inner_h, inner_h))
         self._remove_btn.SetToolTip("Remove row")
         self._remove_btn.SetAction(self._dispatch_remove)
@@ -514,13 +492,13 @@ class _CollectionRow(wx.Panel):
             gc.StrokeLine(x, 0, x, h)
 
         if self._limit_error:
-            gc.SetPen(wx.Pen(DANGER, 2))
+            gc.SetPen(wx.Pen(app_theme.red, 2))
             gc.SetBrush(wx.TRANSPARENT_BRUSH)
             gc.StrokeLine(1, 1, w, 1)
             gc.StrokeLine(1, h - 2, w, h - 2)
             gc.StrokeLine(1, 1, 1, h - 2)
         elif self._active:
-            gc.SetPen(wx.Pen(ACCENT, 2))
+            gc.SetPen(wx.Pen(app_theme.blue, 2))
             gc.SetBrush(wx.TRANSPARENT_BRUSH)
             gc.StrokeLine(1, 1, w, 1)
             gc.StrokeLine(1, h - 2, w, h - 2)
@@ -541,13 +519,13 @@ class _CollectionRow(wx.Panel):
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
         if self._limit_error:
-            gc.SetPen(wx.Pen(DANGER, 2))
+            gc.SetPen(wx.Pen(app_theme.red, 2))
             gc.SetBrush(wx.TRANSPARENT_BRUSH)
             gc.StrokeLine(w - 1, 1, w - 1, h - 1)
             gc.StrokeLine(0, 1, w - 1, 1)
             gc.StrokeLine(0, h - 2, w - 1, h - 2)
         elif self._active:
-            gc.SetPen(wx.Pen(ACCENT, 2))
+            gc.SetPen(wx.Pen(app_theme.blue, 2))
             gc.SetBrush(wx.TRANSPARENT_BRUSH)
             gc.StrokeLine(w - 1, 1, w - 1, h - 1)
             gc.StrokeLine(0, 1, w - 1, 1)
@@ -636,7 +614,7 @@ class _HeaderRow(wx.Panel):
         on_select_all: Callable[[bool], None],
     ) -> None:
         super().__init__(parent, size=(-1, _HEADER_H), style=wx.BORDER_NONE)
-        self.SetBackgroundColour(_HEADER_BG)
+        self.SetBackgroundColour(app_theme.background)
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._col_widths = col_widths
         self._is_map = False
@@ -690,14 +668,14 @@ class _HeaderRow(wx.Panel):
         if gc is None:
             return
 
-        gc.SetBrush(wx.Brush(_HEADER_BG))
+        gc.SetBrush(wx.Brush(app_theme.background))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
 
         _draw_checkbox(gc, self._checkbox_rect(), self._all_selected)
 
-        font = scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
-        gc.SetFont(font, FG_SECONDARY)
+        font = app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
+        gc.SetFont(font, app_theme.foreground)
 
         x = 0
         gc.SetPen(wx.Pen(_BORDER, 1))
@@ -746,7 +724,6 @@ class CollectionTableView(wx.Panel):
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent, style=wx.BORDER_NONE)
-        self.SetBackgroundColour(BG_CARD)
 
         self._motor_shorthands: list[str] = []
         self._motor_precisions: dict[str, int] = {}
@@ -909,32 +886,28 @@ class CollectionTableView(wx.Panel):
         return [_CHECK_W, ext_w] + [_MOTOR_W] * n_motor + motor_action_cols + [_TYPE_W, _ROT_W, _ROT_W, _STEP_W, _TIME_W, _REMOVE_W]
 
     def _build_layout(self) -> None:
-        self._delete_selected_btn = FlatButton(self, "Delete selected", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._delete_selected_btn = FlatButton(self, "Delete selected", color_scheme=app_theme.danger_scheme(), font=app_theme.btn_font())
         self._delete_selected_btn.SetMinSize((100, 22))
         self._delete_selected_btn.SetAction(self._on_delete_selected_clicked)
 
-        self._clear_btn = FlatButton(self, "Clear all", color_scheme=DANGER_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._clear_btn = FlatButton(self, "Clear all", color_scheme=app_theme.danger_scheme(), font=app_theme.btn_font())
         self._clear_btn.SetMinSize((70, 22))
         self._clear_btn.SetAction(self._on_clear_clicked)
 
-        self._slew_scan_toggle = FlatCheckBox(self, "Trajectory scanning", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
-        self._slew_scan_toggle.SetBackgroundColour(BG_CARD)
+        self._slew_scan_toggle = FlatCheckBox(self, "Trajectory scanning")
         self._slew_scan_toggle.SetValue(True)
         self._slew_scan_toggle.Hide()
         self._slew_scan_toggle.SetAction(lambda v: self._on_trajectory_toggled(v))
 
-        self._use_ext_toggle = FlatCheckBox(self, "Use Ext.", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
-        self._use_ext_toggle.SetBackgroundColour(BG_CARD)
+        self._use_ext_toggle = FlatCheckBox(self, "Use Ext.")
         self._use_ext_toggle.SetValue(True)
         self._use_ext_toggle.SetAction(lambda v: self._on_use_ext_toggled(v))
 
-        self._keep_shutter_open_toggle = FlatCheckBox(self, "Keep shutter open", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
-        self._keep_shutter_open_toggle.SetBackgroundColour(BG_CARD)
+        self._keep_shutter_open_toggle = FlatCheckBox(self, "Keep shutter open")
         self._keep_shutter_open_toggle.SetAction(lambda v: self._on_keep_shutter_open_toggled(v))
         self._keep_shutter_open_toggle.Hide()
 
-        self._snake_combine_toggle = FlatCheckBox(self, "Combine map", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
-        self._snake_combine_toggle.SetBackgroundColour(BG_CARD)
+        self._snake_combine_toggle = FlatCheckBox(self, "Combine map")
         self._snake_combine_toggle.SetAction(lambda v: self._on_snake_combine_toggled(v))
         self._snake_combine_toggle.Hide()
 
@@ -948,7 +921,7 @@ class CollectionTableView(wx.Panel):
         title_row.Add(self._clear_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
 
         title_sep = wx.Panel(self, size=(-1, 1))
-        title_sep.SetBackgroundColour(SEP_COLOUR)
+        title_sep.SetBackgroundColour(app_theme.bright_black)
 
         self._header = _HeaderRow(
             self,
@@ -961,13 +934,12 @@ class CollectionTableView(wx.Panel):
         header_border = wx.Panel(self, size=(-1, 1))
         header_border.SetBackgroundColour(_BORDER)
 
-        self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll, scrollbar_scheme=SCROLLBAR_SCHEME)
+        self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll)
         self._viewport = _RowsViewport(
             self,
             on_scroll_changed=self._on_scroll_changed,
             on_repopulate=self._repopulate_visible,
         )
-        self._scrollbar.SetBackgroundColour(BG_ELEVATED)
 
         scroll_row = wx.BoxSizer(wx.HORIZONTAL)
         scroll_row.Add(self._viewport, 1, wx.EXPAND)
@@ -1323,7 +1295,7 @@ class CollectionTableView(wx.Panel):
 
     def _bind_pool_row(self, row: _CollectionRow, data_idx: int) -> None:
         point = self._points[data_idx]
-        bg = BG_CARD
+        bg = app_theme.black
         selected = self._selected_flags[data_idx]
         active = self._active_index == data_idx
         limit_error = self._limit_error_flags[data_idx]
