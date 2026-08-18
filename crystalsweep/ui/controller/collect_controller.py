@@ -25,14 +25,14 @@ from typing import Callable
 
 import wx
 from epics import caget, caput, caput_many
+from wxutils import FlatWaitDialog
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
-from crystalsweep.model.motor_limits import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
 from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
-from wxutils import FlatWaitDialog
+from crystalsweep.utils import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
 
 __all__ = ["CollectController"]
 

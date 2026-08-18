@@ -24,9 +24,9 @@ from crystalsweep.model.beamline_config_model import BeamlineConfig, MotorConfig
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.model.file_settings_model import FileSettingsModel
-from crystalsweep.model.motor_limits import check_soft_limits
 from crystalsweep.model.scan_model import ScanSpec, get_driver
 from crystalsweep.model.script_model import ScriptModel
+from crystalsweep.utils import check_soft_limits
 
 __all__ = ["ScanEngine"]
 

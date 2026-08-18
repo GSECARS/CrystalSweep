@@ -21,12 +21,12 @@ from typing import Callable
 
 import wx
 from epics import caget, camonitor, camonitor_clear, caput
+from wxutils import FlatMessageDialog
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.beamline_config_model import BeamlineConfig, DetectorConfig, MotorConfig
-from crystalsweep.model.motor_limits import check_soft_limits
-from wxutils import FlatMessageDialog
 from crystalsweep.ui.view.preview_view import CenteringMotorSpec, PreviewView
+from crystalsweep.utils import check_soft_limits
 
 __all__ = ["PreviewController"]
 
