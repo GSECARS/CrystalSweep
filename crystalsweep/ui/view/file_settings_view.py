@@ -21,9 +21,8 @@ from typing import Callable
 
 import wx
 
-from crystalsweep.ui.view.custom.icons import draw_folder, draw_folder_open, draw_refresh, draw_update
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatCheckBox, FlatTextCtrl, FlatIconButton
+from wxutils import FlatCheckBox, FlatTextCtrl, FlatIconButton, draw_arrow_up, draw_folder, draw_folder_open, draw_refresh
 
 __all__ = ["FileSettingsView"]
 
@@ -97,7 +96,7 @@ class FileSettingsView(wx.Panel):
         self._filename_ctrl = FlatTextCtrl(self)
         self._filename_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_filename_enter)
         self._filename_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_filename_enter)
-        self._filename_update_btn = FlatIconButton(self, draw_update, icon_size=16, tooltip="Update filename")
+        self._filename_update_btn = FlatIconButton(self, draw_arrow_up, icon_size=16, tooltip="Update filename")
         self._filename_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_filename_update_cb))
         self._frame_lbl = self._field_label("Frame #", label_font)
         frame_lbl = self._frame_lbl
@@ -106,7 +105,7 @@ class FileSettingsView(wx.Panel):
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_enter)
         self._frame_reset_btn = FlatIconButton(self, draw_refresh, icon_size=16, tooltip="Reset frame number")
         self._frame_reset_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_reset())
-        self._frame_update_btn = FlatIconButton(self, draw_update, icon_size=16, tooltip="Update frame number")
+        self._frame_update_btn = FlatIconButton(self, draw_arrow_up, icon_size=16, tooltip="Update frame number")
         self._frame_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_update())
         vsep = wx.Panel(self, size=(1, -1))
         vsep.SetBackgroundColour(app_theme.bright_black)
@@ -139,7 +138,7 @@ class FileSettingsView(wx.Panel):
         self._path_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_path_enter)
         self._path_browse_btn = FlatIconButton(self, draw_folder_open, icon_size=16, tooltip="Browse for directory")
         self._path_browse_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_directory())
-        self._path_update_btn = FlatIconButton(self, draw_update, icon_size=16, tooltip="Update path")
+        self._path_update_btn = FlatIconButton(self, draw_arrow_up, icon_size=16, tooltip="Update path")
         self._path_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_path_update_cb))
         row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         row.AddSpacer(6)

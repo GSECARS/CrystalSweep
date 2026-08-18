@@ -19,9 +19,8 @@ from typing import Callable
 import wx
 
 from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.icons import draw_chevron_left, draw_chevron_right
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatButton, FlatTextCtrl, StatusField, FlatIconButton
+from wxutils import FlatButton, FlatTextCtrl, StatusField, FlatIconButton, draw_chevron_left, draw_chevron_right
 
 __all__ = ["CenteringMotorSpec", "PreviewView"]
 

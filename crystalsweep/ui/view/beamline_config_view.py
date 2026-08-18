@@ -19,7 +19,6 @@ from typing import Callable, Protocol
 import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
-from crystalsweep.ui.view.custom.icons import draw_folder
 from crystalsweep.ui.view.custom.theme import app_theme
 from wxutils import (
     FlatButton,
@@ -32,6 +31,7 @@ from wxutils import (
     FlatScrolledPanel,
     FlatTableHeader,
     FlatTableRow,
+    draw_folder,
 )
 
 __all__ = [
