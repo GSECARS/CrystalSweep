@@ -17,10 +17,10 @@
 from typing import Callable
 
 import wx
+from wxutils import FlatButton, FlatIconButton, FlatTextCtrl, StatusField, draw_chevron_left, draw_chevron_right
 
-from crystalsweep.model.validation import MotorPositionValidator
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatButton, FlatTextCtrl, StatusField, FlatIconButton, draw_chevron_left, draw_chevron_right
+from crystalsweep.utils import MotorPositionValidator
 
 __all__ = ["CenteringMotorSpec", "PreviewView"]
 
