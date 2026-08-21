@@ -131,6 +131,20 @@ class CollectController:
             self._view.collect.set_status(reason, wx.Colour(220, 80, 40))
             return
 
+        conflicts = self._check_output_conflicts(points)
+        if conflicts:
+            lines = "\n".join(f"  {c}" for c in conflicts[:10])
+            if len(conflicts) > 10:
+                lines += f"\n  ... and {len(conflicts) - 10} more"
+            with wx.MessageDialog(
+                self._view,
+                f"The following output paths already exist and may be overwritten:\n\n{lines}\n\nProceed anyway?",
+                "Output already exists",
+                wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
+            ) as dlg:
+                if dlg.ShowModal() != wx.ID_YES:
+                    return
+
         self._abort_event.clear()
         self._start_time = _time.monotonic()
         if self._on_collecting_changed is not None:
@@ -1056,6 +1070,54 @@ class CollectController:
     def _raw_dir(self, config) -> "Path | None":
         raw = config.raw_directory.strip() if config else ""
         return Path(raw) if raw else None
+
+    def _check_output_conflicts(self, points: list) -> list[str]:
+        """Return a list of existing paths that collection would overwrite."""
+        fs = self._model.file_settings
+        config = self._model.beamline.active
+        raw = self._raw_dir(config)
+        det = config.active_detector_config if config else None
+        ext = det.file_format if det else "hdf5"
+        base = fs.filename or ""
+        map_ext = fs.map_ext.strip()
+        out_dir = Path(str(fs.directory))
+        write_root = raw if raw else out_dir
+
+        conflicts: list[str] = []
+        seen: set[str] = set()
+
+        map_groups: set[str] = set()
+        has_non_map = False
+        for p in points:
+            if p.map_group:
+                map_groups.add(p.map_group)
+            else:
+                has_non_map = True
+
+        if has_non_map:
+            pattern = f"{base}*.{ext}" if base else f"*.{ext}"
+            key = f"{write_root}/{pattern}"
+            if key not in seen:
+                seen.add(key)
+                matches = list(write_root.glob(pattern)) if write_root.is_dir() else []
+                if matches:
+                    conflicts.append(f"{write_root}/{pattern} ({len(matches)} file(s) exist)")
+
+        for group in sorted(map_groups):
+            folder_suffix = map_ext if map_ext else "map"
+            folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
+            map_dir = write_root / folder_name
+            if str(map_dir) not in seen:
+                seen.add(str(map_dir))
+                if map_dir.is_dir() and any(map_dir.iterdir()):
+                    conflicts.append(f"{map_dir}/ (directory not empty)")
+            combined = out_dir / f"{folder_name}.h5"
+            if str(combined) not in seen:
+                seen.add(str(combined))
+                if combined.exists():
+                    conflicts.append(str(combined))
+
+        return conflicts
 
     def _spawn_file_copy(self, point: CollectionPoint, config, frame_number: int | None = None) -> None:
         """Copy the raw detector file to the output directory after a non-map point.
