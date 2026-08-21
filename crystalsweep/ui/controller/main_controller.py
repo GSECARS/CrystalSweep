@@ -79,6 +79,8 @@ class MainController:
     def _on_collecting_changed(self, collecting: bool) -> None:
         self._view.set_ui_collecting(collecting)
         self._beamline_config_controller.set_collecting(collecting)
+        if not collecting:
+            self._file_settings_controller.push_to_detector()
 
     def _on_config_applied(self, cfg: BeamlineConfig) -> None:
         self._ad_viewer_controller.resubscribe_detector()

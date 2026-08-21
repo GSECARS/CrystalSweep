@@ -16,11 +16,13 @@
 import json
 import logging
 import multiprocessing
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
 import time as _time
+from pathlib import Path
 from typing import Callable
 
 import wx
@@ -1024,15 +1026,24 @@ class CollectController:
             return
 
         fs = self._model.file_settings
+        config = self._model.beamline.active
+        raw = self._raw_dir(config)
         base = fs.filename or ""
         map_ext = fs.map_ext.strip()
         folder_suffix = map_ext if map_ext else "map"
         folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
-        input_dir = f"{str(fs.directory).rstrip('/')}/{folder_name}"
         map_stem = folder_name
-        output_path = f"{input_dir}/{map_stem}.h5"
-        flipped_dir = f"{input_dir}/{map_stem}_flipped"
         pattern = f"{map_stem}_*.h5"
+        out_dir = str(fs.directory).rstrip("/")
+
+        if raw:
+            input_dir = f"{str(raw).rstrip('/')}/{folder_name}"
+            flipped_dir = f"{str(raw).rstrip('/')}/{folder_name}_flipped"
+        else:
+            input_dir = f"{out_dir}/{folder_name}"
+            flipped_dir = f"{out_dir}/{folder_name}_flipped"
+
+        output_path = f"{out_dir}/{map_stem}.h5"
 
         self._launch_snake_combiner(
             input_dir=input_dir,
@@ -1041,6 +1052,50 @@ class CollectController:
             first_row_reversed=False,
             flipped_dir=flipped_dir,
         )
+
+    def _raw_dir(self, config) -> "Path | None":
+        raw = config.raw_directory.strip() if config else ""
+        return Path(raw) if raw else None
+
+    def _spawn_file_copy(self, point: CollectionPoint, config, frame_number: int | None = None) -> None:
+        """Copy the raw detector file to the output directory after a non-map point.
+
+        Only runs when a raw_directory is configured and the point is not part
+        of a map group. Map row files stay in raw; only the combined output
+        reaches the output directory via the snake combiner."""
+        if point.map_group:
+            return
+        raw = self._raw_dir(config)
+        if raw is None:
+            return
+
+        fs = self._model.file_settings
+        det = config.active_detector_config if config else None
+        width = det.file_number_width if det else 4
+        source_ext = det.file_format if det else "h5"
+        label = point.label.strip() if fs.use_ext else ""
+        base = fs.filename or ""
+        parts = [p for p in [base, label] if p]
+        filenumber = frame_number if frame_number is not None else fs.frame_number
+        stem = "_".join(parts) if parts else base
+        basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
+        dst_dir = Path(str(fs.directory))
+
+        def _copy() -> None:
+            try:
+                dst_dir.mkdir(parents=True, exist_ok=True)
+                direct = raw / f"{basename}.{source_ext}"
+                if direct.is_file():
+                    shutil.copy2(str(direct), str(dst_dir / direct.name))
+                    _log.debug("copied %s -> %s", direct, dst_dir)
+                else:
+                    for f in sorted(raw.glob(f"{basename}*")):
+                        shutil.copy2(str(f), str(dst_dir / f.name))
+                        _log.debug("copied %s -> %s", f, dst_dir)
+            except Exception as exc:
+                _log.warning("_spawn_file_copy: %s", exc)
+
+        threading.Thread(target=_copy, daemon=True, name="file-copy").start()
 
     def _spawn_format_conversion(self, point: CollectionPoint, frame_number: int | None = None) -> None:
         """Spawn the format converter for a collection point.
@@ -1061,15 +1116,15 @@ class CollectController:
         config = self._model.beamline.active
         det = config.active_detector_config
         width = det.file_number_width if det else 4
+        raw = self._raw_dir(config)
+        out_dir = str(fs.directory)
 
         label = point.label.strip() if fs.use_ext else ""
         base = fs.filename or ""
         map_ext = fs.map_ext.strip() if point.map_group else ""
-        directory = str(fs.directory)
         if point.map_group:
             folder_suffix = map_ext if map_ext else "map"
             folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
-            directory = f"{directory.rstrip('/')}/{folder_name}"
             effective_map_ext = map_ext if map_ext else "map"
             parts = [p for p in [base, effective_map_ext] if p]
             map_label = point.label.strip()
@@ -1079,18 +1134,20 @@ class CollectController:
                 filenumber = frame_number if frame_number is not None else fs.frame_number
             map_stem = "_".join(parts) if parts else base
             basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
-            converted_root = f"{directory.rstrip('/')}/{map_stem}_converted"
+            src_dir = f"{str(raw).rstrip('/')}/{folder_name}" if raw else f"{out_dir.rstrip('/')}/{folder_name}"
+            converted_root = f"{out_dir.rstrip('/')}/{folder_name}/{map_stem}_converted"
         else:
             parts = [p for p in [base, label] if p]
             filenumber = frame_number if frame_number is not None else fs.frame_number
             stem = "_".join(parts) if parts else base
             basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
-            converted_root = f"{directory.rstrip('/')}/{basename}_converted"
+            src_dir = str(raw) if raw else out_dir
+            converted_root = f"{out_dir.rstrip('/')}/{basename}_converted"
 
         output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
 
         self._launch_format_converter(
-            directory=directory,
+            directory=src_dir,
             basename=basename,
             source_format=source_format,
             extras=extras,
@@ -1123,12 +1180,13 @@ class CollectController:
         config = self._model.beamline.active
         det = config.active_detector_config
         width = det.file_number_width if det else 4
+        raw = self._raw_dir(config)
+        out_dir = str(fs.directory)
 
         base = fs.filename or ""
         map_ext = fs.map_ext.strip()
         folder_suffix = map_ext if map_ext else "map"
         folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
-        directory = f"{str(fs.directory).rstrip('/')}/{folder_name}"
         effective_map_ext = map_ext if map_ext else "map"
         parts = [p for p in [base, effective_map_ext] if p]
         map_label = ref.label.strip()
@@ -1138,11 +1196,12 @@ class CollectController:
             filenumber = first_frame_number if first_frame_number is not None else fs.frame_number
         map_stem = "_".join(parts) if parts else base
         basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
-        converted_root = f"{directory.rstrip('/')}/{map_stem}_converted"
+        src_dir = f"{str(raw).rstrip('/')}/{folder_name}" if raw else f"{out_dir.rstrip('/')}/{folder_name}"
+        converted_root = f"{out_dir.rstrip('/')}/{folder_name}/{map_stem}_converted"
         output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
 
         self._launch_format_converter(
-            directory=directory,
+            directory=src_dir,
             basename=basename,
             source_format=source_format,
             extras=extras,
@@ -1335,6 +1394,7 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._spawn_file_copy(point, config)
             self._spawn_format_conversion(point)
             self._spawn_crysalis_conversion(point)
 
@@ -1418,6 +1478,7 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._spawn_file_copy(point, config, frame_number_before)
             self._spawn_format_conversion(point, frame_number_before)
             self._spawn_crysalis_conversion(point, frame_number_before)
 
@@ -1495,5 +1556,6 @@ class CollectController:
             self._abort_event.set()
 
         else:
+            self._spawn_file_copy(point, config)
             self._spawn_format_conversion(point)
             self._spawn_crysalis_conversion(point)

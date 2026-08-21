@@ -800,8 +800,9 @@ class ScanEngine:
         If either prefix is empty the local path string is used as-is.
         AutoIncrement is disabled when the collection point has a non-empty label.
         """
-        local_dir = str(file_settings.directory)
         det = config.active_detector_config
+        raw = config.raw_directory.strip()
+        local_dir = raw if raw else str(file_settings.directory)
         remote_dir = det.translate_path(local_dir) if det else local_dir
         use_ext = getattr(file_settings, "use_ext", True)
         label = point.label.strip() if use_ext else ""

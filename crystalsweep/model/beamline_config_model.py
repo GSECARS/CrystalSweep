@@ -168,6 +168,7 @@ class BeamlineConfig:
     preview_exposure: float = 0.1
     preview_timeout: float = 60.0
     preview_num_images: int = 1000000
+    raw_directory: str = ""
 
     @property
     def is_empty(self) -> bool:
@@ -357,6 +358,7 @@ class BeamlineConfigModel:
             preview_exposure=max(0.0, float(data.get("preview_exposure", 0.1))),
             preview_timeout=max(0.0, float(data.get("preview_timeout", 60.0))),
             preview_num_images=max(1, int(data.get("preview_num_images", 1000000))),
+            raw_directory=str(data.get("raw_directory", "")),
         )
         self._active = cfg
         return cfg
@@ -431,6 +433,7 @@ class BeamlineConfigModel:
             "preview_exposure": config.preview_exposure,
             "preview_timeout": config.preview_timeout,
             "preview_num_images": config.preview_num_images,
+            "raw_directory": config.raw_directory,
         }
 
         path = self.path_for(config.name)
