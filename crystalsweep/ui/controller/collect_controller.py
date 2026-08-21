@@ -1038,10 +1038,10 @@ class CollectController:
 
         if raw:
             input_dir = f"{str(raw).rstrip('/')}/{folder_name}"
-            flipped_dir = f"{str(raw).rstrip('/')}/{folder_name}_flipped"
+            flipped_dir = f"{str(raw).rstrip('/')}/{folder_name}/flipped"
         else:
             input_dir = f"{out_dir}/{folder_name}"
-            flipped_dir = f"{out_dir}/{folder_name}_flipped"
+            flipped_dir = f"{out_dir}/{folder_name}/flipped"
 
         output_path = f"{out_dir}/{map_stem}.h5"
 
@@ -1079,7 +1079,7 @@ class CollectController:
         filenumber = frame_number if frame_number is not None else fs.frame_number
         stem = "_".join(parts) if parts else base
         basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
-        dst_dir = Path(str(fs.directory))
+        dst_dir = Path(str(fs.directory)) / basename
 
         def _copy() -> None:
             try:
@@ -1135,14 +1135,14 @@ class CollectController:
             map_stem = "_".join(parts) if parts else base
             basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
             src_dir = f"{str(raw).rstrip('/')}/{folder_name}" if raw else f"{out_dir.rstrip('/')}/{folder_name}"
-            converted_root = f"{out_dir.rstrip('/')}/{folder_name}/{map_stem}_converted"
+            converted_root = f"{out_dir.rstrip('/')}/{folder_name}/{map_stem}"
         else:
             parts = [p for p in [base, label] if p]
             filenumber = frame_number if frame_number is not None else fs.frame_number
             stem = "_".join(parts) if parts else base
             basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
             src_dir = str(raw) if raw else out_dir
-            converted_root = f"{out_dir.rstrip('/')}/{basename}_converted"
+            converted_root = f"{out_dir.rstrip('/')}/{basename}"
 
         output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
 
@@ -1197,7 +1197,7 @@ class CollectController:
         map_stem = "_".join(parts) if parts else base
         basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
         src_dir = f"{str(raw).rstrip('/')}/{folder_name}" if raw else f"{out_dir.rstrip('/')}/{folder_name}"
-        converted_root = f"{out_dir.rstrip('/')}/{folder_name}/{map_stem}_converted"
+        converted_root = f"{out_dir.rstrip('/')}/{folder_name}/{map_stem}"
         output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
 
         self._launch_format_converter(
@@ -1249,10 +1249,10 @@ class CollectController:
         det_width = det.file_number_width if det else 4
         full_basename = f"{basename}_{int(filenumber):0{max(1, det_width)}d}"
         if point.map_group:
-            converted_root = f"{directory.rstrip('/')}/{basename}_converted"
+            converted_root = f"{directory.rstrip('/')}/{basename}"
             crysalis_output_dir = f"{converted_root}/crysalis/{full_basename}"
         else:
-            converted_root = f"{directory.rstrip('/')}/{full_basename}_converted"
+            converted_root = f"{directory.rstrip('/')}/{full_basename}"
             crysalis_output_dir = f"{converted_root}/crysalis"
 
         step_p = point.parse_step_params()

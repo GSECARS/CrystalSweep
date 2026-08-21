@@ -304,7 +304,7 @@ def combine_snake_map(
     if not input_dir.is_dir():
         raise RuntimeError(f"Input directory not found: {input_dir}")
 
-    target_flipped_dir = flipped_dir or input_dir.with_name(f"{input_dir.name}_flipped")
+    target_flipped_dir = flipped_dir or input_dir / "flipped"
 
     # ``glob`` is non-recursive so files inside ``target_flipped_dir`` are not
     # rediscovered; we only need to skip a combined output that may have been
