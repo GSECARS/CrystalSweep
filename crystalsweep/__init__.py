@@ -19,6 +19,7 @@ def main() -> None:
     """Main entry point for `crystalsweep` console script."""
     parser = ArgumentParser("CrystalSweep CLI")
     parser.add_argument("-g", "--gui", action="store_true", help="launch the GUI application")
+    parser.add_argument("-t", "--test", action="store_true", help="run the test suite")
 
     args = parser.parse_args()
 
@@ -27,5 +28,10 @@ def main() -> None:
         from crystalsweep.ui import start_ui
 
         start_ui()
+    elif args.test:
+        import sys
+        import pytest
+
+        sys.exit(pytest.main([]))
     else:
         parser.print_help()
