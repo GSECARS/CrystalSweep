@@ -1088,6 +1088,7 @@ class CollectController:
         conflicts: list[str] = []
         seen: set[str] = set()
 
+        width = det.file_number_width if det else 4
         map_groups: set[str] = set()
         for p in points:
             if p.map_group:
@@ -1095,13 +1096,12 @@ class CollectController:
                 continue
             label = p.label.strip() if fs.use_ext else ""
             parts = [s for s in [base, label] if s]
-            stem = "_".join(parts) if parts else base
-            pattern = f"{stem}*.{ext}" if stem else f"*.{ext}"
-            if pattern not in seen:
-                seen.add(pattern)
-                matches = list(write_root.glob(pattern)) if write_root.is_dir() else []
-                if matches:
-                    conflicts.append(f"{write_root}/{pattern} ({len(matches)} file(s) exist)")
+            filename = "_".join(parts) if parts else base
+            exact = write_root / f"{filename}_{int(fs.frame_number):0{max(1, width)}d}.{ext}"
+            if str(exact) not in seen:
+                seen.add(str(exact))
+                if exact.exists():
+                    conflicts.append(str(exact))
 
         for group in sorted(map_groups):
             folder_suffix = map_ext if map_ext else "map"
