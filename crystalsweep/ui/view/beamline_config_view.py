@@ -681,6 +681,21 @@ class GeneralConfigView(wx.Panel):
         r_sizer.Add(self._add_restore_btn, 0, wx.EXPAND)
         r_body.SetSizer(r_sizer)
 
+        self._raw_dir_section = _Section(self, "Raw Directory")
+        rd_body = self._raw_dir_section.body
+        self._raw_directory_ctrl = FlatTextCtrl(rd_body, placeholder="e.g. /mnt/fast_scratch/raw")
+        self._raw_directory_ctrl.SetMinSize((-1, 28))
+        self._raw_directory_btn = FlatIconButton(rd_body, draw_folder, icon_size=16, tooltip="Browse for raw directory")
+        self._raw_directory_btn.Bind(wx.EVT_BUTTON, lambda _: self._browse_raw_directory())
+        raw_row = wx.BoxSizer(wx.HORIZONTAL)
+        raw_row.Add(self._raw_directory_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        raw_row.AddSpacer(4)
+        raw_row.Add(self._raw_directory_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+        rd_sizer = wx.BoxSizer(wx.VERTICAL)
+        rd_sizer.Add(_label(rd_body, "Path", secondary=True), 0, wx.BOTTOM, 4)
+        rd_sizer.Add(raw_row, 0, wx.EXPAND)
+        rd_body.SetSizer(rd_sizer)
+
         self._status_label = _status_label(self)
 
         outer = wx.BoxSizer(wx.VERTICAL)
@@ -688,6 +703,7 @@ class GeneralConfigView(wx.Panel):
         outer.Add(self._scan_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._abort_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._restore_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        outer.Add(self._raw_dir_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
         self.SetMinSize((400, -1))
@@ -707,6 +723,7 @@ class GeneralConfigView(wx.Panel):
         self._clear_restore_pv_rows()
         for pv in config.restore_pvs:
             self._append_restore_pv_row(pv)
+        self._raw_directory_ctrl.SetValue(config.raw_directory)
         self.set_status("")
 
     def beamline_name(self) -> str:
@@ -733,6 +750,9 @@ class GeneralConfigView(wx.Panel):
     def collect_restore_pvs(self) -> tuple[str, ...]:
         return tuple(row.to_restore_pv() for row in self._restore_pv_rows if row.to_restore_pv())
 
+    def raw_directory(self) -> str:
+        return self._raw_directory_ctrl.GetValue().strip()
+
     def set_status(self, text: str, error: bool = False) -> None:
         self._status_label.SetForegroundColour(app_theme.red if error else app_theme.bright_black)
         self._status_label.SetLabel(text)
@@ -741,6 +761,12 @@ class GeneralConfigView(wx.Panel):
     def trigger_save(self) -> None:
         if self._on_save_cb is not None:
             self._on_save_cb()
+
+    def _browse_raw_directory(self) -> None:
+        current = self._raw_directory_ctrl.GetValue().strip()
+        with wx.DirDialog(self, "Select raw directory", defaultPath=current or "") as dlg:
+            if dlg.ShowModal() == wx.ID_OK:
+                self._raw_directory_ctrl.SetValue(dlg.GetPath())
 
     def _clear_abort_pv_rows(self) -> None:
         for row in self._abort_pv_rows:
