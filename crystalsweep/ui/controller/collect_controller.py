@@ -42,6 +42,7 @@ _log = logging.getLogger(__name__)
 
 _PROGRESS_INTERVAL_MS = 100
 _TRIGGERING_POLL_S = 0.05
+_FORMAT_EXT = {"hdf5": "h5", "cbf": "cbf", "tif": "tif"}
 
 
 class CollectController:
@@ -1077,7 +1078,7 @@ class CollectController:
         config = self._model.beamline.active
         raw = self._raw_dir(config)
         det = config.active_detector_config if config else None
-        ext = det.file_format if det else "hdf5"
+        ext = _FORMAT_EXT.get(det.file_format, det.file_format) if det else "h5"
         base = fs.filename or ""
         map_ext = fs.map_ext.strip()
         out_dir = Path(str(fs.directory))
@@ -1134,7 +1135,7 @@ class CollectController:
         fs = self._model.file_settings
         det = config.active_detector_config if config else None
         width = det.file_number_width if det else 4
-        source_ext = det.file_format if det else "h5"
+        source_ext = _FORMAT_EXT.get(det.file_format, det.file_format) if det else "h5"
         label = point.label.strip() if fs.use_ext else ""
         base = fs.filename or ""
         parts = [p for p in [base, label] if p]
