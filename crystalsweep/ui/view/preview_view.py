@@ -314,6 +314,11 @@ class PreviewView(wx.Panel):
         for row in self._centering_rows.values():
             row.set_enabled(previewing)
 
+    def set_collecting(self, collecting: bool) -> None:
+        self._toggle_btn.Enable(not collecting)
+        for row in self._centering_rows.values():
+            row.set_enabled(self._previewing and not collecting)
+
     def _build_column1(self) -> wx.BoxSizer:
         col = wx.BoxSizer(wx.VERTICAL)
 
