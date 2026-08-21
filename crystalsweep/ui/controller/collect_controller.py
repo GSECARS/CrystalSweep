@@ -1089,18 +1089,16 @@ class CollectController:
         seen: set[str] = set()
 
         map_groups: set[str] = set()
-        has_non_map = False
         for p in points:
             if p.map_group:
                 map_groups.add(p.map_group)
-            else:
-                has_non_map = True
-
-        if has_non_map:
-            pattern = f"{base}*.{ext}" if base else f"*.{ext}"
-            key = f"{write_root}/{pattern}"
-            if key not in seen:
-                seen.add(key)
+                continue
+            label = p.label.strip() if fs.use_ext else ""
+            parts = [s for s in [base, label] if s]
+            stem = "_".join(parts) if parts else base
+            pattern = f"{stem}*.{ext}" if stem else f"*.{ext}"
+            if pattern not in seen:
+                seen.add(pattern)
                 matches = list(write_root.glob(pattern)) if write_root.is_dir() else []
                 if matches:
                     conflicts.append(f"{write_root}/{pattern} ({len(matches)} file(s) exist)")
