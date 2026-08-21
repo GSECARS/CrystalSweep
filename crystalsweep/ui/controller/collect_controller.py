@@ -1079,8 +1079,8 @@ class CollectController:
         filenumber = frame_number if frame_number is not None else fs.frame_number
         stem = "_".join(parts) if parts else base
         basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
-        has_conversions = self._selected_extras() is not None or fs.use_crysalis
-        dst_dir = Path(str(fs.directory)) / basename if has_conversions else Path(str(fs.directory))
+        has_step_conversions = point.scan_type == "step" and (self._selected_extras() is not None or fs.use_crysalis)
+        dst_dir = Path(str(fs.directory)) / basename if has_step_conversions else Path(str(fs.directory))
 
         def _copy() -> None:
             try:
@@ -1137,15 +1137,18 @@ class CollectController:
             basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
             src_dir = f"{str(raw).rstrip('/')}/{folder_name}" if raw else f"{out_dir.rstrip('/')}/{folder_name}"
             converted_root = f"{out_dir.rstrip('/')}/{folder_name}/{map_stem}"
+            output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
         else:
             parts = [p for p in [base, label] if p]
             filenumber = frame_number if frame_number is not None else fs.frame_number
             stem = "_".join(parts) if parts else base
             basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
             src_dir = str(raw) if raw else out_dir
-            converted_root = f"{out_dir.rstrip('/')}/{basename}"
-
-        output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
+            if point.scan_type == "step":
+                output_base = f"{out_dir.rstrip('/')}/{basename}"
+                output_dirs = {fmt: f"{output_base}/{fmt}" for fmt in extras}
+            else:
+                output_dirs = {fmt: out_dir.rstrip('/') for fmt in extras}
 
         self._launch_format_converter(
             directory=src_dir,
