@@ -1079,7 +1079,8 @@ class CollectController:
         filenumber = frame_number if frame_number is not None else fs.frame_number
         stem = "_".join(parts) if parts else base
         basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
-        dst_dir = Path(str(fs.directory)) / basename
+        has_conversions = self._selected_extras() is not None or fs.use_crysalis
+        dst_dir = Path(str(fs.directory)) / basename if has_conversions else Path(str(fs.directory))
 
         def _copy() -> None:
             try:
