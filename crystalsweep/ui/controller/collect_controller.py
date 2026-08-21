@@ -27,13 +27,14 @@ from typing import Callable
 
 import wx
 from epics import caget, caput, caput_many
-from wxutils import FlatWaitDialog
+from wxutils import FlatConfirmDialog, FlatWaitDialog
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
+from crystalsweep.ui.view.custom.theme import app_theme
 from crystalsweep.utils import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
 
 __all__ = ["CollectController"]
@@ -137,14 +138,14 @@ class CollectController:
             lines = "\n".join(f"  {c}" for c in conflicts[:10])
             if len(conflicts) > 10:
                 lines += f"\n  ... and {len(conflicts) - 10} more"
-            with wx.MessageDialog(
+            result = FlatConfirmDialog(
                 self._view,
                 f"The following output paths already exist and may be overwritten:\n\n{lines}\n\nProceed anyway?",
                 "Output already exists",
-                wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
-            ) as dlg:
-                if dlg.ShowModal() != wx.ID_YES:
-                    return
+                yes_scheme=app_theme.danger_scheme(),
+            ).ShowModal()
+            if result != wx.ID_YES:
+                return
 
         self._abort_event.clear()
         self._start_time = _time.monotonic()
