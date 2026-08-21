@@ -759,7 +759,8 @@ class CollectController:
                         self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     map_completed_weight += pt_weight
 
-            if not self._abort_event.is_set() and self._model.file_settings.use_snake_combine:
+            det = config.active_detector_config if config else None
+            if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5":
                 self._spawn_snake_combine_for_map(group_points)
 
         if keep_shutter_open:
