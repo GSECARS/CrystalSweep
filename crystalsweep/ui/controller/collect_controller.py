@@ -759,6 +759,9 @@ class CollectController:
                         self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     map_completed_weight += pt_weight
 
+            if not self._abort_event.is_set() and self._model.file_settings.use_snake_combine:
+                self._spawn_snake_combine_for_map(group_points)
+
         if keep_shutter_open:
             self._engine._close_shutter(config)
             self._engine._restore_detector_shutter_control(config, original_shutter_mode)
@@ -775,9 +778,6 @@ class CollectController:
                 _log.debug("Restored map motor2 %s to %.4f", motor2, original_motor2)
             except Exception as exc:
                 _log.warning("Failed to restore map motor2 %s: %s", motor2, exc)
-
-        if not self._abort_event.is_set() and self._model.file_settings.use_snake_combine:
-            self._spawn_snake_combine_for_map(group_points)
 
         self._model.file_settings.reset_frame_number()
         wx.CallAfter(self._view.file_settings.set_frame_number, 0)
