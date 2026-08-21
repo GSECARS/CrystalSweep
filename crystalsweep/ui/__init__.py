@@ -36,6 +36,7 @@ def _configure_logging() -> None:
     sh._crystalsweep = True  # type: ignore[attr-defined]
     root.addHandler(fh)
     root.addHandler(sh)
+    logging.getLogger("epicsapps").setLevel(logging.WARNING)
     logging.getLogger(__name__).info("Logging to %s", log_path)
 
 
