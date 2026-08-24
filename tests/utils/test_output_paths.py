@@ -255,14 +255,18 @@ class TestConversionDirs:
 
 
 class TestCrysalisSourceDir:
-    """Verify crysalis_source_dir() always uses the output directory, not raw."""
+    """Verify crysalis_source_dir() reads from where the IOC wrote the files."""
 
-    def test_non_map_uses_directory(self):
+    def test_non_map_uses_raw_directory_when_set(self):
         output = _make_output(directory="/out", raw_directory="/raw")
-        assert output.crysalis_source_dir(_still_point()) == Path("/out")
+        assert output.crysalis_source_dir(_still_point()) == Path("/raw")
 
-    def test_non_map_always_uses_directory_not_raw(self):
+    def test_non_map_step_uses_raw_directory_when_set(self):
         output = _make_output(directory="/out", raw_directory="/raw/somewhere")
+        assert output.crysalis_source_dir(_step_point()) == Path("/raw/somewhere")
+
+    def test_non_map_falls_back_to_directory_without_raw(self):
+        output = _make_output(directory="/out", raw_directory=None)
         assert output.crysalis_source_dir(_step_point()) == Path("/out")
 
     def test_map_appends_folder_name_to_directory(self):

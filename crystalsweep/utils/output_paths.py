@@ -104,12 +104,13 @@ class OutputPaths:
     def crysalis_source_dir(self, point) -> Path:
         """Source directory for CrysAlis conversion.
 
-        CrysAlis always reads from the primary output directory (not raw) so
-        that the file-copy thread has already placed the file there.
+        Returns the directory where the IOC wrote the detector files - raw_directory
+        when configured, otherwise the primary output directory. Reading directly from
+        the write location avoids any race with the async file-copy thread.
         """
         if point.map_group:
             return self.directory / self.map_folder_name()
-        return self.directory
+        return self.source_dir(point)
 
     def crysalis_output_dir(self, point, frame_number: int) -> Path:
         """Directory where CrysAlis writes its output."""
