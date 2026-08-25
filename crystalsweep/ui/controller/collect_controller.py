@@ -608,6 +608,7 @@ class CollectController:
         scan_type = group_points[0].scan_type
         motor1 = group_points[0].map_motor1
         motor2 = group_points[0].map_motor2
+        map_row_shift = round(group_points[0].map_row_shift) if group_points else 0
         use_trajectory = self._view.collection_table.trajectory_scan
         keep_shutter_open = self._view.collection_table.keep_shutter_open
         if scan_type == "wide" and not self._model.collection_settings.wide_flip:
@@ -781,7 +782,7 @@ class CollectController:
 
             det = config.active_detector_config if config else None
             if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5":
-                self._spawn_snake_combine_for_map()
+                self._spawn_snake_combine_for_map(row_shift_frames=map_row_shift)
 
         if keep_shutter_open:
             self._engine._close_shutter(config)
@@ -1032,7 +1033,7 @@ class CollectController:
         except Exception as exc:
             _log.warning("Failed to spawn format conversion: %s", exc)
 
-    def _launch_snake_combiner(self, input_dir: str, output_path: str, pattern: str, first_row_reversed: bool, flipped_dir: str | None = None) -> None:
+    def _launch_snake_combiner(self, input_dir: str, output_path: str, pattern: str, first_row_reversed: bool, flipped_dir: str | None = None, row_shift_frames: int = 0) -> None:
         """Spawn the snake-map combiner as a detached subprocess."""
         args = {
             "input_dir": input_dir,
@@ -1040,6 +1041,7 @@ class CollectController:
             "pattern": pattern,
             "first_row_reversed": first_row_reversed,
             "flipped_dir": flipped_dir or "",
+            "row_shift_frames": row_shift_frames,
         }
         try:
             tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
@@ -1056,7 +1058,7 @@ class CollectController:
         except Exception as exc:
             _log.warning("Failed to spawn snake combiner: %s", exc)
 
-    def _spawn_snake_combine_for_map(self) -> None:
+    def _spawn_snake_combine_for_map(self, row_shift_frames: int = 0) -> None:
         """Spawn the snake combiner for a finished map collection.
 
         Snake convention matches _run_map_group: row 0 forward, row 1
@@ -1071,6 +1073,7 @@ class CollectController:
             pattern=output.map_row_pattern(),
             first_row_reversed=False,
             flipped_dir=str(output.map_flipped_dir()),
+            row_shift_frames=row_shift_frames,
         )
 
     def _check_output_conflicts(self, points: list) -> list[str]:

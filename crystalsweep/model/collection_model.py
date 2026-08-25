@@ -53,6 +53,7 @@ class CollectionPoint:
     map_col: int = -1
     map_motor1: str = ""
     map_motor2: str = ""
+    map_row_shift: float = 0.0
 
     def parse_exposure(self) -> float | None:
         """Return exposure time in seconds. Returns None if missing or invalid."""

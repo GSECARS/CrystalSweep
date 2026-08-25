@@ -128,10 +128,15 @@ def _copy_attrs(src, dst) -> None:
         dst.attrs[k] = v
 
 
-def _write_flipped_row(src_path: Path, dst_path: Path, frame_count: int, reverse: bool) -> None:
+def _write_flipped_row(src_path: Path, dst_path: Path, frame_count: int, reverse: bool, row_shift_frames: int = 0) -> None:
     """Copy ``src_path`` to ``dst_path``, reversing the leading axis on any
     dataset whose leading dimension equals ``frame_count`` when ``reverse`` is
-    True. Groups, attrs, dtypes, chunking and compression are preserved."""
+    True. Groups, attrs, dtypes, chunking and compression are preserved.
+
+    ``row_shift_frames`` rolls the frame sequence of reversed rows by that many
+    positions to correct for motor backlash or other physical offsets that shift
+    odd rows relative to even rows in a snake scan.
+    """
     import h5py
 
     dst_path.parent.mkdir(parents=True, exist_ok=True)
@@ -151,7 +156,8 @@ def _write_flipped_row(src_path: Path, dst_path: Path, frame_count: int, reverse
                 if is_per_frame and reverse:
                     n = obj.shape[0]
                     for i in range(n):
-                        out[i] = obj[n - 1 - i]
+                        src_idx = (n - 1 - i + row_shift_frames) % n
+                        out[i] = obj[src_idx]
                 elif is_per_frame:
                     n = obj.shape[0]
                     for i in range(n):
@@ -297,10 +303,16 @@ def combine_snake_map(
     skip_flip: bool = False,
     flipped_dir: Path | None = None,
     data_path: str = _DEFAULT_DATA_PATH,
+    row_shift_frames: int = 0,
 ) -> None:
     """Flip per-row .h5 files according to the snake convention and combine
     them into a single map file. The combined output preserves the schema of a
-    single per-row file (per-frame leading axis grown by a factor of rows)."""
+    single per-row file (per-frame leading axis grown by a factor of rows).
+
+    ``row_shift_frames`` shifts the frame sequence of each reversed (odd) row by
+    that many positions, correcting for motor backlash or other physical offsets.
+    Positive values shift right; negative values shift left.
+    """
     if not input_dir.is_dir():
         raise RuntimeError(f"Input directory not found: {input_dir}")
 
@@ -315,11 +327,12 @@ def combine_snake_map(
         raise RuntimeError(f"No row files matching {pattern!r} in {input_dir}")
     frame_count = _detect_frame_count(row_files[0], data_path)
     _log.info(
-        "snake_combiner: %d row files, %d frames/row, flipped_dir=%s, output=%s",
+        "snake_combiner: %d row files, %d frames/row, flipped_dir=%s, output=%s, row_shift_frames=%d",
         len(row_files),
         frame_count,
         target_flipped_dir,
         output_path,
+        row_shift_frames,
     )
 
     flipped_files: list[Path] = []
@@ -339,7 +352,7 @@ def combine_snake_map(
             _log.info("snake_combiner: row %d already flipped, skipping %s", row_one_based, src.name)
             continue
         _log.info("snake_combiner: row %d %s %s -> %s", row_one_based, "REVERSE" if reverse else "keep   ", src.name, dst)
-        _write_flipped_row(src, dst, frame_count=frame_count, reverse=reverse)
+        _write_flipped_row(src, dst, frame_count=frame_count, reverse=reverse, row_shift_frames=row_shift_frames if reverse else 0)
 
     _log.info("snake_combiner: building combined map file %s", output_path)
     _build_combined(flipped_files, output_path, frame_count=frame_count)
@@ -355,15 +368,17 @@ def run_combine(args: dict) -> None:
     skip_flip = bool(args.get("skip_flip", False))
     flipped_dir_raw = args.get("flipped_dir") or ""
     data_path = args.get("data_path") or _DEFAULT_DATA_PATH
+    row_shift_frames = int(args.get("row_shift_frames", 0))
 
     _log.info(
-        "run_combine: input_dir=%r output_path=%r pattern=%r first_row_reversed=%s skip_flip=%s flipped_dir=%r",
+        "run_combine: input_dir=%r output_path=%r pattern=%r first_row_reversed=%s skip_flip=%s flipped_dir=%r row_shift_frames=%d",
         input_dir,
         output_path,
         pattern,
         first_row_reversed,
         skip_flip,
         flipped_dir_raw,
+        row_shift_frames,
     )
 
     if not input_dir or not output_path:
@@ -378,6 +393,7 @@ def run_combine(args: dict) -> None:
         skip_flip=skip_flip,
         flipped_dir=Path(flipped_dir_raw) if flipped_dir_raw else None,
         data_path=data_path,
+        row_shift_frames=row_shift_frames,
     )
 
 

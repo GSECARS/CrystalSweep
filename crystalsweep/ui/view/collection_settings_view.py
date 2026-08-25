@@ -255,6 +255,7 @@ class CollectionSettingsView(wx.Panel):
         self._on_map2_end_changed_cb: Callable[[float], None] | None = None
         self._on_map2_step_changed_cb: Callable[[float], None] | None = None
         self._on_map2_points_changed_cb: Callable[[int], None] | None = None
+        self._on_map_row_shift_changed_cb: Callable[[float], None] | None = None
         self._on_add_point_cb: Callable[[], None] | None = None
         self._on_update_selected_cb: Callable[[], None] | None = None
 
@@ -275,6 +276,9 @@ class CollectionSettingsView(wx.Panel):
         outer.Add(self._make_map_table(), 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
         self._map_table.Hide()
         self._flip_toggle.Hide()
+
+        outer.Add(self._make_map_shift_row(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        self._map_shift_panel.Hide()
 
         outer.Add(self._make_map_presets(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP | wx.BOTTOM, 10)
         self._map_presets_panel.Hide()
@@ -379,6 +383,22 @@ class CollectionSettingsView(wx.Panel):
         self._scan_row = row
         return row
 
+    def _make_map_shift_row(self, label_font: wx.Font) -> wx.Window:
+        self._map_shift_panel = wx.Panel(self)
+        lbl = wx.StaticText(self._map_shift_panel, label="Row shift (frames)")
+        lbl.SetFont(label_font)
+        self._row_shift_ctrl = FlatTextCtrl(self._map_shift_panel, value="0")
+        self._row_shift_ctrl.SetRestrictToFloat(True)
+        self._row_shift_ctrl.SetMinSize((70, 24))
+        self._row_shift_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_row_shift_enter)
+        self._row_shift_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_row_shift_enter)
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+        row.Add(self._row_shift_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddStretchSpacer()
+        self._map_shift_panel.SetSizer(row)
+        return self._map_shift_panel
+
     def _make_map_presets(self, label_font: wx.Font) -> wx.Window:
         self._map_presets_panel = wx.Panel(self)
         self._map_presets_lbl = wx.StaticText(self._map_presets_panel, label="Presets")
@@ -472,6 +492,7 @@ class CollectionSettingsView(wx.Panel):
     def _refresh_map_row(self) -> None:
         show = self._map_toggle.GetValue()
         self._map_table.Show(show)
+        self._map_shift_panel.Show(show)
         self._map_presets_panel.Show(show)
         self._add_btn.SetLabel("+ Add map points" if show else "+ Add point")
         self._refresh_flip_visibility()
@@ -505,6 +526,7 @@ class CollectionSettingsView(wx.Panel):
         self._flip_toggle.Enable(enabled)
         if not self._map_table.IsShown():
             return
+        self._row_shift_ctrl.Enable(enabled)
         for row in (self._map_table.row1, self._map_table.row2):
             state = enabled and row.enabled
             for ctrl in (row.motor_combo, row.start_ctrl, row.end_ctrl, row.step_ctrl, row.points_ctrl):
@@ -580,6 +602,9 @@ class CollectionSettingsView(wx.Panel):
     def set_map2_points(self, value: int) -> None:
         self._map_table.row2.points_ctrl.SetValue(str(value))
 
+    def set_map_row_shift(self, value: float) -> None:
+        self._row_shift_ctrl.SetValue(f"{value:g}")
+
     def bind_scan_type_changed(self, callback: Callable[[ScanType], None]) -> None:
         self._on_scan_type_changed_cb = callback
 
@@ -636,6 +661,9 @@ class CollectionSettingsView(wx.Panel):
 
     def bind_map2_points_changed(self, callback: Callable[[int], None]) -> None:
         self._on_map2_points_changed_cb = callback
+
+    def bind_map_row_shift_changed(self, callback: Callable[[float], None]) -> None:
+        self._on_map_row_shift_changed_cb = callback
 
     def bind_add_point(self, callback: Callable[[], None]) -> None:
         self._on_add_point_cb = callback
@@ -730,6 +758,10 @@ class CollectionSettingsView(wx.Panel):
         self._map_table.row2.sync_step_from_points()
         self._fire_int(self._map_table.row2.points_ctrl, self._on_map2_points_changed_cb)
         self._fire_float(self._map_table.row2.step_ctrl, self._on_map2_step_changed_cb)
+        event.Skip()
+
+    def _on_row_shift_enter(self, event: wx.Event) -> None:
+        self._fire_float(self._row_shift_ctrl, self._on_map_row_shift_changed_cb)
         event.Skip()
 
     def _on_add_clicked(self, _e=None) -> None:
