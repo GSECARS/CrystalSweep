@@ -411,7 +411,7 @@ class CollectionSettingsView(wx.Panel):
             label = f"{size_um}×{size_um} / {step_um}µm"
             btn = FlatButton(self._map_presets_panel, label, font=app_theme.btn_font())
             btn.SetMinSize((-1, 22))
-            btn.SetAction(lambda s=size_um, st=step_um, p=pts: self._apply_map_preset(s, st, p))
+            btn.SetAction(lambda event, s=size_um, st=step_um, p=pts: self._apply_map_preset(s, st, p))
             row.Add(btn, 1, wx.EXPAND | wx.RIGHT, 4)
         self._map_presets_panel.SetSizer(row)
         return self._map_presets_panel
