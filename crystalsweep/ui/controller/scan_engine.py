@@ -365,6 +365,13 @@ class ScanEngine:
                         on_done()
                         return
                     if on_status:
+                        on_status("moving")
+                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
+                    caput(f"{pv_base}.VAL", omega_start, wait=True)
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
+                    if on_status:
                         on_status("preparing")
 
                     prepare_done = threading.Event()
