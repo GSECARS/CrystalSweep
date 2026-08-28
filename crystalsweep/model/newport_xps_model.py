@@ -88,7 +88,7 @@ class NewportXPSModel:
             step = 0.01
             scantime = spec.exposure
         else:
-            step = rng / spec.points
+            step = rng / (spec.points - 0.5)
             scantime = spec.exposure * spec.points
 
         self._define_line_trajectory(group, axis_name, 0.0, signed_range, step, scantime)
