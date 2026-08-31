@@ -86,6 +86,13 @@ class FileSettingsController:
         cfg = self._model.beamline.active
         det = cfg.active_detector_config if cfg else None
         fmt = det.file_format if det else None
+        fs = self._model.file_settings
+        if fmt != "hdf5":
+            fs.use_hdf5 = False
+        if fmt != "cbf":
+            fs.use_cbf = False
+        if fmt != "tif":
+            fs.use_tif = False
         self._view.file_settings.set_detector_format(fmt)
 
     def push_to_detector(self) -> None:
