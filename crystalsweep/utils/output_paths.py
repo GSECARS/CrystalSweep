@@ -117,7 +117,8 @@ class OutputPaths:
         bn = self.basename(point, frame_number)
         if point.map_group:
             return self._map_conversion_root() / "crysalis" / bn
-        return self.directory / bn / "crysalis"
+        root = self.raw_directory if self.raw_directory else self.directory
+        return root / bn / "crysalis"
 
     def expected_file(self, point, frame_number: int) -> Path:
         """Exact path the IOC would write - used for pre-collection conflict detection."""
