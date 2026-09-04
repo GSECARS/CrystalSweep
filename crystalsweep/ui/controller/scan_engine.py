@@ -136,8 +136,10 @@ class ScanEngine:
         Returns an error string to abort the collection, or None to proceed.
         """
         if self._scripts is not None:
+            self._scripts.begin_collection()
             result = self._scripts.call("pre_collection", points, config)
             if isinstance(result, str):
+                self._scripts.end_collection()
                 return result
         return None
 
@@ -145,6 +147,7 @@ class ScanEngine:
         """Run once after the entire collection completes. Delegates to the user script if available."""
         if self._scripts is not None:
             self._scripts.call("post_collection", points, config)
+            self._scripts.end_collection()
 
     def run_still(
         self,
