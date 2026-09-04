@@ -46,6 +46,7 @@ class FileSettingsController:
         fs.bind_frame_reset(self._on_frame_reset)
         fs.bind_frame_update(self._on_frame_update)
         fs.bind_map_ext_changed(self._on_map_ext_changed)
+        fs.bind_map_ext_update(self._on_map_ext_update)
         fs.bind_hdf5_changed(self._on_hdf5_changed)
         fs.bind_cbf_changed(self._on_cbf_changed)
         fs.bind_tif_changed(self._on_tif_changed)
@@ -218,6 +219,26 @@ class FileSettingsController:
     def _on_map_ext_changed(self, value: str) -> None:
         self._model.file_settings.map_ext = value
         _log.debug("file_settings.map_ext = %r", value)
+
+    def _on_map_ext_update(self) -> None:
+        new_ext = self._model.file_settings.map_ext.strip() or "map"
+        points = self._model.collection.points
+        for index, point in enumerate(points):
+            if not point.map_group:
+                continue
+            label = point.label.strip()
+            try:
+                label_parts = label.rsplit("_", 2)
+                if len(label_parts) < 3:
+                    continue
+                frame_str = label_parts[-2]
+                point_str = label_parts[-1]
+            except (ValueError, IndexError):
+                continue
+            new_label = f"{new_ext}_{frame_str}_{point_str}"
+            self._model.collection.update_label(index, new_label)
+            self._view.collection_table.refresh_row(index, point)
+        _log.debug("map ext update: relabelled map points with ext=%r", new_ext)
 
     def add_hdf5_changed_listener(self, callback) -> None:
         self._on_hdf5_changed_listeners.append(callback)

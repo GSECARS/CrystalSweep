@@ -381,7 +381,7 @@ class CollectionSettingsController:
         point_index = 0
         for row_idx, pos2 in enumerate(axis2):
             for col_idx, pos1 in enumerate(axis1):
-                label = f"{map_ext}_{frame_number + point_index:0{width}d}"
+                label = f"{map_ext}_{frame_number:0{width}d}_{point_index + 1:0{width}d}"
                 point = self._model.collection.add_point(shorthands, label=label)
                 point.selected = True
                 point.scan_type = cs.scan_type

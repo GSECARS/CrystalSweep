@@ -46,6 +46,7 @@ class FileSettingsView(wx.Panel):
         self._on_frame_reset_cb: Callable[[], None] | None = None
         self._on_frame_update_cb: Callable[[], None] | None = None
         self._on_map_ext_changed_cb: Callable[[str], None] | None = None
+        self._on_map_ext_update_cb: Callable[[], None] | None = None
         self._on_hdf5_changed_cb: Callable[[bool], None] | None = None
         self._on_cbf_changed_cb: Callable[[bool], None] | None = None
         self._on_tif_changed_cb: Callable[[bool], None] | None = None
@@ -180,6 +181,8 @@ class FileSettingsView(wx.Panel):
         self._map_ext_ctrl = FlatTextCtrl(self)
         self._map_ext_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_map_ext_enter)
         self._map_ext_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_map_ext_enter)
+        self._map_ext_update_btn = FlatIconButton(self, draw_arrow_up, icon_size=16, tooltip="Update map labels in collection table")
+        self._map_ext_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_map_ext_update_cb))
 
         vsep1 = wx.Panel(self, size=(1, -1))
         vsep1.SetBackgroundColour(app_theme.bright_black)
@@ -216,6 +219,8 @@ class FileSettingsView(wx.Panel):
         map_col.Add(map_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         map_col.AddSpacer(6)
         map_col.Add(self._map_ext_ctrl, 1, wx.EXPAND)
+        map_col.AddSpacer(4)
+        map_col.Add(self._map_ext_update_btn, 0, wx.ALIGN_CENTER_VERTICAL)
 
         row.Add(map_col, 1, wx.EXPAND)
         row.AddSpacer(8)
@@ -247,6 +252,9 @@ class FileSettingsView(wx.Panel):
 
     def bind_map_ext_changed(self, callback: Callable[[str], None]) -> None:
         self._on_map_ext_changed_cb = callback
+
+    def bind_map_ext_update(self, callback: Callable[[], None]) -> None:
+        self._on_map_ext_update_cb = callback
 
     def bind_hdf5_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_hdf5_changed_cb = callback

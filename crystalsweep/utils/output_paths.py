@@ -63,15 +63,19 @@ class OutputPaths:
         encodes the row/col position as the IOC uses it). The supplied
         frame_number is the fallback when parsing fails.
         """
+        w = max(1, self.file_number_width)
         if point.map_group:
             label = point.label.strip()
             try:
-                num = int(label.rsplit("_", 1)[-1])
+                label_parts = label.rsplit("_", 2)
+                if len(label_parts) < 3:
+                    raise ValueError
+                map_frame_str = label_parts[-2]
+                num = int(label_parts[-1])
+                return f"{self.stem(point)}_{map_frame_str}_{num:0{w}d}"
             except (ValueError, IndexError):
-                num = frame_number
-        else:
-            num = frame_number
-        w = max(1, self.file_number_width)
+                return f"{self.stem(point)}_{frame_number:0{w}d}"
+        num = frame_number
         return f"{self.stem(point)}_{int(num):0{w}d}"
 
     def source_dir(self, point) -> Path:

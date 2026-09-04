@@ -146,8 +146,8 @@ class TestBasename:
 
     def test_map_parses_number_from_label(self):
         output = _make_output(filename="sample", map_ext="map", file_number_width=4)
-        point = _map_point(label="sample_map_007")
-        assert output.basename(point, 999) == "sample_map_0007"
+        point = _map_point(label="map_0005_0007")
+        assert output.basename(point, 999) == "sample_map_0005_0007"
 
     def test_map_falls_back_to_frame_number_when_label_unparseable(self):
         output = _make_output(filename="sample", map_ext="map", file_number_width=4)
@@ -293,9 +293,9 @@ class TestCrysalisOutputDir:
 
     def test_map_is_inside_map_conversion_root(self):
         output = _make_output(directory="/out", filename="s", map_ext="map", file_number_width=4)
-        point = _map_point(label="s_map_007")
+        point = _map_point(label="map_0005_0007")
         result = output.crysalis_output_dir(point, 999)
-        assert result == Path("/out/s_map/s_map/crysalis/s_map_0007")
+        assert result == Path("/out/s_map/s_map/crysalis/s_map_0005_0007")
 
 
 class TestExpectedFile:
@@ -318,9 +318,9 @@ class TestExpectedFile:
 
     def test_map_in_map_source_dir(self):
         output = _make_output(directory="/out", raw_directory=None, filename="s", map_ext="map", file_ext="h5", file_number_width=4)
-        point = _map_point(label="s_map_003")
+        point = _map_point(label="map_0005_0003")
         f = output.expected_file(point, 999)
-        assert f == Path("/out/s_map/s_map_0003.h5")
+        assert f == Path("/out/s_map/s_map_0005_0003.h5")
 
 
 class TestMapFolderName:

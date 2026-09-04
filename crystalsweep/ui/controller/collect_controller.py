@@ -616,6 +616,7 @@ class CollectController:
         original_shutter_mode: int = 1
         weights = group_weights if group_weights is not None else [1] * len(group_points)
         map_completed_weight = completed_weight
+        frame_before_map = self._model.file_settings.frame_number
 
         rows: dict[int, list[CollectionPoint]] = {}
         for pt in group_points:
@@ -801,8 +802,8 @@ class CollectController:
             except Exception as exc:
                 _log.warning("Failed to restore map motor2 %s: %s", motor2, exc)
 
-        self._model.file_settings.reset_frame_number()
-        wx.CallAfter(self._view.file_settings.set_frame_number, 0)
+        self._model.file_settings.frame_number = frame_before_map
+        wx.CallAfter(self._view.file_settings.set_frame_number, frame_before_map)
 
     def _run_map_row_trajectory(
         self,
