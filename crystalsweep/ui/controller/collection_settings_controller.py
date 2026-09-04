@@ -383,7 +383,7 @@ class CollectionSettingsController:
                 if cs.scan_type in ("wide", "step"):
                     rot_start = cs.rotation_start + cs.beam_angle
                     rot_end = cs.rotation_end + cs.beam_angle
-                    if cs.scan_type == "wide" and cs.wide_flip and row_idx % 2 == 1:
+                    if cs.scan_type == "wide" and cs.wide_flip and point_index % 2 == 1:
                         rot_start, rot_end = rot_end, rot_start
                     point.rotation_start = str(rot_start)
                     point.rotation_end = str(rot_end)

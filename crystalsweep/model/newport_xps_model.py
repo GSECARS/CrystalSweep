@@ -45,6 +45,7 @@ class NewportXPSModel:
         self._owns_connection = False
         self._aborted = False
         self._has_line_traj = False
+        self._reverse = False
 
     def prepare(self, spec: ScanSpec) -> None:
         if NewportXPS is None:
@@ -84,6 +85,8 @@ class NewportXPSModel:
         if rng == 0.0:
             raise ValueError("XPS slew scan requires spec.start != spec.end.")
 
+        self._reverse = signed_range < 0
+
         if spec.points == 1:
             step = 0.01
             scantime = spec.exposure
@@ -91,7 +94,7 @@ class NewportXPSModel:
             step = rng / (spec.points - 0.5)
             scantime = spec.exposure * spec.points
 
-        self._define_line_trajectory(group, axis_name, 0.0, signed_range, step, scantime)
+        self._define_line_trajectory(group, axis_name, 0.0, rng, step, scantime)
         self._has_line_traj = True
 
         _log.debug(
@@ -116,12 +119,13 @@ class NewportXPSModel:
         if self._has_line_traj:
             if self._xps is None:
                 raise RuntimeError("XPS not connected. Call prepare() first.")
-            self._xps.arm_trajectory(name=self._TRAJ_NAME, move_to_start=False)
+            traj_name = "backward" if self._reverse else self._TRAJ_NAME
+            self._xps.arm_trajectory(name=traj_name, move_to_start=False)
             if on_at_start is not None and not self._aborted:
                 on_at_start()
             if self._aborted:
                 return
-            self._xps.run_trajectory(name=self._TRAJ_NAME, save=False, clean=True, move_to_start=False)
+            self._xps.run_trajectory(name=traj_name, save=False, clean=True, move_to_start=False)
             if not self._aborted:
                 on_point(spec.points - 1, spec.end)
             return
