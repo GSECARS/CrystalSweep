@@ -91,6 +91,7 @@ class MainController:
         self._file_settings_controller.apply_crysalis_from_config()
         self._collect_controller.on_config_applied()
         self._preview_controller.on_config_applied(cfg)
+        self._view.set_centering_tools_visible(cfg.centering_tools_enabled)
         self._check_epics_status(cfg)
 
     def _check_epics_status(self, cfg: BeamlineConfig | None = None) -> None:

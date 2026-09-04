@@ -231,11 +231,13 @@ class BeamlineConfigController:
         if self._detectors_dlg:
             detectors, active_detector = self._detectors_dlg.config_panel.collect_detectors()
             preview_exposure, preview_timeout, preview_num_images = self._detectors_dlg.config_panel.collect_preview()
+            centering_tools_enabled = self._detectors_dlg.config_panel.collect_centering_tools_enabled()
         else:
             detectors, active_detector = base.detectors, base.active_detector
             preview_exposure = base.preview_exposure
             preview_timeout = base.preview_timeout
             preview_num_images = base.preview_num_images
+            centering_tools_enabled = base.centering_tools_enabled
 
         controllers = self._controllers_dlg.config_panel.collect_controllers() if self._controllers_dlg else base.controllers
 
@@ -273,6 +275,7 @@ class BeamlineConfigController:
             preview_exposure=preview_exposure,
             preview_timeout=preview_timeout,
             preview_num_images=preview_num_images,
+            centering_tools_enabled=centering_tools_enabled,
             raw_directory=raw_directory,
             still_map_trajectory=still_map_trajectory,
         )

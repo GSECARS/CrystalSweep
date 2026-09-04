@@ -1072,7 +1072,9 @@ class DetectorsConfigView(wx.Panel):
         self.preview_timeout_ctrl = FlatTextCtrl(p_body, value="60", placeholder=_PLACEHOLDER_PREVIEW_TIMEOUT)
         self.preview_timeout_ctrl.SetRestrictToFloat(True)
         self.preview_num_ctrl = FlatTextCtrl(p_body, value="1000000", placeholder=_PLACEHOLDER_PREVIEW_NUM)
-        p_grid = wx.FlexGridSizer(rows=3, cols=2, vgap=6, hgap=8)
+        self.centering_tools_toggle = FlatCheckBox(p_body, "Enable centering tools")
+        self.centering_tools_toggle.SetValue(True)
+        p_grid = wx.FlexGridSizer(rows=4, cols=2, vgap=6, hgap=8)
         p_grid.AddGrowableCol(1, 1)
         for label_text, ctrl in (
             ("Exposure (s)", self.preview_exposure_ctrl),
@@ -1083,6 +1085,8 @@ class DetectorsConfigView(wx.Panel):
             lbl.SetFont(app_theme.scaled_font(11))
             p_grid.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
             p_grid.Add(ctrl, 0, wx.EXPAND)
+        p_grid.Add((0, 0))
+        p_grid.Add(self.centering_tools_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
         p_body.SetSizer(p_grid)
 
         self._status_label = _status_label(self)
@@ -1104,8 +1108,12 @@ class DetectorsConfigView(wx.Panel):
         self.preview_exposure_ctrl.SetValue(f"{config.preview_exposure:g}")
         self.preview_timeout_ctrl.SetValue(f"{config.preview_timeout:g}")
         self.preview_num_ctrl.SetValue(str(config.preview_num_images))
+        self.centering_tools_toggle.SetValue(config.centering_tools_enabled)
         self.Layout()
         self.set_status("")
+
+    def collect_centering_tools_enabled(self) -> bool:
+        return self.centering_tools_toggle.GetValue()
 
     def collect_preview(self) -> tuple[float, float, int]:
         """Return (exposure, timeout, num_images), coercing invalid input to defaults."""

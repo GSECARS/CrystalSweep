@@ -80,10 +80,11 @@ class MainView(wx.Frame):
         left_sizer.Add(SectionDivider(self._left_panel, "Collection Points"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_table, 1, wx.EXPAND)
         left_sizer.AddSpacer(12)
-        left_sizer.Add(SectionDivider(self._left_panel, "Single-Crystal Centering Tools"), 0, wx.EXPAND)
+        self._centering_divider = SectionDivider(self._left_panel, "Single-Crystal Centering Tools")
+        left_sizer.Add(self._centering_divider, 0, wx.EXPAND)
         self.centering_tabs = self._build_centering_tabs()
         left_sizer.Add(self.centering_tabs, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
-        left_sizer.AddSpacer(8)
+        self._centering_spacer = left_sizer.AddSpacer(8)
         left_sizer.Add(collect_sep, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
         left_sizer.Add(self.collect, 0, wx.EXPAND)
         self._left_panel.SetSizer(left_sizer)
@@ -118,6 +119,12 @@ class MainView(wx.Frame):
 
     def bind_open_positioners(self, callback: Callable[[], None]) -> None:
         self._open_positioners_cb = callback
+
+    def set_centering_tools_visible(self, visible: bool) -> None:
+        self._centering_divider.Show(visible)
+        self.centering_tabs.Show(visible)
+        self._centering_spacer.Show(visible)
+        self._left_panel.Layout()
 
     def set_active_config_name(self, name: str) -> None:
         if self._menu_bar is not None:
