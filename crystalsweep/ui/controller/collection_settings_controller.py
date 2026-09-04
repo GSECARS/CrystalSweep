@@ -127,6 +127,8 @@ class CollectionSettingsController:
     def _on_scan_type_changed(self, scan_type: ScanType) -> None:
         self._model.collection_settings.scan_type = scan_type
         self._apply_type_defaults(scan_type)
+        if scan_type == "step":
+            self._view.collection_table.set_trajectory_scan(True)
         self._sync_trajectory_toggle()
         _log.debug("collection_settings.scan_type = %s", scan_type)
 
