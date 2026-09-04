@@ -73,13 +73,13 @@ class MainView(wx.Frame):
         left_sizer = wx.BoxSizer(wx.VERTICAL)
         left_sizer.Add(SectionDivider(self._left_panel, "File Settings"), 0, wx.EXPAND)
         left_sizer.Add(self.file_settings, 0, wx.EXPAND)
-        left_sizer.AddSpacer(25)
+        left_sizer.AddSpacer(12)
         left_sizer.Add(SectionDivider(self._left_panel, "Collection Settings"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_settings, 0, wx.EXPAND)
-        left_sizer.AddSpacer(25)
+        left_sizer.AddSpacer(12)
         left_sizer.Add(SectionDivider(self._left_panel, "Collection Points"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_table, 1, wx.EXPAND)
-        left_sizer.AddSpacer(25)
+        left_sizer.AddSpacer(12)
         left_sizer.Add(SectionDivider(self._left_panel, "Single-Crystal Centering Tools"), 0, wx.EXPAND)
         self.centering_tabs = self._build_centering_tabs()
         left_sizer.Add(self.centering_tabs, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
@@ -155,7 +155,7 @@ class MainView(wx.Frame):
 
     def _build_centering_tabs(self) -> FlatTabbedPanel:
         tabs = FlatTabbedPanel(self._left_panel)
-        tabs.SetMinSize((-1, 180))
+        tabs.SetMinSize((-1, 150))
 
         self.preview = PreviewView(tabs)
 
