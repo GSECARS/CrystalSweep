@@ -45,4 +45,3 @@ class CollectionSettingsModel:
     rotation_shorthand: str = field(default="")
     beam_angle: float = field(default=0.0)
     wide_flip: bool = field(default=True)
-    map_row_shift: float = field(default=0.0)

@@ -58,7 +58,6 @@ class CollectionSettingsController:
         cs.bind_rotation_range_changed(self._on_rotation_range_changed)
         cs.bind_step_size_changed(self._on_step_size_changed)
         cs.bind_wide_flip_changed(self._on_wide_flip_changed)
-        cs.bind_map_row_shift_changed(self._on_map_row_shift_changed)
         cs.bind_add_point(self._on_add_point)
         cs.bind_update_selected(self._on_update_selected)
 
@@ -84,7 +83,6 @@ class CollectionSettingsController:
         v.set_map2_end(cs.map2_end)
         v.set_map2_step(cs.map2_step)
         v.set_map2_points(cs.map2_points)
-        v.set_map_row_shift(cs.map_row_shift)
 
     def add_points_changed_listener(self, callback) -> None:
         self._on_points_changed.append(callback)
@@ -270,10 +268,6 @@ class CollectionSettingsController:
         self._sync_trajectory_toggle()
         _log.debug("collection_settings.wide_flip = %s", value)
 
-    def _on_map_row_shift_changed(self, value: float) -> None:
-        self._model.collection_settings.map_row_shift = value
-        _log.debug("collection_settings.map_row_shift = %s", value)
-
     def _on_rotation_start_changed(self, value: float) -> None:
         cs = self._model.collection_settings
         cs.rotation_start = value
@@ -406,7 +400,6 @@ class CollectionSettingsController:
                 point.map_col = col_idx
                 point.map_motor1 = cs.map_motor
                 point.map_motor2 = cs.map2_motor if cs.map2_enabled else ""
-                point.map_row_shift = cs.map_row_shift
                 new_points.append(point)
                 point_index += 1
 
