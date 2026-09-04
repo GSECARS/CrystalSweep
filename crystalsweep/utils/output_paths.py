@@ -89,7 +89,7 @@ class OutputPaths:
         """Directory where the primary file lands after copying/processing."""
         if point.map_group:
             return self.directory / self.map_folder_name()
-        if point.scan_type == "step" and (self.extras or self.use_crysalis):
+        if self.extras or (point.scan_type == "step" and self.use_crysalis):
             return self.directory / self.basename(point, frame_number)
         return self.directory
 
@@ -100,10 +100,11 @@ class OutputPaths:
         if point.map_group:
             root = self._map_conversion_root()
             return {fmt: root / fmt for fmt in self.extras}
+        root = self.directory / self.basename(point, frame_number)
         if point.scan_type == "step":
-            root = self.directory / self.basename(point, frame_number)
             return {fmt: root / fmt for fmt in self.extras}
-        return {fmt: self.directory for fmt in self.extras}
+        # still or wide: converted files go in the same subfolder as the original
+        return {fmt: root for fmt in self.extras}
 
     def crysalis_source_dir(self, point) -> Path:
         """Source directory for CrysAlis conversion.
