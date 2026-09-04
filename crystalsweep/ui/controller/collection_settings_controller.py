@@ -135,12 +135,15 @@ class CollectionSettingsController:
         cfg = self._model.beamline.active
         still_map = cs.scan_type == "still" and cs.map
         wide_flip_map = cs.scan_type == "wide" and cs.map and cs.wide_flip
+        step_scan = cs.scan_type == "step"
 
-        # Trajectory toggle only makes sense for still maps whose map motor
-        # is driven by an XPS controller (the only controller type that
-        # supports the array trajectory used by the still-map row scan),
-        # and only when the beamline config permits it.
-        trajectory_visible = still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory
+        # Trajectory toggle is relevant for two cases:
+        # - still maps whose map motor uses XPS (array trajectory for row scan)
+        # - step scans whose rotation motor uses XPS (slew trajectory per point)
+        trajectory_visible = (
+            (still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory)
+            or (step_scan and self._rotation_motor_uses_xps())
+        )
         if not trajectory_visible:
             self._view.collection_table.set_trajectory_scan(False)
         self._view.collection_table.set_trajectory_visible(trajectory_visible)
@@ -154,6 +157,14 @@ class CollectionSettingsController:
         # only handles HDF5 row files).
         combine_visible = cs.map and self._model.file_settings.use_hdf5
         self._view.collection_table.set_snake_combine_visible(combine_visible)
+
+    def _rotation_motor_uses_xps(self) -> bool:
+        """Return True if the rotation motor is driven by a Newport XPS controller."""
+        cfg = self._model.beamline.active
+        if cfg.rotation_motor is None:
+            return False
+        controller_types = {c.name: c.type for c in cfg.controllers if c.name}
+        return controller_types.get(cfg.rotation_motor.controller) == "newport_xps"
 
     def _map_motor_uses_xps(self) -> bool:
         """Return True if the currently-selected map motor (or, when map2 is
