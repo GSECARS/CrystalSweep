@@ -696,6 +696,14 @@ class GeneralConfigView(wx.Panel):
         rd_sizer.Add(raw_row, 0, wx.EXPAND)
         rd_body.SetSizer(rd_sizer)
 
+        self._scan_options_section = _Section(self, "Scan Options")
+        so_body = self._scan_options_section.body
+        self._still_trajectory_toggle = FlatCheckBox(so_body, "Enable trajectory scanning for still maps")
+        self._still_trajectory_toggle.SetValue(True)
+        so_sizer = wx.BoxSizer(wx.VERTICAL)
+        so_sizer.Add(self._still_trajectory_toggle, 0, wx.EXPAND)
+        so_body.SetSizer(so_sizer)
+
         self._status_label = _status_label(self)
 
         outer = wx.BoxSizer(wx.VERTICAL)
@@ -704,6 +712,7 @@ class GeneralConfigView(wx.Panel):
         outer.Add(self._abort_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._restore_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._raw_dir_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        outer.Add(self._scan_options_section, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         outer.Add(self._status_label, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
         self.SetMinSize((400, -1))
@@ -724,6 +733,7 @@ class GeneralConfigView(wx.Panel):
         for pv in config.restore_pvs:
             self._append_restore_pv_row(pv)
         self._raw_directory_ctrl.SetValue(config.raw_directory)
+        self._still_trajectory_toggle.SetValue(config.still_map_trajectory)
         self.set_status("")
 
     def beamline_name(self) -> str:
@@ -752,6 +762,9 @@ class GeneralConfigView(wx.Panel):
 
     def raw_directory(self) -> str:
         return self._raw_directory_ctrl.GetValue().strip()
+
+    def still_map_trajectory(self) -> bool:
+        return self._still_trajectory_toggle.GetValue()
 
     def set_status(self, text: str, error: bool = False) -> None:
         self._status_label.SetForegroundColour(app_theme.red if error else app_theme.bright_black)

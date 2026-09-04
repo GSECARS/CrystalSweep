@@ -169,6 +169,7 @@ class BeamlineConfig:
     preview_timeout: float = 60.0
     preview_num_images: int = 1000000
     raw_directory: str = ""
+    still_map_trajectory: bool = True
 
     @property
     def is_empty(self) -> bool:
@@ -359,6 +360,7 @@ class BeamlineConfigModel:
             preview_timeout=max(0.0, float(data.get("preview_timeout", 60.0))),
             preview_num_images=max(1, int(data.get("preview_num_images", 1000000))),
             raw_directory=str(data.get("raw_directory", "")),
+            still_map_trajectory=bool(data.get("still_map_trajectory", True)),
         )
         self._active = cfg
         return cfg
@@ -434,6 +436,7 @@ class BeamlineConfigModel:
             "preview_timeout": config.preview_timeout,
             "preview_num_images": config.preview_num_images,
             "raw_directory": config.raw_directory,
+            "still_map_trajectory": config.still_map_trajectory,
         }
 
         path = self.path_for(config.name)

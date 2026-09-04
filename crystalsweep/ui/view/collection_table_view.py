@@ -805,6 +805,9 @@ class CollectionTableView(wx.Panel):
         self._slew_scan_toggle.Show(visible)
         self.Layout()
 
+    def set_trajectory_scan(self, value: bool) -> None:
+        self._slew_scan_toggle.SetValue(value)
+
     def set_keep_shutter_open_visible(self, visible: bool) -> None:
         self._keep_shutter_open_toggle.Show(visible)
         self.Layout()

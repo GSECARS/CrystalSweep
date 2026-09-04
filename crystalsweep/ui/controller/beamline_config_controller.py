@@ -211,6 +211,7 @@ class BeamlineConfigController:
         abort_pvs = self._general_dlg.config_panel.collect_abort_pvs() if self._general_dlg else base.abort_pvs
         restore_pvs = self._general_dlg.config_panel.collect_restore_pvs() if self._general_dlg else base.restore_pvs
         raw_directory = self._general_dlg.config_panel.raw_directory() if self._general_dlg else base.raw_directory
+        still_map_trajectory = self._general_dlg.config_panel.still_map_trajectory() if self._general_dlg else base.still_map_trajectory
         crysalis_par_path = self._crysalis_dlg.config_panel.crysalis_par_path() if self._crysalis_dlg else base.crysalis_par_path
         crysalis_set_path = self._crysalis_dlg.config_panel.crysalis_set_path() if self._crysalis_dlg else base.crysalis_set_path
         crysalis_ccd_path = self._crysalis_dlg.config_panel.crysalis_ccd_path() if self._crysalis_dlg else base.crysalis_ccd_path
@@ -273,6 +274,7 @@ class BeamlineConfigController:
             preview_timeout=preview_timeout,
             preview_num_images=preview_num_images,
             raw_directory=raw_directory,
+            still_map_trajectory=still_map_trajectory,
         )
 
     def _save(self, config: BeamlineConfig) -> None:

@@ -134,13 +134,17 @@ class CollectionSettingsController:
 
     def _sync_trajectory_toggle(self) -> None:
         cs = self._model.collection_settings
+        cfg = self._model.beamline.active
         still_map = cs.scan_type == "still" and cs.map
         wide_flip_map = cs.scan_type == "wide" and cs.map and cs.wide_flip
 
         # Trajectory toggle only makes sense for still maps whose map motor
         # is driven by an XPS controller (the only controller type that
-        # supports the array trajectory used by the still-map row scan).
-        trajectory_visible = still_map and self._map_motor_uses_xps()
+        # supports the array trajectory used by the still-map row scan),
+        # and only when the beamline config permits it.
+        trajectory_visible = still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory
+        if not trajectory_visible:
+            self._view.collection_table.set_trajectory_scan(False)
         self._view.collection_table.set_trajectory_visible(trajectory_visible)
 
         keep_shutter_visible = still_map or wide_flip_map
