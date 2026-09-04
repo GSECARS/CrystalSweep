@@ -48,6 +48,7 @@ class ScanEngine:
         self._controllers = controllers
         self._shutter_open = False
         self._abort_event: threading.Event = threading.Event()
+        self.test_mode: bool = False
 
     def _inject_shared_connection(self, params: dict, controller_name: str) -> None:
         if self._controllers is None or not controller_name:
@@ -120,7 +121,7 @@ class ScanEngine:
         Returns an error string if the scan cannot proceed, or None if OK.
         """
         if self._scripts is not None:
-            result = self._scripts.call("pre_scan", point, config)
+            result = self._scripts.call("pre_scan", point, config, self.test_mode)
             if isinstance(result, str):
                 return result
         return None
@@ -128,7 +129,7 @@ class ScanEngine:
     def post_scan(self, point: CollectionPoint, config: BeamlineConfig) -> None:
         """Run post-scan cleanup after each point. Delegates to the user script if available."""
         if self._scripts is not None:
-            self._scripts.call("post_scan", point, config)
+            self._scripts.call("post_scan", point, config, self.test_mode)
 
     def pre_collection(self, points: list[CollectionPoint], config: BeamlineConfig) -> str | None:
         """Run once before the entire collection starts. Delegates to the user script if available.
@@ -137,7 +138,7 @@ class ScanEngine:
         """
         if self._scripts is not None:
             self._scripts.begin_collection()
-            result = self._scripts.call("pre_collection", points, config)
+            result = self._scripts.call("pre_collection", points, config, self.test_mode)
             if isinstance(result, str):
                 self._scripts.end_collection()
                 return result
@@ -146,7 +147,7 @@ class ScanEngine:
     def post_collection(self, points: list[CollectionPoint], config: BeamlineConfig) -> None:
         """Run once after the entire collection completes. Delegates to the user script if available."""
         if self._scripts is not None:
-            self._scripts.call("post_collection", points, config)
+            self._scripts.call("post_collection", points, config, self.test_mode)
             self._scripts.end_collection()
 
     def run_still(

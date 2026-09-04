@@ -41,25 +41,27 @@ def is_map(point: CollectionPoint) -> bool:
     return bool(point.map_group)
 
 
-def pre_collection(points: list[CollectionPoint], config: BeamlineConfig) -> str | None:
+def pre_collection(points: list[CollectionPoint], config: BeamlineConfig, test_mode: bool = False) -> str | None:
     """Called once before the entire collection starts (before any scans or maps).
 
     Return an error string to abort the collection, or None to proceed.
     *points* is the full list of points that will be collected.
+    *test_mode* is True when the Test mode checkbox is checked in the UI.
     """
     return None
 
 
-def post_collection(points: list[CollectionPoint], config: BeamlineConfig) -> None:
+def post_collection(points: list[CollectionPoint], config: BeamlineConfig, test_mode: bool = False) -> None:
     """Called once after the entire collection completes (after all scans and maps)."""
     pass
 
 
-def pre_scan(point: CollectionPoint, config: BeamlineConfig) -> str | None:
+def pre_scan(point: CollectionPoint, config: BeamlineConfig, test_mode: bool = False) -> str | None:
     """Called before each scan point.
 
     Return an error string to skip the point, or None to proceed.
     Example: return "Sample not aligned" to skip this point with that message.
+    *test_mode* is True when the Test mode checkbox is checked in the UI.
 
     Useful point attributes:
       point.scan_type     -- "still", "wide", or "step"
@@ -75,10 +77,11 @@ def pre_scan(point: CollectionPoint, config: BeamlineConfig) -> str | None:
     return None
 
 
-def post_scan(point: CollectionPoint, config: BeamlineConfig) -> None:
+def post_scan(point: CollectionPoint, config: BeamlineConfig, test_mode: bool = False) -> None:
     """Called after each scan point completes.
 
     Same point attributes as pre_scan are available.
+    *test_mode* is True when the Test mode checkbox is checked in the UI.
     """
     pass
 '''

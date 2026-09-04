@@ -149,6 +149,7 @@ class CollectController:
                 return
 
         self._abort_event.clear()
+        self._engine.test_mode = self._view.collect.test_mode
         self._start_time = _time.monotonic()
         if self._on_collecting_changed is not None:
             self._on_collecting_changed(True)
