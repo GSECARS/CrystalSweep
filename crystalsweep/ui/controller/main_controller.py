@@ -122,6 +122,7 @@ class MainController:
         if self._beamline_config_controller.has_active_config():
             self._view.set_active_config_name(self._model.beamline.active.name)
             self._file_settings_controller.apply_crysalis_from_config()
+            self._view.set_centering_tools_visible(self._model.beamline.active.centering_tools_enabled)
             self._check_epics_status()
         else:
             wx.CallAfter(self._beamline_config_controller.open_general)
