@@ -1089,15 +1089,16 @@ class CollectController:
             if p.map_group:
                 map_groups.add(p.map_group)
                 continue
-            exact = output.expected_file(p, fs.frame_number)
-            key = str(exact)
+            target_dir = output.output_dir(p, fs.frame_number)
+            target = target_dir / f"{output.basename(p, fs.frame_number)}.{output.file_ext}"
+            key = str(target)
             if key not in seen:
                 seen.add(key)
-                if exact.exists():
-                    conflicts.append(str(exact))
+                if target.exists():
+                    conflicts.append(str(target))
 
         for group in sorted(map_groups):
-            map_dir = output.map_source_dir()
+            map_dir = output.directory / output.map_folder_name()
             key = str(map_dir)
             if key not in seen:
                 seen.add(key)
