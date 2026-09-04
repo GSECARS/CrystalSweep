@@ -337,26 +337,23 @@ class FileSettingsView(wx.Panel):
         self._apply_detector_format_lock()
 
     def _apply_detector_format_lock(self) -> None:
-        """Lock the native format toggle checked and lock all others unchecked."""
+        """Lock the native format toggle checked; leave non-native toggles user-editable for conversion."""
         format_key = self._detector_format
         if format_key == "hdf5":
             self._hdf5_toggle.SetValue(True)
             self._hdf5_toggle.Enable(False)
         else:
-            self._hdf5_toggle.SetValue(False)
-            self._hdf5_toggle.Enable(False)
+            self._hdf5_toggle.Enable(True)
         if format_key == "cbf":
             self._cbf_toggle.SetValue(True)
             self._cbf_toggle.Enable(False)
         else:
-            self._cbf_toggle.SetValue(False)
-            self._cbf_toggle.Enable(False)
+            self._cbf_toggle.Enable(True)
         if format_key == "tif":
             self._tif_toggle.SetValue(True)
             self._tif_toggle.Enable(False)
         else:
-            self._tif_toggle.SetValue(False)
-            self._tif_toggle.Enable(False)
+            self._tif_toggle.Enable(True)
 
     def set_crysalis(self, value: bool) -> None:
         self._crysalis_toggle.SetValue(value)
