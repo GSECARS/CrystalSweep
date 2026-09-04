@@ -101,6 +101,7 @@ class FileSettingsView(wx.Panel):
         self._frame_lbl = self._field_label("Frame #", label_font)
         frame_lbl = self._frame_lbl
         self._frame_ctrl = FlatTextCtrl(self, value="0", placeholder="0")
+        self._frame_ctrl.SetMinSize((50, -1))
         self._frame_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_frame_enter)
         self._frame_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_frame_enter)
         self._frame_reset_btn = FlatIconButton(self, draw_refresh, icon_size=16, tooltip="Reset frame number")
