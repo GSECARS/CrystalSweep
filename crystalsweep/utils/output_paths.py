@@ -93,14 +93,20 @@ class OutputPaths:
             return self.directory / self.basename(point, frame_number)
         return self.directory
 
-    def conversion_dirs(self, point, frame_number: int) -> dict[str, Path]:
-        """Per-format output directory for each extra-format conversion."""
+    def conversion_dirs(self, point, frame_number: int, target: Path | None = None) -> dict[str, Path]:
+        """Per-format output directory for each extra-format conversion.
+
+        target overrides self.directory as the destination root so callers can
+        supply the live model directory instead of the snapshot captured at
+        collection start.
+        """
         if not self.extras:
             return {}
+        dest = target if target is not None else self.directory
         if point.map_group:
-            root = self._map_conversion_root()
+            root = dest / self.map_folder_name() / self.map_folder_name()
             return {fmt: root / fmt for fmt in self.extras}
-        root = self.directory / self.basename(point, frame_number)
+        root = dest / self.basename(point, frame_number)
         if point.scan_type == "step":
             return {fmt: root / fmt for fmt in self.extras}
         # still or wide: converted files go in the same subfolder as the original

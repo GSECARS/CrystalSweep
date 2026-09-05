@@ -1136,7 +1136,11 @@ class CollectController:
         raw = output.raw_directory
         bn = output.basename(point, frame_number)
         ext = output.file_ext
-        dst_dir = output.output_dir(point, frame_number)
+        target = self._model.file_settings.directory
+        if output.extras or (point.scan_type == "step" and output.use_crysalis):
+            dst_dir = target / bn
+        else:
+            dst_dir = target
 
         def _copy() -> None:
             try:
@@ -1161,7 +1165,8 @@ class CollectController:
             return
 
         bn = output.basename(point, frame_number)
-        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(point, frame_number).items()}
+        target = self._model.file_settings.directory
+        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(point, frame_number, target).items()}
 
         self._launch_format_converter(
             directory=str(output.source_dir(point)),
@@ -1190,7 +1195,8 @@ class CollectController:
         ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
         fallback_fn = self._model.file_settings.frame_number
         bn = output.basename(ref, fallback_fn)
-        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(ref, fallback_fn).items()}
+        target = self._model.file_settings.directory
+        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(ref, fallback_fn, target).items()}
 
         self._launch_format_converter(
             directory=str(output.map_source_dir()),
