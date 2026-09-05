@@ -1312,6 +1312,7 @@ class CollectController:
         def on_status(phase: str) -> None:
             wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
 
+        frame_number_before = self._model.file_settings.frame_number
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
@@ -1348,10 +1349,9 @@ class CollectController:
             )
             self._abort_event.set()
         else:
-            fn = self._model.file_settings.frame_number
-            self._spawn_file_copy(point, fn)
-            self._spawn_format_conversion(point, fn)
-            self._spawn_crysalis_conversion(point, fn, config)
+            self._spawn_file_copy(point, frame_number_before)
+            self._spawn_format_conversion(point, frame_number_before)
+            self._spawn_crysalis_conversion(point, frame_number_before, config)
 
     def _run_step(
         self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1
@@ -1474,6 +1474,7 @@ class CollectController:
         def on_status(phase: str) -> None:
             wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
 
+        frame_number_before = self._model.file_settings.frame_number
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
@@ -1511,7 +1512,6 @@ class CollectController:
             self._abort_event.set()
 
         else:
-            fn = self._model.file_settings.frame_number
-            self._spawn_file_copy(point, fn)
-            self._spawn_format_conversion(point, fn)
-            self._spawn_crysalis_conversion(point, fn, config)
+            self._spawn_file_copy(point, frame_number_before)
+            self._spawn_format_conversion(point, frame_number_before)
+            self._spawn_crysalis_conversion(point, frame_number_before, config)

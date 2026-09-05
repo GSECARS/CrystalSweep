@@ -36,6 +36,7 @@ dependencies = [
     "h5py>=3.12.1",
     "numpy>=2.4.4",
     "p4p>=4.2.2",
+    "fabio>=2023.10.0",
     "pillow>=11.2.0",
     "pyfai>=2026.3.0",
     "pyopengl>=3.1.10",
