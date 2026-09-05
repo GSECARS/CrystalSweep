@@ -2,58 +2,54 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/installation/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/usage/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/paths/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/model/collection/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/model/detector/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/model/epics/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/model/hardware/</loc>
-         <lastmod>2026-08-04</lastmod>
-    </url>
-    <url>
-         <loc>https://gsecars.github.io/CrystalSweep/api/model/integration/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/model/scan/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/model/settings/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/model/utilities/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/ui/controllers/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
     <url>
          <loc>https://gsecars.github.io/CrystalSweep/api/ui/views/</loc>
-         <lastmod>2026-08-04</lastmod>
+         <lastmod>2026-09-05</lastmod>
     </url>
 </urlset>
