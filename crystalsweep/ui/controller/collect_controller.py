@@ -1024,10 +1024,14 @@ class CollectController:
         extras = tuple(result[1]) if result else ()
         raw = config.raw_directory.strip() if config else ""
         crysalis_active = bool(fs.use_crysalis and fs.crysalis_calibration is not None)
+        fn_path = Path(fs.filename) if fs.filename else Path(".")
+        fn_parent = fn_path.parent
+        full_directory = Path(str(fs.directory)) / fn_parent if fn_parent != Path(".") else Path(str(fs.directory))
+        stem = fn_path.name if fs.filename else ""
         return OutputPaths(
-            directory=Path(str(fs.directory)),
+            directory=full_directory,
             raw_directory=Path(raw) if raw else None,
-            filename=fs.filename or "",
+            filename=stem,
             map_ext=fs.map_ext.strip(),
             use_ext=fs.use_ext,
             file_ext=file_ext,
@@ -1157,11 +1161,7 @@ class CollectController:
         raw = output.raw_directory
         bn = output.basename(point, frame_number)
         ext = output.file_ext
-        target = self._model.file_settings.directory
-        if output.extras or (point.scan_type == "step" and output.use_crysalis):
-            dst_dir = target / bn
-        else:
-            dst_dir = target
+        dst_dir = output.output_dir(point, frame_number)
 
         def _copy() -> None:
             try:
@@ -1186,8 +1186,7 @@ class CollectController:
             return
 
         bn = output.basename(point, frame_number)
-        target = self._model.file_settings.directory
-        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(point, frame_number, target).items()}
+        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(point, frame_number).items()}
 
         self._launch_format_converter(
             directory=str(output.source_dir(point)),
@@ -1216,8 +1215,7 @@ class CollectController:
         ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
         fallback_fn = self._model.file_settings.frame_number
         bn = output.basename(ref, fallback_fn)
-        target = self._model.file_settings.directory
-        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(ref, fallback_fn, target).items()}
+        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(ref, fallback_fn).items()}
 
         self._launch_format_converter(
             directory=str(output.map_source_dir()),
