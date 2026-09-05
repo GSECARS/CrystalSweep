@@ -18,7 +18,8 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatButton, FlatCheckBox, FlatLabel, FlatPanel, FlatProgressBar
+from crystalsweep.ui.view.custom.widgets import FlatPanel
+from wxutils import FlatButton, FlatCheckBox, FlatLabel, FlatProgressBar
 
 __all__ = ["CollectView"]
 

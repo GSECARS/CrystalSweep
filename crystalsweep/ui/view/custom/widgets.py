@@ -13,11 +13,25 @@
 # ----------------------------------------------------------------------------------
 
 import wx
-from wxutils import FlatLabel, FlatMenuBar, SectionDivider
+from wxutils import FlatLabel, FlatMenuBar, FlatPanel as _FlatPanel, SectionDivider
 
 from crystalsweep.ui.view.custom.theme import app_theme
 
-__all__ = ["CrystalMenuBar", "ThemedSectionDivider"]
+__all__ = ["CrystalMenuBar", "FlatPanel", "ThemedSectionDivider"]
+
+
+class FlatPanel(_FlatPanel):
+    """FlatPanel that reports app_theme.background via GetBackgroundColour().
+
+    wxutils FlatPanel paints its background from the active theme but never
+    calls SetBackgroundColour(), so child widgets that query
+    GetParent().GetBackgroundColour() receive the system default instead of
+    the theme color. Overriding GetBackgroundColour() fixes checkboxes,
+    text fields, and other flat widgets parented to this panel.
+    """
+
+    def GetBackgroundColour(self) -> wx.Colour:
+        return app_theme.background
 
 
 class ThemedSectionDivider(SectionDivider):

@@ -20,11 +20,11 @@ import wx
 
 from crystalsweep.model.beamline_config_model import BeamlineConfig, ControllerConfig, DetectorConfig, MotorConfig
 from crystalsweep.ui.view.custom.theme import app_theme
+from crystalsweep.ui.view.custom.widgets import FlatPanel
 from wxutils import (
     FlatButton,
     FlatCheckBox,
     FlatLabel,
-    FlatPanel,
     FlatTextCtrl,
     FlatCombo,
     FlatScrollBar,
