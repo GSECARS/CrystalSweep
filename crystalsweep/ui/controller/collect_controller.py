@@ -1028,7 +1028,7 @@ class CollectController:
         fn_parent = fn_path.parent
         full_directory = Path(str(fs.directory)) / fn_parent if fn_parent != Path(".") else Path(str(fs.directory))
         stem = fn_path.name if fs.filename else ""
-        _log.debug("_build_output_paths: fs.directory=%r fs.filename=%r -> full_directory=%r stem=%r raw=%r", str(fs.directory), fs.filename, str(full_directory), stem, raw)
+        _log.warning("_build_output_paths: fs.directory=%r fs.filename=%r -> full_directory=%r stem=%r raw=%r", str(fs.directory), fs.filename, str(full_directory), stem, raw)
         return OutputPaths(
             directory=full_directory,
             raw_directory=Path(raw) if raw else None,
