@@ -172,9 +172,13 @@ class FileSettingsController:
         if update_directory and directory:
             local_dir = det.translate_path_reverse(directory) if det else directory
             path = Path(local_dir)
-            m.directory = path
-            fs.set_directory(path)
-            _log.debug("sync_from_detector: remote_dir=%r local_dir=%r", directory, local_dir)
+            raw = cfg.raw_directory.strip() if cfg else ""
+            if raw and Path(raw) == path:
+                _log.debug("sync_from_detector: skipping directory update, IOC at raw_directory (%r)", local_dir)
+            else:
+                m.directory = path
+                fs.set_directory(path)
+                _log.debug("sync_from_detector: remote_dir=%r local_dir=%r", directory, local_dir)
         if update_filename and filename:
             m.filename = filename
             fs.set_filename(filename)
