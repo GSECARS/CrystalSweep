@@ -58,6 +58,7 @@ class CollectController:
         self._thread: threading.Thread | None = None
         self._start_time: float = 0.0
         self._on_collecting_changed: Callable[[bool], None] | None = None
+        self._on_post_scan: Callable[[], None] | None = None
         self._elapsed_timer = wx.Timer()
         self._elapsed_timer.Bind(wx.EVT_TIMER, self._on_elapsed_tick)
 
@@ -83,6 +84,9 @@ class CollectController:
 
     def bind_collecting_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_collecting_changed = callback
+
+    def bind_post_scan(self, callback: Callable[[], None]) -> None:
+        self._on_post_scan = callback
 
     def on_config_applied(self) -> None:
         """Re-subscribe soft-limit monitors for the newly active beamline config."""
@@ -929,6 +933,8 @@ class CollectController:
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
         wx.CallAfter(self._stop_point_timer, start_idx + n_points - 1, total)
 
         if error_holder:
@@ -1338,6 +1344,8 @@ class CollectController:
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
         wx.CallAfter(self._stop_point_timer, idx, total)
 
         if error_holder:
@@ -1422,6 +1430,8 @@ class CollectController:
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
         wx.CallAfter(self._view.collect.set_progress, idx, total, n_frames, n_frames, (completed_weight + point_weight) / total_weight)
 
         if error_holder:
@@ -1500,6 +1510,8 @@ class CollectController:
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
         wx.CallAfter(self._stop_point_timer, idx, total)
 
         if error_holder:
