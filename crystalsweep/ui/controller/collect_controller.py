@@ -814,17 +814,14 @@ class CollectController:
                     map_completed_weight += pt_weight
 
             det = config.active_detector_config if config else None
-            if not self._abort_event.is_set() and scan_type == "still" and det is not None and det.file_format == "hdf5":
-                self._spawn_snake_combine_for_map(row_shift_frames=map_row_shift)
-
-        det = config.active_detector_config if config else None
-        output = self._output_paths
-        if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5" and output is not None and output.raw_directory is not None:
-            if scan_type == "step":
-                self._spawn_map_copy_to_target(flip_odd_rows=False, row_shift_frames=map_row_shift)
-            elif scan_type == "wide":
-                wide_flip = self._model.collection_settings.wide_flip
-                self._spawn_map_copy_to_target(flip_odd_rows=wide_flip, row_shift_frames=map_row_shift)
+            if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5":
+                if scan_type == "still":
+                    self._spawn_snake_combine_for_map(row_shift_frames=map_row_shift)
+                elif scan_type in ("step", "wide"):
+                    _out = self._output_paths
+                    if _out is not None and _out.raw_directory is not None:
+                        wide_flip = scan_type == "wide" and self._model.collection_settings.wide_flip
+                        self._spawn_map_copy_to_target(flip_odd_rows=wide_flip, row_shift_frames=map_row_shift)
 
         if keep_shutter_open:
             self._engine._close_shutter(config)
