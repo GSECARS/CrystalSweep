@@ -22,7 +22,7 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatCheckBox, FlatTextCtrl, FlatIconButton, draw_arrow_up, draw_folder, draw_folder_open, draw_refresh
+from wxutils import FlatCheckBox, FlatPanel, FlatTextCtrl, FlatIconButton, draw_arrow_up, draw_folder, draw_folder_open, draw_refresh
 
 __all__ = ["FileSettingsView"]
 
@@ -31,7 +31,7 @@ _PATH_EXISTS = wx.Colour(220, 160, 40)
 _PATH_OK = wx.Colour(46, 139, 78)
 
 
-class FileSettingsView(wx.Panel):
+class FileSettingsView(FlatPanel):
     """File settings panel: filename, path, frame #, map ext, format flags, software flags."""
 
     def __init__(self, parent: wx.Window) -> None:
@@ -79,8 +79,8 @@ class FileSettingsView(wx.Panel):
         self.SetSizer(outer)
         self._validate_path()
 
-    def _make_sep(self) -> wx.Panel:
-        sep = wx.Panel(self, size=(-1, 1))
+    def _make_sep(self) -> FlatPanel:
+        sep = FlatPanel(self, size=(-1, 1))
         sep.SetBackgroundColour(app_theme.bright_black)
         return sep
 
@@ -109,7 +109,7 @@ class FileSettingsView(wx.Panel):
         self._frame_reset_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_reset())
         self._frame_update_btn = FlatIconButton(self, draw_arrow_up, icon_size=16, tooltip="Update frame number")
         self._frame_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._on_frame_update())
-        vsep = wx.Panel(self, size=(1, -1))
+        vsep = FlatPanel(self, size=(1, -1))
         vsep.SetBackgroundColour(app_theme.bright_black)
         frame_section = wx.BoxSizer(wx.HORIZONTAL)
         frame_section.Add(frame_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -184,7 +184,7 @@ class FileSettingsView(wx.Panel):
         self._map_ext_update_btn = FlatIconButton(self, draw_arrow_up, icon_size=16, tooltip="Update map labels in collection table")
         self._map_ext_update_btn.Bind(wx.EVT_BUTTON, lambda _: self._fire(self._on_map_ext_update_cb))
 
-        vsep1 = wx.Panel(self, size=(1, -1))
+        vsep1 = FlatPanel(self, size=(1, -1))
         vsep1.SetBackgroundColour(app_theme.bright_black)
 
         self._crysalis_toggle = FlatCheckBox(self, "Use CrysAlis")

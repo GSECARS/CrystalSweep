@@ -23,7 +23,7 @@
 from typing import Callable
 
 import wx
-from wxutils import FlatButton, FlatCheckBox, FlatCombo, FlatScrollBar, FlatTextCtrl
+from wxutils import FlatButton, FlatCheckBox, FlatCombo, FlatPanel, FlatScrollBar, FlatTextCtrl
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.ui.view.custom.theme import app_theme
@@ -63,7 +63,7 @@ _CHECK_BORDER = wx.Colour(80, 80, 92)
 _OVERSCAN_ROWS = 2
 
 
-class _RowsViewport(wx.Panel):
+class _RowsViewport(FlatPanel):
     """Clipping panel that hosts the pooled row widgets.
 
     The viewport does not own a sizer for the rows; rows are positioned
@@ -72,20 +72,20 @@ class _RowsViewport(wx.Panel):
     """
 
     def __init__(self, parent: wx.Window, on_scroll_changed: Callable[[float, float], None], on_repopulate: Callable[[], None]) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
+        super().__init__(parent)
         self._on_scroll_changed = on_scroll_changed
         self._on_repopulate = on_repopulate
         self._scroll_offset: int = 0
         self._virtual_height: int = 0
 
-        self._rows_panel = wx.Panel(self, style=wx.BORDER_NONE)
+        self._rows_panel = FlatPanel(self)
 
         self.Bind(wx.EVT_SIZE, self._on_size)
         self.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
         self._rows_panel.Bind(wx.EVT_MOUSEWHEEL, self._on_wheel)
 
     @property
-    def rows_panel(self) -> wx.Panel:
+    def rows_panel(self) -> FlatPanel:
         return self._rows_panel
 
     @property
@@ -202,7 +202,7 @@ class _RowDispatcher:
         self.on_move: Callable[[int], None] | None = None
 
 
-class _CollectionRow(wx.Panel):
+class _CollectionRow(FlatPanel):
     """One editable row with checkbox and data controls positioned flush inside each cell.
 
     Rows are pooled and re-bound to different points via :meth:`bind_to` as the
@@ -220,7 +220,7 @@ class _CollectionRow(wx.Panel):
         col_widths: list[int],
         dispatcher: _RowDispatcher,
     ) -> None:
-        super().__init__(parent, size=(-1, _ROW_H), style=wx.BORDER_NONE)
+        super().__init__(parent, size=(-1, _ROW_H))
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
 
         self._dispatcher = dispatcher
@@ -294,7 +294,7 @@ class _CollectionRow(wx.Panel):
         self._time_ctrl.SetRestrictToFloat(True)
         self._time_ctrl.SetValidator(self._make_motor_validator(4))
 
-        self._remove_btn_panel = wx.Panel(self, style=wx.BORDER_NONE)
+        self._remove_btn_panel = FlatPanel(self)
         self._remove_btn_panel.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._remove_btn_panel.Bind(wx.EVT_PAINT, self._on_remove_panel_paint)
         self._remove_btn = FlatButton(self._remove_btn_panel, "×", color_scheme=app_theme.danger_scheme(), font=app_theme.btn_font())
@@ -602,7 +602,7 @@ class _CollectionRow(wx.Panel):
         return _validate
 
 
-class _HeaderRow(wx.Panel):
+class _HeaderRow(FlatPanel):
     """Custom-painted header with column labels, bottom border, and a select-all checkbox."""
 
     def __init__(
@@ -613,7 +613,7 @@ class _HeaderRow(wx.Panel):
         col_widths: list[int],
         on_select_all: Callable[[bool], None],
     ) -> None:
-        super().__init__(parent, size=(-1, _HEADER_H), style=wx.BORDER_NONE)
+        super().__init__(parent, size=(-1, _HEADER_H))
         self.SetBackgroundColour(app_theme.background)
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._col_widths = col_widths
@@ -703,7 +703,7 @@ class _HeaderRow(wx.Panel):
 _NO_FIELD_ERRORS: tuple[dict[str, bool], bool, bool] = ({}, False, False)
 
 
-class CollectionTableView(wx.Panel):
+class CollectionTableView(FlatPanel):
     """Editable collection-points table with a traditional grid look.
 
     Internally the table is virtualized:
@@ -723,7 +723,7 @@ class CollectionTableView(wx.Panel):
     _SIDE_PAD = 20
 
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
+        super().__init__(parent)
 
         self._motor_shorthands: list[str] = []
         self._motor_precisions: dict[str, int] = {}
@@ -923,7 +923,7 @@ class CollectionTableView(wx.Panel):
         title_row.Add(self._delete_selected_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._clear_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
 
-        title_sep = wx.Panel(self, size=(-1, 1))
+        title_sep = FlatPanel(self, size=(-1, 1))
         title_sep.SetBackgroundColour(app_theme.bright_black)
 
         self._header = _HeaderRow(
@@ -934,7 +934,7 @@ class CollectionTableView(wx.Panel):
             on_select_all=self._on_select_all,
         )
 
-        header_border = wx.Panel(self, size=(-1, 1))
+        header_border = FlatPanel(self, size=(-1, 1))
         header_border.SetBackgroundColour(_BORDER)
 
         self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll)

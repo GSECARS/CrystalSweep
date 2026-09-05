@@ -23,6 +23,7 @@ from crystalsweep.ui.view.custom.theme import app_theme
 from wxutils import (
     FlatButton,
     FlatCheckBox,
+    FlatPanel,
     FlatTextCtrl,
     FlatCombo,
     FlatScrollBar,
@@ -111,15 +112,15 @@ def _label(parent: wx.Window, text: str, bold: bool = False, secondary: bool = F
     return lbl
 
 
-class _Section(wx.Panel):
+class _Section(FlatPanel):
     """Card-like grouping with a bold title, separator, and a body panel."""
 
     def __init__(self, parent: wx.Window, title: str) -> None:
         super().__init__(parent)
         title_lbl = _label(self, title, bold=True)
-        sep = wx.Panel(self, size=wx.Size(-1, 1))
+        sep = FlatPanel(self, size=wx.Size(-1, 1))
         sep.SetBackgroundColour(app_theme.bright_black)
-        self.body = wx.Panel(self)
+        self.body = FlatPanel(self)
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(title_lbl, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
         sizer.AddSpacer(6)
@@ -288,7 +289,7 @@ class _ControllerRow(_TableRow):
         self.type_combo = FlatCombo(self, choices=_CONTROLLER_DISPLAY_NAMES, selection=sel)
         self.type_combo.Bind(wx.EVT_CHOICE, self._on_type_changed)
 
-        self._params_panel = wx.Panel(self)
+        self._params_panel = FlatPanel(self)
         self._params_panel.SetBackgroundColour(self.GetBackgroundColour())
         self._params_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self._params_panel.SetSizer(self._params_sizer)
@@ -533,7 +534,7 @@ def _restripe(rows: list, sizer: wx.BoxSizer) -> None:
         row.Refresh()
 
 
-def _status_label(parent: wx.Panel) -> wx.StaticText:
+def _status_label(parent: FlatPanel) -> wx.StaticText:
     lbl = wx.StaticText(parent, label="")
     lbl.SetFont(app_theme.scaled_font(11))
     return lbl
@@ -608,7 +609,7 @@ class _RestorePvRow(_TableRow):
         return self.pv_ctrl.GetValue().strip()
 
 
-class GeneralConfigView(wx.Panel):
+class GeneralConfigView(FlatPanel):
     """General configuration: beamline name, abort PVs, and restore PVs."""
 
     def __init__(self, parent: wx.Window) -> None:
@@ -841,7 +842,7 @@ class GeneralConfigView(wx.Panel):
         self.Layout()
 
 
-class CrysalisConfigView(wx.Panel):
+class CrysalisConfigView(FlatPanel):
     """CrysAlis configuration: PAR, SET, and CCD calibration file paths."""
 
     def __init__(self, parent: wx.Window) -> None:
@@ -1042,7 +1043,7 @@ class CrysalisConfigView(wx.Panel):
             self._crysalis_ccd_ctrl.SetValue(dlg.GetPath())
 
 
-class DetectorsConfigView(wx.Panel):
+class DetectorsConfigView(FlatPanel):
     """Detectors configuration: manage detector list."""
 
     def __init__(self, parent: wx.Window) -> None:
@@ -1193,7 +1194,7 @@ class DetectorsConfigView(wx.Panel):
         _restripe(self._detector_rows, self._detector_rows_panel.rows_sizer)
 
 
-class ControllersConfigView(wx.Panel):
+class ControllersConfigView(FlatPanel):
     """Controllers configuration: manage motion controller list."""
 
     def __init__(self, parent: wx.Window) -> None:
@@ -1279,7 +1280,7 @@ class ControllersConfigView(wx.Panel):
         _restripe(self._controller_rows, self._controller_rows_panel.rows_sizer)
 
 
-class PositionersConfigView(wx.Panel):
+class PositionersConfigView(FlatPanel):
     """Positioners configuration: rotation stage and motors."""
 
     def __init__(self, parent: wx.Window) -> None:
@@ -1424,7 +1425,7 @@ class _ConfigDialog(wx.Dialog):
 
     def __init__(self, parent: wx.Window, title: str, size: tuple[int, int] = (820, 620)) -> None:
         super().__init__(parent, title=title, style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
-        self._viewport = wx.Panel(self, style=wx.BORDER_NONE)
+        self._viewport = FlatPanel(self)
         self._scroll_offset: int = 0
         self.config_panel = self._make_panel(self._viewport)
         self._scrollbar = FlatScrollBar(self, on_scroll=self._on_sb_scroll)
@@ -1440,7 +1441,7 @@ class _ConfigDialog(wx.Dialog):
         self.SetMinSize((520, 420))
         self.CentreOnParent()
 
-    def _make_panel(self, viewport: wx.Panel) -> wx.Panel:
+    def _make_panel(self, viewport: FlatPanel) -> FlatPanel:
         raise NotImplementedError
 
     def _on_char_hook(self, event: wx.KeyEvent) -> None:
@@ -1493,7 +1494,7 @@ class GeneralConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent, "General configuration", size=(660, 520))
 
-    def _make_panel(self, viewport: wx.Panel) -> GeneralConfigView:
+    def _make_panel(self, viewport: FlatPanel) -> GeneralConfigView:
         return GeneralConfigView(viewport)
 
 
@@ -1501,7 +1502,7 @@ class CrysalisConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent, "CrysAlis configuration", size=(660, 620))
 
-    def _make_panel(self, viewport: wx.Panel) -> CrysalisConfigView:
+    def _make_panel(self, viewport: FlatPanel) -> CrysalisConfigView:
         return CrysalisConfigView(viewport)
 
 
@@ -1509,7 +1510,7 @@ class DetectorsConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent, "Detectors configuration", size=(760, 500))
 
-    def _make_panel(self, viewport: wx.Panel) -> DetectorsConfigView:
+    def _make_panel(self, viewport: FlatPanel) -> DetectorsConfigView:
         return DetectorsConfigView(viewport)
 
 
@@ -1517,7 +1518,7 @@ class ControllersConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent, "Controllers configuration", size=(840, 500))
 
-    def _make_panel(self, viewport: wx.Panel) -> ControllersConfigView:
+    def _make_panel(self, viewport: FlatPanel) -> ControllersConfigView:
         return ControllersConfigView(viewport)
 
 
@@ -1525,5 +1526,5 @@ class PositionersConfigDialog(_ConfigDialog):
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent, "Positioners configuration", size=(900, 620))
 
-    def _make_panel(self, viewport: wx.Panel) -> PositionersConfigView:
+    def _make_panel(self, viewport: FlatPanel) -> PositionersConfigView:
         return PositionersConfigView(viewport)

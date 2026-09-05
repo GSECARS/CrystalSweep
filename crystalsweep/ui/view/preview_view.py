@@ -17,7 +17,7 @@
 from typing import Callable
 
 import wx
-from wxutils import FlatButton, FlatIconButton, FlatTextCtrl, StatusField, draw_chevron_left, draw_chevron_right
+from wxutils import FlatButton, FlatIconButton, FlatPanel, FlatTextCtrl, StatusField, draw_chevron_left, draw_chevron_right
 
 from crystalsweep.ui.view.custom.theme import app_theme
 from crystalsweep.utils import MotorPositionValidator
@@ -46,7 +46,7 @@ _UM_PER_MM = 1000.0
 _PREDEFINED_STEPS_UM: tuple[float, ...] = (1.0, 2.0, 5.0, 10.0)
 
 
-class _CenteringRow(wx.Panel):
+class _CenteringRow(FlatPanel):
     """One row in the centering motors column: [label] [<] [live RBV] [>]."""
 
     _ARROW_SIZE = 20
@@ -54,7 +54,7 @@ class _CenteringRow(wx.Panel):
     _VALUE_W = 90
 
     def __init__(self, parent: wx.Window, spec: CenteringMotorSpec) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
+        super().__init__(parent)
         self.SetMinSize((-1, self._ROW_H))
         self.spec = spec
         self._precision = max(0, int(spec.precision))
@@ -110,11 +110,11 @@ class _CenteringRow(wx.Panel):
             cb(self.spec)
 
 
-class PreviewView(wx.Panel):
+class PreviewView(FlatPanel):
     """Preview tab: Start/Stop button and step-size selector in column 1."""
 
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
+        super().__init__(parent)
 
         self._on_start_cb: Callable[[], None] | None = None
         self._on_stop_cb: Callable[[], None] | None = None
@@ -172,13 +172,13 @@ class PreviewView(wx.Panel):
 
         self._original_rows: list[wx.Window] = []
         self._current_pair_rows: list[wx.Window] = []
-        self._current_motor_rows: dict[str, tuple[wx.Panel, wx.StaticText, int]] = {}
-        self._current_max_row: wx.Panel | None = None
+        self._current_motor_rows: dict[str, tuple[FlatPanel, wx.StaticText, int]] = {}
+        self._current_max_row: FlatPanel | None = None
         self._current_max_value: wx.StaticText | None = None
         self._original_max_intensity: float | None = None
         self._best_pair_rows: list[wx.Window] = []
-        self._best_motor_rows: dict[str, tuple[wx.Panel, wx.StaticText, int]] = {}
-        self._best_max_row: wx.Panel | None = None
+        self._best_motor_rows: dict[str, tuple[FlatPanel, wx.StaticText, int]] = {}
+        self._best_max_row: FlatPanel | None = None
         self._best_max_value: wx.StaticText | None = None
 
     def bind_start(self, callback: Callable[[], None]) -> None:
@@ -333,7 +333,7 @@ class PreviewView(wx.Panel):
         self._toggle_btn.SetAction(self._on_toggle_clicked)
         col.Add(self._toggle_btn, 1, wx.EXPAND | wx.BOTTOM, 10)
 
-        sep = wx.Panel(self, size=(presets_total_w, 1))
+        sep = FlatPanel(self, size=(presets_total_w, 1))
         sep.SetBackgroundColour(app_theme.bright_black)
         sep.SetMinSize((presets_total_w, 1))
         sep.SetMaxSize((presets_total_w, 1))
@@ -372,8 +372,8 @@ class PreviewView(wx.Panel):
 
         return col
 
-    def _build_centering_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
-        panel = wx.Panel(self, style=wx.BORDER_NONE)
+    def _build_centering_column(self) -> tuple[FlatPanel, wx.BoxSizer, wx.StaticText]:
+        panel = FlatPanel(self)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -384,8 +384,8 @@ class PreviewView(wx.Panel):
         panel.SetSizer(sizer)
         return panel, sizer, empty_label
 
-    def _build_originals_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
-        panel = wx.Panel(self, style=wx.BORDER_NONE)
+    def _build_originals_column(self) -> tuple[FlatPanel, wx.BoxSizer, wx.StaticText]:
+        panel = FlatPanel(self)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -463,8 +463,8 @@ class PreviewView(wx.Panel):
         label_text: str,
         value_text: str,
         on_go: Callable[[], None] | None,
-    ) -> tuple[wx.Panel, wx.StaticText, FlatButton | None]:
-        row = wx.Panel(parent, style=wx.BORDER_NONE)
+    ) -> tuple[FlatPanel, wx.StaticText, FlatButton | None]:
+        row = FlatPanel(parent)
 
         label = wx.StaticText(row, label=label_text)
         label.SetFont(app_theme.scaled_font(12))
@@ -482,11 +482,11 @@ class PreviewView(wx.Panel):
 
     def _add_motor_pair_rows(
         self,
-        parent: wx.Panel,
+        parent: FlatPanel,
         sizer: wx.BoxSizer,
         items: list[tuple[str, str, float | None, int]],
         container_list: list[wx.Window],
-        key_map: dict[str, tuple[wx.Panel, wx.StaticText, int]] | None,
+        key_map: dict[str, tuple[FlatPanel, wx.StaticText, int]] | None,
     ) -> None:
         """Add motor items to *sizer* two per line. Pair containers go into *container_list*.
         If *key_map* is provided, maps each item key → (cell_panel, value_label, precision)."""
@@ -494,7 +494,7 @@ class PreviewView(wx.Panel):
         for left in it:
             right = next(it, None)
 
-            pair = wx.Panel(parent, style=wx.BORDER_NONE)
+            pair = FlatPanel(parent)
             pair.SetBackgroundColour(app_theme.black)
             pair_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -526,14 +526,14 @@ class PreviewView(wx.Panel):
         except (TypeError, ValueError):
             return "—"
 
-    def _build_currents_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
+    def _build_currents_column(self) -> tuple[FlatPanel, wx.BoxSizer, wx.StaticText]:
         return self._build_snapshot_column("Current Positions", "_currents_go_btn")
 
-    def _build_bests_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
+    def _build_bests_column(self) -> tuple[FlatPanel, wx.BoxSizer, wx.StaticText]:
         return self._build_snapshot_column("Best Positions", "_bests_go_btn")
 
-    def _build_snapshot_column(self, title: str, go_btn_attr: str) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
-        panel = wx.Panel(self, style=wx.BORDER_NONE)
+    def _build_snapshot_column(self, title: str, go_btn_attr: str) -> tuple[FlatPanel, wx.BoxSizer, wx.StaticText]:
+        panel = FlatPanel(self)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -555,8 +555,8 @@ class PreviewView(wx.Panel):
         panel.SetSizer(sizer)
         return panel, sizer, empty_label
 
-    def _build_auto_optimize_panel(self) -> wx.Panel:
-        panel = wx.Panel(self, style=wx.BORDER_NONE)
+    def _build_auto_optimize_panel(self) -> FlatPanel:
+        panel = FlatPanel(self)
 
         self._auto_optimize_btn = FlatButton(panel, "Auto Optimize", font=app_theme.btn_font())
         self._auto_optimize_btn.SetMinSize((-1, 30))

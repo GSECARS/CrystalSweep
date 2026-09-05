@@ -23,7 +23,7 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, ScanType
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatTableHeader, FlatTableRow
+from wxutils import FlatButton, FlatCheckBox, FlatPanel, FlatTextCtrl, FlatCombo, FlatTableHeader, FlatTableRow
 
 __all__ = ["CollectionSettingsView"]
 
@@ -207,11 +207,11 @@ class _MapDataRow(FlatTableRow):
         return self.motor_combo.GetStringSelection()
 
 
-class _MapTable(wx.Panel):
+class _MapTable(FlatPanel):
     """Compact two-row table for map axes, styled like the collection table."""
 
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
+        super().__init__(parent)
 
         self._header = _MapHeaderRow(self)
         self.row1 = _MapDataRow(self, row_index=0)
@@ -231,7 +231,7 @@ _TYPE_COLOURS: dict[str, wx.Colour] = {
 }
 
 
-class CollectionSettingsView(wx.Panel):
+class CollectionSettingsView(FlatPanel):
     """Collection settings panel: scan type selector and dynamic parameter fields."""
 
     def __init__(self, parent: wx.Window) -> None:
@@ -380,7 +380,7 @@ class CollectionSettingsView(wx.Panel):
         return row
 
     def _make_map_presets(self, label_font: wx.Font) -> wx.Window:
-        self._map_presets_panel = wx.Panel(self)
+        self._map_presets_panel = FlatPanel(self)
         self._map_presets_lbl = wx.StaticText(self._map_presets_panel, label="Presets")
         self._map_presets_lbl.SetFont(label_font)
         lbl = self._map_presets_lbl

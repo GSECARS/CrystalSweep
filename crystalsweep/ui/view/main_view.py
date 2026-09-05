@@ -17,7 +17,7 @@ from typing import Callable
 
 import wx
 from epicsapps.pva_adviewer.ad_viewer_view import ADViewerView
-from wxutils import FlatConfirmDialog, FlatSplitter, FlatTabbedPanel, SectionDivider
+from wxutils import FlatConfirmDialog, FlatPanel, FlatSplitter, FlatTabbedPanel, SectionDivider
 
 from crystalsweep.assets import LOGO_PNG
 from crystalsweep.ui.view.collect_view import CollectView
@@ -57,15 +57,15 @@ class MainView(wx.Frame):
         self._splitter.SetSashGravity(0.0)
         self._splitter.SetMinimumPaneSize(180)
 
-        self._left_panel = wx.Panel(self._splitter)
+        self._left_panel = FlatPanel(self._splitter)
 
         self.file_settings = FileSettingsView(self._left_panel)
         self.collection_settings = CollectionSettingsView(self._left_panel)
         self.collection_table = CollectionTableView(self._left_panel)
         self.collect = CollectView(self._left_panel)
 
-        def _sep() -> wx.Panel:
-            return wx.Panel(self._left_panel, size=(-1, 1))
+        def _sep() -> FlatPanel:
+            return FlatPanel(self._left_panel, size=(-1, 1))
 
         collect_sep = _sep()
         collect_sep.SetBackgroundColour(app_theme.bright_black)
@@ -166,7 +166,7 @@ class MainView(wx.Frame):
 
         self.preview = PreviewView(tabs)
 
-        xrd_page = wx.Panel(tabs)
+        xrd_page = FlatPanel(tabs)
         xrd_label = wx.StaticText(xrd_page, label="Coming soon")
         xrd_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
         xrd_sizer = wx.BoxSizer(wx.VERTICAL)

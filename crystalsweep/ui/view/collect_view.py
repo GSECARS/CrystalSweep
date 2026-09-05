@@ -18,7 +18,7 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatButton, FlatCheckBox, FlatProgressBar
+from wxutils import FlatButton, FlatCheckBox, FlatPanel, FlatProgressBar
 
 __all__ = ["CollectView"]
 
@@ -31,7 +31,7 @@ _COLLECT_SCHEME = (
 )
 
 
-class CollectView(wx.Panel):
+class CollectView(FlatPanel):
     """Status + progress bar (left) and collect/abort button (right)."""
 
     def __init__(self, parent: wx.Window) -> None:
