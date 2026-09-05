@@ -18,13 +18,37 @@ from argparse import ArgumentParser
 
 
 def _make_ico(png_path: str) -> str:
-    """Generate a multi-size .ico from a PNG using Pillow. Returns the .ico path."""
+    """Generate a multi-size .ico from a PNG. Returns the .ico path.
+
+    Builds the ICO file manually using PNG-compressed entries so all sizes
+    (16, 32, 48, 64, 128, 256) are included — Pillow's ICO save() silently
+    drops larger sizes on some versions.
+    """
+    import io
+    import struct
     from PIL import Image
+
     ico_path = os.path.splitext(png_path)[0] + ".ico"
     img = Image.open(png_path).convert("RGBA")
-    sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
-    imgs = [img.resize(s, Image.LANCZOS) for s in sizes]
-    imgs[0].save(ico_path, format="ICO", append_images=imgs[1:])
+    sizes = [16, 32, 48, 64, 128, 256]
+    blobs = []
+    for s in sizes:
+        buf = io.BytesIO()
+        img.resize((s, s), Image.LANCZOS).save(buf, format="PNG")
+        blobs.append(buf.getvalue())
+
+    num = len(blobs)
+    header = struct.pack("<HHH", 0, 1, num)
+    offset = 6 + num * 16
+    dir_entries = b""
+    for s, data in zip(sizes, blobs):
+        w = s if s < 256 else 0
+        h = s if s < 256 else 0
+        dir_entries += struct.pack("<BBBBHHII", w, h, 0, 0, 1, 32, len(data), offset)
+        offset += len(data)
+
+    with open(ico_path, "wb") as f:
+        f.write(header + dir_entries + b"".join(blobs))
     return ico_path
 
 
