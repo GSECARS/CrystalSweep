@@ -50,8 +50,11 @@ def _mkdir_safe(path: Path) -> None:
     """Create path and any missing parents, skipping parents that already exist.
 
     Windows returns ACCESS_DENIED when CreateDirectory is called on a network
-    share root (e.g. T:\\Data) even though it exists. Walking up from the leaf
-    and only creating the missing portion avoids that error.
+    share root (e.g. T:\\Data) even though it exists. .exists() also returns
+    False for that root when the process lacks enumeration rights, so the
+    walk-up can overshoot past the real root. Catching PermissionError in the
+    mkdir loop treats such a path as already present and lets subdirectory
+    creation continue normally.
     """
     missing: list[Path] = []
     p = path
@@ -64,7 +67,10 @@ def _mkdir_safe(path: Path) -> None:
             break
         p = parent
     for part in reversed(missing):
-        part.mkdir(exist_ok=True)
+        try:
+            part.mkdir(exist_ok=True)
+        except PermissionError:
+            pass
 
 
 class CollectController:
@@ -1028,7 +1034,7 @@ class CollectController:
         fn_parent = fn_path.parent
         full_directory = Path(str(fs.directory)) / fn_parent if fn_parent != Path(".") else Path(str(fs.directory))
         stem = fn_path.name if fs.filename else ""
-        _log.warning("_build_output_paths: fs.directory=%r fs.filename=%r -> full_directory=%r stem=%r raw=%r", str(fs.directory), fs.filename, str(full_directory), stem, raw)
+        _log.debug("_build_output_paths: fs.directory=%r fs.filename=%r -> full_directory=%r stem=%r raw=%r", str(fs.directory), fs.filename, str(full_directory), stem, raw)
         return OutputPaths(
             directory=full_directory,
             raw_directory=Path(raw) if raw else None,
