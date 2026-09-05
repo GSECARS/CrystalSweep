@@ -173,6 +173,13 @@ def _write_hdf5(out_path: Path, data) -> None:
 
 
 def _write_fabio(out_path: Path, data, target_format: str) -> None:
+    if target_format == "tif":
+        from PIL import Image
+        import numpy as np
+
+        arr = np.asarray(data)
+        Image.fromarray(arr).save(str(out_path))
+        return
     import fabio
 
     if target_format == "cbf":

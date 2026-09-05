@@ -17,25 +17,11 @@
 from typing import Callable
 
 import wx
+from wxutils import FlatButton, FlatIconButton, FlatTextCtrl, StatusField, draw_chevron_left, draw_chevron_right
 
-from crystalsweep.model.validation import MotorPositionValidator
-from crystalsweep.ui.view.custom.icons import draw_chevron_left, draw_chevron_right
-from crystalsweep.ui.view.custom.theme import (
-    BG_CARD,
-    DANGER,
-    DANGER_HOVER,
-    DANGER_PRESS,
-    FG_PRIMARY,
-    FG_SECONDARY,
-    PONI_LOADED,
-    POPUP_BTN_BG,
-    POPUP_BTN_HOVER,
-    POPUP_BTN_PRESS,
-    SEP_COLOUR,
-    scaled_font,
-)
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, DEFAULT_SCHEME, TEXT_SCHEME, STATUS_SCHEME, icon_scheme
-from wxutils import FlatButton, FlatTextCtrl, StatusField, FlatIconButton
+from crystalsweep.ui.view.custom.theme import app_theme
+from crystalsweep.ui.view.custom.widgets import FlatLabel, FlatPanel
+from crystalsweep.utils import MotorPositionValidator
 
 __all__ = ["CenteringMotorSpec", "PreviewView"]
 
@@ -52,17 +38,16 @@ class CenteringMotorSpec:
         self.precision = precision
 
 
-_START_SCHEME = DEFAULT_SCHEME
-_STOP_SCHEME = (DANGER, DANGER_HOVER, DANGER_PRESS, FG_PRIMARY, FG_PRIMARY)
+def _stop_scheme():
+    return (app_theme.red, app_theme.bright_red, app_theme.red, app_theme.foreground, app_theme.foreground)
 
-_STEP_SCHEME = (POPUP_BTN_BG, POPUP_BTN_HOVER, POPUP_BTN_PRESS, FG_PRIMARY, FG_PRIMARY)
 
 _STEP_PRECISION = 4
 _UM_PER_MM = 1000.0
 _PREDEFINED_STEPS_UM: tuple[float, ...] = (1.0, 2.0, 5.0, 10.0)
 
 
-class _CenteringRow(wx.Panel):
+class _CenteringRow(FlatPanel):
     """One row in the centering motors column: [label] [<] [live RBV] [>]."""
 
     _ARROW_SIZE = 20
@@ -70,29 +55,22 @@ class _CenteringRow(wx.Panel):
     _VALUE_W = 90
 
     def __init__(self, parent: wx.Window, spec: CenteringMotorSpec) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
-        self.SetBackgroundColour(BG_CARD)
+        super().__init__(parent)
         self.SetMinSize((-1, self._ROW_H))
         self.spec = spec
         self._precision = max(0, int(spec.precision))
 
         label_text = spec.description or spec.shorthand or spec.pv
-        self._label = wx.StaticText(self, label=label_text)
-        self._label.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-        self._label.SetForegroundColour(FG_SECONDARY)
-        self._label.SetBackgroundColour(BG_CARD)
+        self._label = FlatLabel(self, label=label_text)
+        self._label.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
 
-        self._left_btn = FlatIconButton(
-            self, draw_chevron_left, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} − step", icon_scheme=icon_scheme(BG_CARD)
-        )
+        self._left_btn = FlatIconButton(self, draw_chevron_left, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} − step")
         self._left_btn.Bind(wx.EVT_BUTTON, lambda _e: self._fire(self._on_left_cb))
 
-        self._right_btn = FlatIconButton(
-            self, draw_chevron_right, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} + step", icon_scheme=icon_scheme(BG_CARD)
-        )
+        self._right_btn = FlatIconButton(self, draw_chevron_right, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} + step")
         self._right_btn.Bind(wx.EVT_BUTTON, lambda _e: self._fire(self._on_right_cb))
 
-        self._value_box = StatusField(self, height=self._ROW_H, bg=STATUS_SCHEME[0], fg=STATUS_SCHEME[1])
+        self._value_box = StatusField(self, height=self._ROW_H)
         self._value_box.SetMinSize((self._VALUE_W, self._ROW_H))
         self._value_box.SetMaxSize((self._VALUE_W, self._ROW_H))
         self._value_box.SetValue("—")
@@ -133,12 +111,11 @@ class _CenteringRow(wx.Panel):
             cb(self.spec)
 
 
-class PreviewView(wx.Panel):
+class PreviewView(FlatPanel):
     """Preview tab: Start/Stop button and step-size selector in column 1."""
 
     def __init__(self, parent: wx.Window) -> None:
-        super().__init__(parent, style=wx.BORDER_NONE)
-        self.SetBackgroundColour(BG_CARD)
+        super().__init__(parent)
 
         self._on_start_cb: Callable[[], None] | None = None
         self._on_stop_cb: Callable[[], None] | None = None
@@ -196,14 +173,14 @@ class PreviewView(wx.Panel):
 
         self._original_rows: list[wx.Window] = []
         self._current_pair_rows: list[wx.Window] = []
-        self._current_motor_rows: dict[str, tuple[wx.Panel, wx.StaticText, int]] = {}
-        self._current_max_row: wx.Panel | None = None
-        self._current_max_value: wx.StaticText | None = None
+        self._current_motor_rows: dict[str, tuple[FlatPanel, FlatLabel, int]] = {}
+        self._current_max_row: FlatPanel | None = None
+        self._current_max_value: FlatLabel | None = None
         self._original_max_intensity: float | None = None
         self._best_pair_rows: list[wx.Window] = []
-        self._best_motor_rows: dict[str, tuple[wx.Panel, wx.StaticText, int]] = {}
-        self._best_max_row: wx.Panel | None = None
-        self._best_max_value: wx.StaticText | None = None
+        self._best_motor_rows: dict[str, tuple[FlatPanel, FlatLabel, int]] = {}
+        self._best_max_row: FlatPanel | None = None
+        self._best_max_value: FlatLabel | None = None
 
     def bind_start(self, callback: Callable[[], None]) -> None:
         self._on_start_cb = callback
@@ -252,19 +229,10 @@ class PreviewView(wx.Panel):
     def set_auto_optimize_running(self, running: bool) -> None:
         if running:
             self._auto_optimize_btn.SetLabel("Stop Optimize")
-            self._auto_optimize_btn._idle_bg = _STOP_SCHEME[0]
-            self._auto_optimize_btn._hover_bg = _STOP_SCHEME[1]
-            self._auto_optimize_btn._press_bg = _STOP_SCHEME[2]
-            self._auto_optimize_btn._idle_fg = _STOP_SCHEME[3]
-            self._auto_optimize_btn._hover_fg = _STOP_SCHEME[4]
+            self._auto_optimize_btn.SetColorScheme(_stop_scheme())
         else:
             self._auto_optimize_btn.SetLabel("Auto Optimize")
-            self._auto_optimize_btn._idle_bg = _START_SCHEME[0]
-            self._auto_optimize_btn._hover_bg = _START_SCHEME[1]
-            self._auto_optimize_btn._press_bg = _START_SCHEME[2]
-            self._auto_optimize_btn._idle_fg = _START_SCHEME[3]
-            self._auto_optimize_btn._hover_fg = _START_SCHEME[4]
-        self._auto_optimize_btn.Refresh()
+            self._auto_optimize_btn.SetColorScheme(None)
 
     @staticmethod
     def _parse_positive_float(raw: str) -> float | None:
@@ -301,7 +269,6 @@ class PreviewView(wx.Panel):
             if not spec.pv.strip():
                 continue
             row = _CenteringRow(self._centering_panel, spec)
-            row.SetBackgroundColour(BG_CARD)
             if self._on_jog_minus_cb is not None:
                 row.bind_left(self._on_jog_minus_cb)
             if self._on_jog_plus_cb is not None:
@@ -341,21 +308,17 @@ class PreviewView(wx.Panel):
         self._previewing = previewing
         if previewing:
             self._toggle_btn.SetLabel("Stop Preview")
-            self._toggle_btn._idle_bg = _STOP_SCHEME[0]
-            self._toggle_btn._hover_bg = _STOP_SCHEME[1]
-            self._toggle_btn._press_bg = _STOP_SCHEME[2]
-            self._toggle_btn._idle_fg = _STOP_SCHEME[3]
-            self._toggle_btn._hover_fg = _STOP_SCHEME[4]
+            self._toggle_btn.SetColorScheme(_stop_scheme())
         else:
             self._toggle_btn.SetLabel("Start Preview")
-            self._toggle_btn._idle_bg = _START_SCHEME[0]
-            self._toggle_btn._hover_bg = _START_SCHEME[1]
-            self._toggle_btn._press_bg = _START_SCHEME[2]
-            self._toggle_btn._idle_fg = _START_SCHEME[3]
-            self._toggle_btn._hover_fg = _START_SCHEME[4]
-        self._toggle_btn.Refresh()
+            self._toggle_btn.SetColorScheme(None)
         for row in self._centering_rows.values():
             row.set_enabled(previewing)
+
+    def set_collecting(self, collecting: bool) -> None:
+        self._toggle_btn.Enable(not collecting)
+        for row in self._centering_rows.values():
+            row.set_enabled(self._previewing and not collecting)
 
     def _build_column1(self) -> wx.BoxSizer:
         col = wx.BoxSizer(wx.VERTICAL)
@@ -365,30 +328,28 @@ class PreviewView(wx.Panel):
         num_presets = len(_PREDEFINED_STEPS_UM)
         presets_total_w = preset_btn_size * num_presets + preset_gap * (num_presets - 1)
 
-        self._toggle_btn = FlatButton(self, "Start Preview", color_scheme=_START_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._toggle_btn = FlatButton(self, "Start Preview", font=app_theme.btn_font())
         self._toggle_btn.SetMinSize((presets_total_w, 36))
         self._toggle_btn.SetMaxSize((presets_total_w, -1))
         self._toggle_btn.SetAction(self._on_toggle_clicked)
         col.Add(self._toggle_btn, 1, wx.EXPAND | wx.BOTTOM, 10)
 
-        sep = wx.Panel(self, size=(presets_total_w, 1))
-        sep.SetBackgroundColour(SEP_COLOUR)
+        sep = FlatPanel(self, size=(presets_total_w, 1))
+        sep.SetBackgroundColour(app_theme.bright_black)
         sep.SetMinSize((presets_total_w, 1))
         sep.SetMaxSize((presets_total_w, 1))
         col.Add(sep)
         col.AddSpacer(12)
 
-        step_label = wx.StaticText(self, label="Step Size", style=wx.ALIGN_CENTRE_HORIZONTAL)
-        step_label.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-        step_label.SetForegroundColour(FG_SECONDARY)
-        step_label.SetBackgroundColour(BG_CARD)
+        step_label = FlatLabel(self, label="Step Size")
+        step_label.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
         step_label.SetMinSize((presets_total_w, -1))
         step_label.SetMaxSize((presets_total_w, -1))
-        col.Add(step_label, 0, wx.BOTTOM, 4)
+        col.Add(step_label, 0, wx.ALIGN_CENTRE_HORIZONTAL | wx.BOTTOM, 4)
 
         preset_row = wx.BoxSizer(wx.HORIZONTAL)
         for i, value_um in enumerate(_PREDEFINED_STEPS_UM):
-            btn = FlatButton(self, self._format_um_label(value_um), color_scheme=_STEP_SCHEME)
+            btn = FlatButton(self, self._format_um_label(value_um))
             btn.SetToolTip(f"Set step to {self._format_um_label(value_um)} um")
             btn.SetMinSize((preset_btn_size, preset_btn_size))
             btn.SetMaxSize((preset_btn_size, preset_btn_size))
@@ -401,7 +362,6 @@ class PreviewView(wx.Panel):
             value=self._format_mm(self._step_mm),
             placeholder="mm",
             centered=True,
-            text_scheme=TEXT_SCHEME,
         )
         self._custom_ctrl.SetMinSize((presets_total_w, 28))
         self._custom_ctrl.SetMaxSize((presets_total_w, 28))
@@ -413,43 +373,35 @@ class PreviewView(wx.Panel):
 
         return col
 
-    def _build_centering_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
-        panel = wx.Panel(self, style=wx.BORDER_NONE)
-        panel.SetBackgroundColour(BG_CARD)
+    def _build_centering_column(self) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
+        panel = FlatPanel(self)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
-        empty_label = wx.StaticText(panel, label="No motors flagged for centering.")
-        empty_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
-        empty_label.SetForegroundColour(FG_SECONDARY)
-        empty_label.SetBackgroundColour(BG_CARD)
+        empty_label = FlatLabel(panel, label="No motors flagged for centering.")
+        empty_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
         sizer.Add(empty_label, 0)
 
         panel.SetSizer(sizer)
         return panel, sizer, empty_label
 
-    def _build_originals_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
-        panel = wx.Panel(self, style=wx.BORDER_NONE)
-        panel.SetBackgroundColour(BG_CARD)
+    def _build_originals_column(self) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
+        panel = FlatPanel(self)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
         header_row = wx.BoxSizer(wx.HORIZONTAL)
-        header = wx.StaticText(panel, label="Original Positions")
-        header.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-        header.SetForegroundColour(FG_SECONDARY)
-        header.SetBackgroundColour(BG_CARD)
-        self._originals_go_btn = FlatButton(panel, "Go", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        header = FlatLabel(panel, label="Original Positions")
+        header.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
+        self._originals_go_btn = FlatButton(panel, "Go", font=app_theme.btn_font())
         self._originals_go_btn.SetMinSize((36, 22))
         self._originals_go_btn.Enable(False)
         header_row.Add(header, 0, wx.ALIGN_CENTER_VERTICAL)
         header_row.Add(self._originals_go_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
         sizer.Add(header_row, 0, wx.BOTTOM, 6)
 
-        empty_label = wx.StaticText(panel, label="No preview snapshot yet.")
-        empty_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
-        empty_label.SetForegroundColour(FG_SECONDARY)
-        empty_label.SetBackgroundColour(BG_CARD)
+        empty_label = FlatLabel(panel, label="No preview snapshot yet.")
+        empty_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
         sizer.Add(empty_label, 0)
 
         panel.SetSizer(sizer)
@@ -512,19 +464,14 @@ class PreviewView(wx.Panel):
         label_text: str,
         value_text: str,
         on_go: Callable[[], None] | None,
-    ) -> tuple[wx.Panel, wx.StaticText, FlatButton | None]:
-        row = wx.Panel(parent, style=wx.BORDER_NONE)
-        row.SetBackgroundColour(BG_CARD)
+    ) -> tuple[FlatPanel, FlatLabel, FlatButton | None]:
+        row = FlatPanel(parent)
 
-        label = wx.StaticText(row, label=label_text)
-        label.SetFont(scaled_font(12))
-        label.SetForegroundColour(FG_SECONDARY)
-        label.SetBackgroundColour(BG_CARD)
+        label = FlatLabel(row, label=label_text)
+        label.SetFont(app_theme.scaled_font(12))
 
-        value = wx.StaticText(row, label=value_text)
-        value.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-        value.SetForegroundColour(FG_PRIMARY)
-        value.SetBackgroundColour(BG_CARD)
+        value = FlatLabel(row, label=value_text)
+        value.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
 
         go_btn: FlatButton | None = None
         s = wx.BoxSizer(wx.HORIZONTAL)
@@ -536,11 +483,11 @@ class PreviewView(wx.Panel):
 
     def _add_motor_pair_rows(
         self,
-        parent: wx.Panel,
+        parent: FlatPanel,
         sizer: wx.BoxSizer,
         items: list[tuple[str, str, float | None, int]],
         container_list: list[wx.Window],
-        key_map: dict[str, tuple[wx.Panel, wx.StaticText, int]] | None,
+        key_map: dict[str, tuple[FlatPanel, FlatLabel, int]] | None,
     ) -> None:
         """Add motor items to *sizer* two per line. Pair containers go into *container_list*.
         If *key_map* is provided, maps each item key → (cell_panel, value_label, precision)."""
@@ -548,8 +495,8 @@ class PreviewView(wx.Panel):
         for left in it:
             right = next(it, None)
 
-            pair = wx.Panel(parent, style=wx.BORDER_NONE)
-            pair.SetBackgroundColour(BG_CARD)
+            pair = FlatPanel(parent)
+            pair.SetBackgroundColour(app_theme.black)
             pair_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
             l_key, l_label, l_value, l_prec = left
@@ -580,24 +527,21 @@ class PreviewView(wx.Panel):
         except (TypeError, ValueError):
             return "—"
 
-    def _build_currents_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
+    def _build_currents_column(self) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
         return self._build_snapshot_column("Current Positions", "_currents_go_btn")
 
-    def _build_bests_column(self) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
+    def _build_bests_column(self) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
         return self._build_snapshot_column("Best Positions", "_bests_go_btn")
 
-    def _build_snapshot_column(self, title: str, go_btn_attr: str) -> tuple[wx.Panel, wx.BoxSizer, wx.StaticText]:
-        panel = wx.Panel(self, style=wx.BORDER_NONE)
-        panel.SetBackgroundColour(BG_CARD)
+    def _build_snapshot_column(self, title: str, go_btn_attr: str) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
+        panel = FlatPanel(self)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
         header_row = wx.BoxSizer(wx.HORIZONTAL)
-        header = wx.StaticText(panel, label=title)
-        header.SetFont(scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-        header.SetForegroundColour(FG_SECONDARY)
-        header.SetBackgroundColour(BG_CARD)
-        go_btn = FlatButton(panel, "Go", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        header = FlatLabel(panel, label=title)
+        header.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
+        go_btn = FlatButton(panel, "Go", font=app_theme.btn_font())
         go_btn.SetMinSize((36, 22))
         go_btn.Enable(False)
         setattr(self, go_btn_attr, go_btn)
@@ -605,36 +549,29 @@ class PreviewView(wx.Panel):
         header_row.Add(go_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
         sizer.Add(header_row, 0, wx.BOTTOM, 6)
 
-        empty_label = wx.StaticText(panel, label="No preview snapshot yet.")
-        empty_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
-        empty_label.SetForegroundColour(FG_SECONDARY)
-        empty_label.SetBackgroundColour(BG_CARD)
+        empty_label = FlatLabel(panel, label="No preview snapshot yet.")
+        empty_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
         sizer.Add(empty_label, 0)
 
         panel.SetSizer(sizer)
         return panel, sizer, empty_label
 
-    def _build_auto_optimize_panel(self) -> wx.Panel:
-        panel = wx.Panel(self, style=wx.BORDER_NONE)
-        panel.SetBackgroundColour(BG_CARD)
+    def _build_auto_optimize_panel(self) -> FlatPanel:
+        panel = FlatPanel(self)
 
-        self._auto_optimize_btn = FlatButton(panel, "Auto Optimize", color_scheme=DEFAULT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._auto_optimize_btn = FlatButton(panel, "Auto Optimize", font=app_theme.btn_font())
         self._auto_optimize_btn.SetMinSize((-1, 30))
         self._auto_optimize_btn.SetAction(self._on_auto_optimize_clicked)
 
-        range_lbl = wx.StaticText(panel, label="Range")
-        range_lbl.SetFont(scaled_font(12))
-        range_lbl.SetForegroundColour(FG_SECONDARY)
-        range_lbl.SetBackgroundColour(BG_CARD)
-        self._auto_range_ctrl = FlatTextCtrl(panel, value="0.005", placeholder="", centered=True, text_scheme=TEXT_SCHEME)
+        range_lbl = FlatLabel(panel, label="Range")
+        range_lbl.SetFont(app_theme.scaled_font(12))
+        self._auto_range_ctrl = FlatTextCtrl(panel, value="0.005", placeholder="", centered=True)
         self._auto_range_ctrl.SetRestrictToFloat(True)
         self._auto_range_ctrl.SetMinSize((70, 28))
 
-        step_lbl = wx.StaticText(panel, label="Step")
-        step_lbl.SetFont(scaled_font(12))
-        step_lbl.SetForegroundColour(FG_SECONDARY)
-        step_lbl.SetBackgroundColour(BG_CARD)
-        self._auto_step_ctrl = FlatTextCtrl(panel, value="0.001", placeholder="", centered=True, text_scheme=TEXT_SCHEME)
+        step_lbl = FlatLabel(panel, label="Step")
+        step_lbl.SetFont(app_theme.scaled_font(12))
+        self._auto_step_ctrl = FlatTextCtrl(panel, value="0.001", placeholder="", centered=True)
         self._auto_step_ctrl.SetRestrictToFloat(True)
         self._auto_step_ctrl.SetMinSize((70, 28))
 
@@ -805,19 +742,19 @@ class PreviewView(wx.Panel):
         if self._current_max_value is None:
             self._current_max_row = None
 
-    def _colour_max_label(self, label: wx.StaticText | None, value: float | None) -> wx.StaticText | None:
+    def _colour_max_label(self, label: FlatLabel | None, value: float | None) -> FlatLabel | None:
         """Apply red/green/neutral colour relative to ``self._original_max_intensity``."""
         if label is None:
             return None
         original = self._original_max_intensity
         if value is None or original is None:
-            colour = FG_PRIMARY
+            colour = app_theme.foreground
         elif value < original:
-            colour = DANGER
+            colour = app_theme.red
         elif value > original:
-            colour = PONI_LOADED
+            colour = app_theme.green
         else:
-            colour = FG_PRIMARY
+            colour = app_theme.foreground
         try:
             label.SetForegroundColour(colour)
             label.Refresh()

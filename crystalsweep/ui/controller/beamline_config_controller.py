@@ -210,6 +210,8 @@ class BeamlineConfigController:
         beamline = self._general_dlg.config_panel.beamline_name() if self._general_dlg else base.beamline
         abort_pvs = self._general_dlg.config_panel.collect_abort_pvs() if self._general_dlg else base.abort_pvs
         restore_pvs = self._general_dlg.config_panel.collect_restore_pvs() if self._general_dlg else base.restore_pvs
+        raw_directory = self._general_dlg.config_panel.raw_directory() if self._general_dlg else base.raw_directory
+        still_map_trajectory = self._general_dlg.config_panel.still_map_trajectory() if self._general_dlg else base.still_map_trajectory
         crysalis_par_path = self._crysalis_dlg.config_panel.crysalis_par_path() if self._crysalis_dlg else base.crysalis_par_path
         crysalis_set_path = self._crysalis_dlg.config_panel.crysalis_set_path() if self._crysalis_dlg else base.crysalis_set_path
         crysalis_ccd_path = self._crysalis_dlg.config_panel.crysalis_ccd_path() if self._crysalis_dlg else base.crysalis_ccd_path
@@ -229,11 +231,13 @@ class BeamlineConfigController:
         if self._detectors_dlg:
             detectors, active_detector = self._detectors_dlg.config_panel.collect_detectors()
             preview_exposure, preview_timeout, preview_num_images = self._detectors_dlg.config_panel.collect_preview()
+            centering_tools_enabled = self._detectors_dlg.config_panel.collect_centering_tools_enabled()
         else:
             detectors, active_detector = base.detectors, base.active_detector
             preview_exposure = base.preview_exposure
             preview_timeout = base.preview_timeout
             preview_num_images = base.preview_num_images
+            centering_tools_enabled = base.centering_tools_enabled
 
         controllers = self._controllers_dlg.config_panel.collect_controllers() if self._controllers_dlg else base.controllers
 
@@ -271,6 +275,9 @@ class BeamlineConfigController:
             preview_exposure=preview_exposure,
             preview_timeout=preview_timeout,
             preview_num_images=preview_num_images,
+            centering_tools_enabled=centering_tools_enabled,
+            raw_directory=raw_directory,
+            still_map_trajectory=still_map_trajectory,
         )
 
     def _save(self, config: BeamlineConfig) -> None:

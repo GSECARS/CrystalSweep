@@ -20,7 +20,7 @@ import wx
 
 from crystalsweep.model.script_model import ScriptModel
 from crystalsweep.ui.view.main_view import MainView
-from crystalsweep.ui.view.custom.theme import DANGER, PONI_LOADED, DEFAULT_SCHEME, SCROLLBAR_SCHEME, SYNTAX_SCHEME
+from crystalsweep.ui.view.custom.theme import app_theme
 from wxutils import FlatScriptEditorDialog
 
 __all__ = ["ScriptEditorController"]
@@ -43,9 +43,7 @@ class ScriptEditorController:
             self._dialog = FlatScriptEditorDialog(
                 self._view,
                 title="Script Editor — hooks.py",
-                syntax_scheme=SYNTAX_SCHEME,
-                btn_scheme=DEFAULT_SCHEME,
-                scrollbar_scheme=SCROLLBAR_SCHEME,
+                syntax_scheme=app_theme.syntax_scheme(),
             )
             self._dialog.bind_save(self._on_save)
             self._dialog.Bind(wx.EVT_CLOSE, lambda e: self._dialog.Hide() or e.Veto())
@@ -59,15 +57,15 @@ class ScriptEditorController:
             self._model.save_source(source)
             self._dialog.set_status(
                 f"Saved — {self._model.hooks_path.name}",
-                ok_color=PONI_LOADED,
-                error_color=DANGER,
+                ok_color=app_theme.green,
+                error_color=app_theme.red,
             )
             _log.info("hooks.py saved")
         except Exception as exc:
             self._dialog.set_status(
                 f"Save failed: {exc}",
-                ok_color=PONI_LOADED,
-                error_color=DANGER,
+                ok_color=app_theme.green,
+                error_color=app_theme.red,
                 error=True,
             )
             _log.error("Failed to save hooks.py: %s", exc)

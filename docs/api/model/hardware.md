@@ -12,7 +12,7 @@ Models for motion controllers supported by CrystalSweep.
 
 ## Motor Limits
 
-::: crystalsweep.model.motor_limits
+::: crystalsweep.utils.limits
 
 ## Controller Connection
 

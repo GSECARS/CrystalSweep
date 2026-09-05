@@ -29,6 +29,7 @@ from crystalsweep.ui.controller.file_settings_controller import FileSettingsCont
 from crystalsweep.ui.controller.preview_controller import PreviewController
 from crystalsweep.ui.controller.script_editor_controller import ScriptEditorController
 from crystalsweep.ui.view import MainView
+from crystalsweep.ui.view.custom.theme import AppTheme
 
 __all__ = ["MainController"]
 
@@ -47,6 +48,7 @@ class MainController:
                 ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
         self._app = wx.App(False)
+        self._app_theme = AppTheme()
         self._model = MainModel()
         self._view = MainView(version=version)
 
@@ -58,6 +60,7 @@ class MainController:
         self._collection_controller = CollectionTableController(model=self._model, view=self._view.collection_table)
         self._collect_controller = CollectController(model=self._model, view=self._view)
         self._collect_controller.bind_collecting_changed(self._on_collecting_changed)
+        self._collect_controller.bind_post_scan(self._file_settings_controller.push_to_detector)
         self._collection_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
         self._collection_controller.add_points_changed_listener(self._collect_controller.validate_limits)
         self._collection_settings_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
@@ -77,6 +80,8 @@ class MainController:
     def _on_collecting_changed(self, collecting: bool) -> None:
         self._view.set_ui_collecting(collecting)
         self._beamline_config_controller.set_collecting(collecting)
+        if not collecting:
+            self._file_settings_controller.push_to_detector()
 
     def _on_config_applied(self, cfg: BeamlineConfig) -> None:
         self._ad_viewer_controller.resubscribe_detector()
@@ -87,6 +92,7 @@ class MainController:
         self._file_settings_controller.apply_crysalis_from_config()
         self._collect_controller.on_config_applied()
         self._preview_controller.on_config_applied(cfg)
+        self._view.set_centering_tools_visible(cfg.centering_tools_enabled)
         self._check_epics_status(cfg)
 
     def _check_epics_status(self, cfg: BeamlineConfig | None = None) -> None:
@@ -117,6 +123,7 @@ class MainController:
         if self._beamline_config_controller.has_active_config():
             self._view.set_active_config_name(self._model.beamline.active.name)
             self._file_settings_controller.apply_crysalis_from_config()
+            self._view.set_centering_tools_visible(self._model.beamline.active.centering_tools_enabled)
             self._check_epics_status()
         else:
             wx.CallAfter(self._beamline_config_controller.open_general)

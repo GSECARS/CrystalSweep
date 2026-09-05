@@ -17,26 +17,14 @@ from typing import Callable
 
 import wx
 from epicsapps.pva_adviewer.ad_viewer_view import ADViewerView
-from wxutils import FlatConfirmDialog, FlatSplitter, FlatTabbedPanel, SectionDivider
+from wxutils import FlatConfirmDialog, FlatSplitter, FlatTabbedPanel
 
 from crystalsweep.assets import LOGO_PNG
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
-from crystalsweep.ui.view.custom.theme import (
-    BG_CARD,
-    BG_SURFACE,
-    FG_SECONDARY,
-    SEP_COLOUR,
-    scaled_font,
-    SPLITTER_SCHEME,
-    DIVIDER_FG,
-    DIVIDER_LINE,
-    dialog_scheme,
-    DANGER_SCHEME,
-    TAB_SCHEME,
-)
-from crystalsweep.ui.view.custom.widgets import CrystalMenuBar
+from crystalsweep.ui.view.custom.theme import app_theme
+from crystalsweep.ui.view.custom.widgets import CrystalMenuBar, FlatLabel, FlatPanel, ThemedSectionDivider
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.preview_view import PreviewView
 
@@ -51,6 +39,7 @@ class MainView(wx.Frame):
     def __init__(self, version: str) -> None:
         """Initializes the main view."""
         super(MainView, self).__init__(None, wx.ID_ANY)
+        self.SetBackgroundColour(app_theme.background)
 
         self._version = version
         self._open_general_cb: Callable[[], None] | None = None
@@ -65,38 +54,38 @@ class MainView(wx.Frame):
         self._abort_cb: Callable[[], None] | None = None
 
         self._collecting = False
-        self._splitter = FlatSplitter(self, splitter_scheme=SPLITTER_SCHEME)
+        self._splitter = FlatSplitter(self)
         self._splitter.SetSashGravity(0.0)
         self._splitter.SetMinimumPaneSize(180)
 
-        self._left_panel = wx.Panel(self._splitter)
-        self._left_panel.SetBackgroundColour(BG_CARD)
+        self._left_panel = FlatPanel(self._splitter)
 
         self.file_settings = FileSettingsView(self._left_panel)
         self.collection_settings = CollectionSettingsView(self._left_panel)
         self.collection_table = CollectionTableView(self._left_panel)
         self.collect = CollectView(self._left_panel)
 
-        def _sep() -> wx.Panel:
-            return wx.Panel(self._left_panel, size=(-1, 1))
+        def _sep() -> FlatPanel:
+            return FlatPanel(self._left_panel, size=(-1, 1))
 
         collect_sep = _sep()
-        collect_sep.SetBackgroundColour(SEP_COLOUR)
+        collect_sep.SetBackgroundColour(app_theme.bright_black)
 
         left_sizer = wx.BoxSizer(wx.VERTICAL)
-        left_sizer.Add(SectionDivider(self._left_panel, "File Settings", fg=DIVIDER_FG, line_colour=DIVIDER_LINE), 0, wx.EXPAND)
+        left_sizer.Add(ThemedSectionDivider(self._left_panel, "File Settings"), 0, wx.EXPAND)
         left_sizer.Add(self.file_settings, 0, wx.EXPAND)
-        left_sizer.AddSpacer(25)
-        left_sizer.Add(SectionDivider(self._left_panel, "Collection Settings", fg=DIVIDER_FG, line_colour=DIVIDER_LINE), 0, wx.EXPAND)
+        left_sizer.AddSpacer(12)
+        left_sizer.Add(ThemedSectionDivider(self._left_panel, "Collection Settings"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_settings, 0, wx.EXPAND)
-        left_sizer.AddSpacer(25)
-        left_sizer.Add(SectionDivider(self._left_panel, "Collection Points", fg=DIVIDER_FG, line_colour=DIVIDER_LINE), 0, wx.EXPAND)
+        left_sizer.AddSpacer(12)
+        left_sizer.Add(ThemedSectionDivider(self._left_panel, "Collection Points"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_table, 1, wx.EXPAND)
-        left_sizer.AddSpacer(25)
-        left_sizer.Add(SectionDivider(self._left_panel, "Single-Crystal Centering Tools", fg=DIVIDER_FG, line_colour=DIVIDER_LINE), 0, wx.EXPAND)
+        left_sizer.AddSpacer(12)
+        self._centering_divider = ThemedSectionDivider(self._left_panel, "Single-Crystal Centering Tools")
+        left_sizer.Add(self._centering_divider, 0, wx.EXPAND)
         self.centering_tabs = self._build_centering_tabs()
         left_sizer.Add(self.centering_tabs, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
-        left_sizer.AddSpacer(8)
+        self._centering_spacer = left_sizer.AddSpacer(8)
         left_sizer.Add(collect_sep, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
         left_sizer.Add(self.collect, 0, wx.EXPAND)
         self._left_panel.SetSizer(left_sizer)
@@ -132,6 +121,12 @@ class MainView(wx.Frame):
     def bind_open_positioners(self, callback: Callable[[], None]) -> None:
         self._open_positioners_cb = callback
 
+    def set_centering_tools_visible(self, visible: bool) -> None:
+        self._centering_divider.Show(visible)
+        self.centering_tabs.Show(visible)
+        self._centering_spacer.Show(visible)
+        self._left_panel.Layout()
+
     def set_active_config_name(self, name: str) -> None:
         if self._menu_bar is not None:
             self._menu_bar.set_config_name(name)
@@ -149,6 +144,7 @@ class MainView(wx.Frame):
         self.collection_settings.set_enabled(not collecting)
         self.collect.set_collecting(collecting)
         self.collection_table.set_collecting(collecting)
+        self.preview.set_collecting(collecting)
 
     def bind_load_config(self, callback: Callable[[], None]) -> None:
         self._load_config_cb = callback
@@ -166,17 +162,14 @@ class MainView(wx.Frame):
         self._abort_cb = callback
 
     def _build_centering_tabs(self) -> FlatTabbedPanel:
-        tabs = FlatTabbedPanel(self._left_panel, scheme=TAB_SCHEME)
-        tabs.SetMinSize((-1, 180))
+        tabs = FlatTabbedPanel(self._left_panel)
+        tabs.SetMinSize((-1, 150))
 
         self.preview = PreviewView(tabs)
 
-        xrd_page = wx.Panel(tabs)
-        xrd_page.SetBackgroundColour(BG_CARD)
-        xrd_label = wx.StaticText(xrd_page, label="Coming soon")
-        xrd_label.SetForegroundColour(FG_SECONDARY)
-        xrd_label.SetBackgroundColour(BG_CARD)
-        xrd_label.SetFont(scaled_font(12, style=wx.FONTSTYLE_ITALIC))
+        xrd_page = FlatPanel(tabs)
+        xrd_label = FlatLabel(xrd_page, label="Coming soon")
+        xrd_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
         xrd_sizer = wx.BoxSizer(wx.VERTICAL)
         xrd_sizer.AddStretchSpacer(1)
         xrd_row = wx.BoxSizer(wx.HORIZONTAL)
@@ -275,7 +268,6 @@ class MainView(wx.Frame):
     def _configure_main_window(self) -> None:
         """Configures the main wx Frame of the application."""
         self.SetTitle(f"CrystalSweep - {self._version}")
-        self.SetBackgroundColour(BG_SURFACE)
         self._apply_app_icon()
 
         main_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -331,7 +323,7 @@ class MainView(wx.Frame):
         """Runs when trying to close the main window."""
         if self._collecting:
             result = FlatConfirmDialog(
-                self, "Collection is in progress. Abort and close?", "Collection in Progress", yes_scheme=DANGER_SCHEME, scheme=dialog_scheme()
+                self, "Collection is in progress. Abort and close?", "Collection in Progress", yes_scheme=app_theme.danger_scheme()
             ).ShowModal()
             if result == wx.ID_YES:
                 self._fire(self._abort_cb)
@@ -340,6 +332,6 @@ class MainView(wx.Frame):
                 event.Veto()
             return
         result = FlatConfirmDialog(
-            self, "Are you sure you want to close the application?", "Close Application", yes_scheme=DANGER_SCHEME, scheme=dialog_scheme()
+            self, "Are you sure you want to close the application?", "Close Application", yes_scheme=app_theme.danger_scheme()
         ).ShowModal()
         event.Skip() if result == wx.ID_YES else event.Veto()

@@ -17,17 +17,8 @@ from typing import Callable
 
 import wx
 
-from crystalsweep.ui.view.custom.theme import (
-    BG_CARD,
-    DANGER,
-    DANGER_HOVER,
-    DANGER_PRESS,
-    FG_PRIMARY,
-    FG_SECONDARY,
-    PONI_LOADED,
-    scaled_font,
-)
-from crystalsweep.ui.view.custom.theme import BTN_DISABLED, btn_font, TOGGLE_SCHEME, PROGRESS_SCHEME
+from crystalsweep.ui.view.custom.theme import app_theme
+from crystalsweep.ui.view.custom.widgets import FlatLabel, FlatPanel
 from wxutils import FlatButton, FlatCheckBox, FlatProgressBar
 
 __all__ = ["CollectView"]
@@ -39,38 +30,39 @@ _COLLECT_SCHEME = (
     wx.Colour(200, 255, 220),
     wx.Colour(200, 255, 220),
 )
-_ABORT_SCHEME = (DANGER, DANGER_HOVER, DANGER_PRESS, FG_PRIMARY, FG_PRIMARY)
+
+_ABORT_SCHEME = (
+    wx.Colour(110, 25, 25),
+    wx.Colour(180, 50, 50),
+    wx.Colour(140, 35, 35),
+    wx.Colour(255, 180, 180),
+    wx.Colour(255, 210, 210),
+)
 
 
-class CollectView(wx.Panel):
+class CollectView(FlatPanel):
     """Status + progress bar (left) and collect/abort button (right)."""
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
-        self.SetBackgroundColour(BG_CARD)
 
         self._on_collect_cb: Callable[[], None] | None = None
         self._on_abort_cb: Callable[[], None] | None = None
         self._collecting = False
 
-        self._status_label = wx.StaticText(self, label="Ready")
-        self._status_label.SetFont(scaled_font(13, weight=wx.FONTWEIGHT_BOLD))
-        self._status_label.SetForegroundColour(FG_SECONDARY)
-        self._status_label.SetBackgroundColour(BG_CARD)
+        self._status_label = FlatLabel(self, label="Ready")
+        self._status_label.SetFont(app_theme.scaled_font(13, weight=wx.FONTWEIGHT_BOLD))
 
-        self._progress_bar = FlatProgressBar(self, progress_scheme=PROGRESS_SCHEME)
+        self._progress_bar = FlatProgressBar(self, progress_scheme=(app_theme.bright_black, app_theme.blue))
 
-        self._collect_btn = FlatButton(self, "Collect", color_scheme=_COLLECT_SCHEME, disabled_scheme=BTN_DISABLED, font=btn_font())
+        self._collect_btn = FlatButton(self, "Collect", color_scheme=_COLLECT_SCHEME, font=app_theme.btn_font())
         self._collect_btn.SetMinSize((120, 42))
         self._collect_btn.SetAction(self._on_btn_clicked)
 
-        self._test_mode_toggle = FlatCheckBox(self, "Test mode", check_scheme=TOGGLE_SCHEME, disabled_scheme=BTN_DISABLED)
-        self._test_mode_toggle.SetBackgroundColour(BG_CARD)
+        self._test_mode_toggle = FlatCheckBox(self, "Test mode")
 
-        self._eta_label = wx.StaticText(self, label="")
-        self._eta_label.SetFont(scaled_font(11))
-        self._eta_label.SetForegroundColour(FG_SECONDARY)
-        self._eta_label.SetBackgroundColour(BG_CARD)
+        self._eta_label = FlatLabel(self, label="")
+        self._eta_label.SetFont(app_theme.scaled_font(11))
 
         top_row = wx.BoxSizer(wx.HORIZONTAL)
         top_row.Add(self._status_label, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -111,7 +103,7 @@ class CollectView(wx.Panel):
 
     def set_status(self, text: str, colour: wx.Colour | None = None) -> None:
         self._status_label.SetLabel(text)
-        self._status_label.SetForegroundColour(colour if colour is not None else FG_SECONDARY)
+        self._status_label._custom_fg = colour
         self._status_label.Refresh()
 
     def set_collecting(self, collecting: bool) -> None:
@@ -119,19 +111,10 @@ class CollectView(wx.Panel):
         self._test_mode_toggle.Enable(not collecting)
         if collecting:
             self._collect_btn.SetLabel("Abort")
-            self._collect_btn._idle_bg = _ABORT_SCHEME[0]
-            self._collect_btn._hover_bg = _ABORT_SCHEME[1]
-            self._collect_btn._press_bg = _ABORT_SCHEME[2]
-            self._collect_btn._idle_fg = _ABORT_SCHEME[3]
-            self._collect_btn._hover_fg = _ABORT_SCHEME[4]
+            self._collect_btn.SetColorScheme(_ABORT_SCHEME)
         else:
             self._collect_btn.SetLabel("Collect")
-            self._collect_btn._idle_bg = _COLLECT_SCHEME[0]
-            self._collect_btn._hover_bg = _COLLECT_SCHEME[1]
-            self._collect_btn._press_bg = _COLLECT_SCHEME[2]
-            self._collect_btn._idle_fg = _COLLECT_SCHEME[3]
-            self._collect_btn._hover_fg = _COLLECT_SCHEME[4]
-        self._collect_btn.Refresh()
+            self._collect_btn.SetColorScheme(_COLLECT_SCHEME)
 
     def set_progress(
         self,
@@ -173,16 +156,16 @@ class CollectView(wx.Panel):
         self.clear_eta()
 
     def set_status_collecting(self) -> None:
-        self.set_status("Collecting…", PONI_LOADED)
+        self.set_status("Collecting…", app_theme.green)
         self.set_collecting(True)
 
     def set_status_ready(self) -> None:
-        self.set_status("Ready", FG_SECONDARY)
+        self.set_status("Ready")
         self.set_collecting(False)
         self.reset_progress()
 
     def set_status_error(self, message: str) -> None:
-        self.set_status(message, DANGER)
+        self.set_status(message, app_theme.red)
         self.set_collecting(False)
 
     def _on_btn_clicked(self, _e=None) -> None:

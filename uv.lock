@@ -320,13 +320,14 @@ wheels = [
 
 [[package]]
 name = "crystalsweep"
-version = "0.1.2"
+version = "0.1.3"
 source = { editable = "." }
 dependencies = [
     { name = "bitshuffle" },
     { name = "blosc" },
     { name = "cryio" },
     { name = "epicsapps" },
+    { name = "fabio" },
     { name = "h5py" },
     { name = "lz4" },
     { name = "newportxps" },
@@ -339,6 +340,7 @@ dependencies = [
     { name = "pyfai" },
     { name = "pyopengl" },
     { name = "pyopengl-accelerate" },
+    { name = "pyshortcuts" },
     { name = "tomli-w" },
     { name = "vispy" },
     { name = "wxmplot" },
@@ -363,6 +365,7 @@ requires-dist = [
     { name = "blosc", specifier = ">=1.11.4" },
     { name = "cryio", specifier = ">=2018.5.30" },
     { name = "epicsapps", editable = "../epicsapps" },
+    { name = "fabio", specifier = ">=2023.10.0" },
     { name = "h5py", specifier = ">=3.12.1" },
     { name = "lz4", specifier = ">=4.4.5" },
     { name = "newportxps", specifier = ">=2026.1.1" },
@@ -375,6 +378,7 @@ requires-dist = [
     { name = "pyfai", specifier = ">=2026.3.0" },
     { name = "pyopengl", specifier = ">=3.1.10" },
     { name = "pyopengl-accelerate", specifier = ">=3.1.10" },
+    { name = "pyshortcuts", specifier = ">=1.9.10" },
     { name = "tomli-w", specifier = ">=1.2.0" },
     { name = "vispy", specifier = ">=0.14.3" },
     { name = "wxmplot", specifier = ">=2026.2.1" },
@@ -508,7 +512,7 @@ requires-dist = [
     { name = "psycopg2-binary" },
     { name = "pyepics" },
     { name = "pyfai", specifier = ">=2026.5.0" },
-    { name = "pyshortcuts", specifier = ">=1.9.9" },
+    { name = "pyshortcuts", specifier = ">=1.9.10" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "python-dateutil" },
@@ -523,8 +527,8 @@ requires-dist = [
     { name = "tomli" },
     { name = "transformations" },
     { name = "twine", marker = "extra == 'dev'" },
-    { name = "wxmplot", specifier = ">=2026.2.1" },
-    { name = "wxpython", specifier = ">=4.2.1" },
+    { name = "wxmplot", specifier = ">=2026.2.3" },
+    { name = "wxpython", specifier = ">=4.2.5" },
     { name = "wxutils", specifier = ">=2026.3.0" },
     { name = "xraydb" },
 ]
@@ -1269,11 +1273,11 @@ wheels = [
 
 [[package]]
 name = "platformdirs"
-version = "4.11.0"
+version = "4.11.7"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/78/9b/560e4be8e26f6fd133a03630a8df0c663b9e8d61b4ade152b72005aec83b/platformdirs-4.11.0.tar.gz", hash = "sha256:0555d18370482847566ffabcaa53ad7c6c1c29f195989ae1ed634a05f76ea1e0", size = 31953, upload-time = "2026-07-21T13:09:36.565Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/69/b7/802a56eca9f2fac455b8bab5375a2647b0f0e14a2cd63ef077de3c4a7658/platformdirs-4.11.7.tar.gz", hash = "sha256:4f41487eeeeeb07f3a6625e61d9bc0ae6809f92d3386dbd74392fbb76108104d", size = 35127, upload-time = "2026-09-01T13:35:10.502Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/68/d8d58938dfb1370b266a1a729e6d77a985be23689a0496498ee17b2cbf90/platformdirs-4.11.0-py3-none-any.whl", hash = "sha256:360ccded2b7fce0af0ff80cc8f5942a1c5d99b0e856033acb030bfc634709e74", size = 23247, upload-time = "2026-07-21T13:09:35.422Z" },
+    { url = "https://files.pythonhosted.org/packages/27/6e/80993e10a0482f630cef528635789233224f36b1ffd11592aa15d13ff9ce/platformdirs-4.11.7-py3-none-any.whl", hash = "sha256:8a02cb259042c79d1cd0450facc2fe6dc9d303ae7901afbe33bf8ea0b188cef6", size = 23938, upload-time = "2026-09-01T13:35:09.02Z" },
 ]
 
 [[package]]
@@ -1555,16 +1559,17 @@ wheels = [
 
 [[package]]
 name = "pyshortcuts"
-version = "1.9.9"
+version = "1.9.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "charset-normalizer" },
+    { name = "platformdirs" },
     { name = "pywin32", marker = "sys_platform == 'win32'" },
     { name = "tabulate" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/91/70/0c2371e9cec9cf42ec883b213dbf4ec22330ccb82a98fc34d268067c767b/pyshortcuts-1.9.9.tar.gz", hash = "sha256:f164591d459c3f0e6fd52ab57bbd8c05227857a26c8791c0cb23e14e9db85398", size = 1007009, upload-time = "2026-05-13T16:41:22.474Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/68/d9/78c251ed798f11a78d6e4f219ff14636ce9bd8c7f6513bff6a5da43647f8/pyshortcuts-1.9.10.tar.gz", hash = "sha256:ab5c12c16277882b282bc07fe085237002ec787f3c043a4ac5c46a6cd3dbde26", size = 1011541, upload-time = "2026-08-31T19:05:54.639Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/f6/adea1c67504932b416afa775e8b20f44d46d753ccc9432213a5cffee1626/pyshortcuts-1.9.9-py3-none-any.whl", hash = "sha256:baf777ba3df7e65eb17df499569622a6911a244c810bf91c42dae8b8bf993cfa", size = 167415, upload-time = "2026-05-13T16:41:21.051Z" },
+    { url = "https://files.pythonhosted.org/packages/73/9f/d175232a85a21ef5566967914d250eeb5a817d849d443ef30b7eee6504d0/pyshortcuts-1.9.10-py3-none-any.whl", hash = "sha256:0ea86171717e079b048daf4f0571120f0d6dfb63a873a07c9061555c2e33ad7c", size = 167800, upload-time = "2026-08-31T19:05:53.054Z" },
 ]
 
 [[package]]
@@ -1990,7 +1995,7 @@ wheels = [
 
 [[package]]
 name = "wxmplot"
-version = "2026.2.1"
+version = "2026.2.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "darkdetect" },
@@ -2007,9 +2012,9 @@ dependencies = [
     { name = "wxpython" },
     { name = "wxutils" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/88/389ba44a2554bb2c2428f0f4caab2831c67dca795af5a326738f1e7354ac/wxmplot-2026.2.1.tar.gz", hash = "sha256:303f8cb15589146641e464793c051bd348822ffc26ba6cf37a03d9d8b832081e", size = 2257219, upload-time = "2026-07-30T04:18:32.011Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bd/83/e2afb165389b3b7826faeedca3192264f22745336e77126cfb3d3fa319e9/wxmplot-2026.2.3.tar.gz", hash = "sha256:9f3590bcaa74fb6bfba33bfacd8064291f8c250326ca33ff244481ef63e6f9f7", size = 2258195, upload-time = "2026-09-01T04:02:15.544Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3a/ae/a7707c131c48ecb9087386cbfdd4d2f3545e1ed3fa8c8dc2078773535c4b/wxmplot-2026.2.1-py3-none-any.whl", hash = "sha256:c0ad98f29afa1f5be2bb4e2c6a4aded0039a2391a10431218d8cccf31d000d34", size = 119229, upload-time = "2026-07-30T04:18:30.727Z" },
+    { url = "https://files.pythonhosted.org/packages/98/0a/d442c13d18340b454210695b7c0cf77d794d1546c89fddfc31ab5162dad0/wxmplot-2026.2.3-py3-none-any.whl", hash = "sha256:6607f947bd687103cd3fffb4cb42e5e973394e0a4d67fb216d78be63c9c34f0d", size = 119357, upload-time = "2026-09-01T04:02:13.953Z" },
 ]
 
 [[package]]

@@ -36,6 +36,8 @@ class FileSettingsController:
         self._model = model
         self._view = view
         self._on_hdf5_changed_listeners: list = []
+        self._ioc_directory: str = ""
+        self._ioc_filename: str = ""
 
         fs = self._view.file_settings
         fs.bind_filename_changed(self._on_filename_changed)
@@ -46,6 +48,7 @@ class FileSettingsController:
         fs.bind_frame_reset(self._on_frame_reset)
         fs.bind_frame_update(self._on_frame_update)
         fs.bind_map_ext_changed(self._on_map_ext_changed)
+        fs.bind_map_ext_update(self._on_map_ext_update)
         fs.bind_hdf5_changed(self._on_hdf5_changed)
         fs.bind_cbf_changed(self._on_cbf_changed)
         fs.bind_tif_changed(self._on_tif_changed)
@@ -86,6 +89,13 @@ class FileSettingsController:
         cfg = self._model.beamline.active
         det = cfg.active_detector_config if cfg else None
         fmt = det.file_format if det else None
+        fs = self._model.file_settings
+        if fmt != "hdf5":
+            fs.use_hdf5 = False
+        if fmt != "cbf":
+            fs.use_cbf = False
+        if fmt != "tif":
+            fs.use_tif = False
         self._view.file_settings.set_detector_format(fmt)
 
     def push_to_detector(self) -> None:
@@ -97,8 +107,8 @@ class FileSettingsController:
 
         m = self._model.file_settings
         detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
-        directory = det.translate_path(str(m.directory))
-        filename = m.filename
+        directory = self._ioc_directory if self._ioc_directory else det.translate_path(str(m.directory))
+        filename = self._ioc_filename if self._ioc_filename else m.filename
         frame_number = m.frame_number
         file_template = det.file_template
 
@@ -164,10 +174,17 @@ class FileSettingsController:
         if update_directory and directory:
             local_dir = det.translate_path_reverse(directory) if det else directory
             path = Path(local_dir)
-            m.directory = path
-            fs.set_directory(path)
-            _log.debug("sync_from_detector: remote_dir=%r local_dir=%r", directory, local_dir)
+            raw = cfg.raw_directory.strip() if cfg else ""
+            _log.debug("sync_from_detector: IOC dir=%r -> local_dir=%r raw_directory=%r", directory, local_dir, raw)
+            if raw and Path(raw) == path:
+                _log.debug("sync_from_detector: skipping directory update, IOC at raw_directory (%r)", local_dir)
+            else:
+                self._ioc_directory = directory
+                m.directory = path
+                fs.set_directory(path)
+                _log.debug("sync_from_detector: set m.directory=%r", str(path))
         if update_filename and filename:
+            self._ioc_filename = filename
             m.filename = filename
             fs.set_filename(filename)
             _log.debug("sync_from_detector: filename=%r", filename)
@@ -193,10 +210,12 @@ class FileSettingsController:
 
     def _on_filename_changed(self, value: str) -> None:
         self._model.file_settings.filename = value
+        self._ioc_filename = ""
         _log.debug("file_settings.filename = %r", value)
 
     def _on_directory_changed(self, path: Path) -> None:
         self._model.file_settings.directory = path
+        self._ioc_directory = ""
         _log.debug("file_settings.directory = %s", path)
 
     def _on_frame_changed(self, value: int) -> None:
@@ -211,6 +230,26 @@ class FileSettingsController:
     def _on_map_ext_changed(self, value: str) -> None:
         self._model.file_settings.map_ext = value
         _log.debug("file_settings.map_ext = %r", value)
+
+    def _on_map_ext_update(self) -> None:
+        new_ext = self._model.file_settings.map_ext.strip() or "map"
+        points = self._model.collection.points
+        for index, point in enumerate(points):
+            if not point.map_group:
+                continue
+            label = point.label.strip()
+            try:
+                label_parts = label.rsplit("_", 2)
+                if len(label_parts) < 3:
+                    continue
+                frame_str = label_parts[-2]
+                point_str = label_parts[-1]
+            except (ValueError, IndexError):
+                continue
+            new_label = f"{new_ext}_{frame_str}_{point_str}"
+            self._model.collection.update_label(index, new_label)
+            self._view.collection_table.refresh_row(index, point)
+        _log.debug("map ext update: relabelled map points with ext=%r", new_ext)
 
     def add_hdf5_changed_listener(self, callback) -> None:
         self._on_hdf5_changed_listeners.append(callback)

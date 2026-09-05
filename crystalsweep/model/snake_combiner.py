@@ -51,12 +51,14 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+import h5py
+
 try:
     import hdf5plugin  # noqa: F401  registers bitshuffle/LZ4 etc. with libhdf5
 except ImportError:
     hdf5plugin = None  # type: ignore[assignment]
 
-__all__ = ["run_combine", "combine_snake_map"]
+__all__ = ["run_combine", "combine_snake_map", "copy_map_to_target", "run_copy_map"]
 
 _log = logging.getLogger(__name__)
 
@@ -126,10 +128,15 @@ def _copy_attrs(src, dst) -> None:
         dst.attrs[k] = v
 
 
-def _write_flipped_row(src_path: Path, dst_path: Path, frame_count: int, reverse: bool) -> None:
+def _write_flipped_row(src_path: Path, dst_path: Path, frame_count: int, reverse: bool, row_shift_frames: int = 0) -> None:
     """Copy ``src_path`` to ``dst_path``, reversing the leading axis on any
     dataset whose leading dimension equals ``frame_count`` when ``reverse`` is
-    True. Groups, attrs, dtypes, chunking and compression are preserved."""
+    True. Groups, attrs, dtypes, chunking and compression are preserved.
+
+    ``row_shift_frames`` rolls the frame sequence of reversed rows by that many
+    positions to correct for motor backlash or other physical offsets that shift
+    odd rows relative to even rows in a snake scan.
+    """
     import h5py
 
     dst_path.parent.mkdir(parents=True, exist_ok=True)
@@ -149,7 +156,8 @@ def _write_flipped_row(src_path: Path, dst_path: Path, frame_count: int, reverse
                 if is_per_frame and reverse:
                     n = obj.shape[0]
                     for i in range(n):
-                        out[i] = obj[n - 1 - i]
+                        src_idx = (n - 1 - i + row_shift_frames) % n
+                        out[i] = obj[src_idx]
                 elif is_per_frame:
                     n = obj.shape[0]
                     for i in range(n):
@@ -160,34 +168,55 @@ def _write_flipped_row(src_path: Path, dst_path: Path, frame_count: int, reverse
         src.visititems(visit)
 
 
-def _build_combined(flipped_files: list[Path], combined_path: Path, frame_count: int) -> None:
-    """Combine all flipped row files into a single map file that keeps the SAME
-    dataset schema as a per-row file: per-frame datasets just have their
-    leading axis grown from ``frame_count`` to ``rows*frame_count``."""
-    import h5py
+def _existing_row_count(combined_path: Path, frame_count: int) -> int:
+    """Return the number of rows already written to *combined_path*, or 0 if the file does not exist or cannot be read."""
 
-    rows = len(flipped_files)
-    total_frames = rows * frame_count
-    template = flipped_files[0]
+    if not combined_path.exists():
+        return 0
+    try:
+        with h5py.File(str(combined_path), "r") as fh:
+
+            def _probe(name, obj):
+                if isinstance(obj, h5py.Dataset) and obj.shape and obj.shape[0] % frame_count == 0:
+                    return int(obj.shape[0] // frame_count)
+
+            result = fh.visititems(_probe)
+            return result if result is not None else 0
+    except Exception:
+        return 0
+
+
+def _create_combined(template_path: Path, combined_path: Path, frame_count: int) -> list[str]:
+    """Create *combined_path* from *template_path* (the first flipped row).
+
+    Per-frame datasets are written with ``maxshape=(None, ...)`` so the file
+    can be grown row-by-row with :func:`_append_rows_to_combined`. Returns the
+    list of per-frame dataset paths written."""
+
+    per_frame_names: list[str] = []
     combined_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with h5py.File(str(template), "r") as tmpl, h5py.File(str(combined_path), "w") as out:
+    with h5py.File(str(template_path), "r") as tmpl, h5py.File(str(combined_path), "w") as out:
         _copy_attrs(tmpl, out)
-
-        per_frame_names: list[str] = []
 
         def visit(name: str, obj) -> None:
             if isinstance(obj, h5py.Group):
-                g = out.require_group(name)
-                _copy_attrs(obj, g)
+                _copy_attrs(obj, out.require_group(name))
                 return
             if isinstance(obj, h5py.Dataset):
                 is_per_frame = bool(obj.shape) and obj.shape[0] == frame_count
                 kw = _dataset_create_kwargs(obj)
                 if is_per_frame:
-                    new_shape = (total_frames,) + tuple(obj.shape[1:])
-                    d = out.create_dataset(name, shape=new_shape, **kw)
+                    maxshape = (None,) + tuple(obj.shape[1:])
+                    if not kw.get("chunks"):
+                        kw["chunks"] = (1,) + tuple(obj.shape[1:])
+                    d = out.create_dataset(name, shape=obj.shape, maxshape=maxshape, **kw)
                     _copy_attrs(obj, d)
+                    if obj.ndim == 1:
+                        d[...] = obj[...]
+                    else:
+                        for c in range(frame_count):
+                            d[c] = obj[c]
                     per_frame_names.append(name)
                 else:
                     d = out.create_dataset(name, shape=obj.shape, **kw)
@@ -196,9 +225,39 @@ def _build_combined(flipped_files: list[Path], combined_path: Path, frame_count:
 
         tmpl.visititems(visit)
 
-        for row_idx, fpath in enumerate(flipped_files):
-            start = row_idx * frame_count
-            stop = start + frame_count
+    return per_frame_names
+
+
+def _append_rows_to_combined(
+    new_files: list[Path],
+    combined_path: Path,
+    start_row: int,
+    total_rows: int,
+    frame_count: int,
+) -> None:
+    """Resize *combined_path* to *total_rows* and write *new_files* starting at
+    *start_row*. The file must already exist and have resizable per-frame
+    datasets (created by :func:`_create_combined`)."""
+
+    if not new_files:
+        return
+
+    total_frames = total_rows * frame_count
+
+    with h5py.File(str(combined_path), "a") as out:
+        per_frame_names: list[str] = []
+
+        def find_per_frame(name, obj):
+            if isinstance(obj, h5py.Dataset) and bool(obj.shape) and obj.shape[0] % frame_count == 0:
+                per_frame_names.append(name)
+
+        out.visititems(find_per_frame)
+
+        for name in per_frame_names:
+            out[name].resize((total_frames,) + tuple(out[name].shape[1:]))
+
+        for row_idx, fpath in enumerate(new_files, start=start_row):
+            row_start = row_idx * frame_count
             with h5py.File(str(fpath), "r") as fin:
                 for name in per_frame_names:
                     src = fin[name]
@@ -206,10 +265,34 @@ def _build_combined(flipped_files: list[Path], combined_path: Path, frame_count:
                     if src.shape[0] != frame_count:
                         raise RuntimeError(f"{fpath}: dataset {name} has leading dim {src.shape[0]}, expected {frame_count}")
                     if src.ndim == 1:
-                        dst[start:stop] = src[...]
+                        dst[row_start : row_start + frame_count] = src[...]
                     else:
                         for c in range(frame_count):
-                            dst[start + c] = src[c]
+                            dst[row_start + c] = src[c]
+
+
+def _build_combined(flipped_files: list[Path], combined_path: Path, frame_count: int) -> None:
+    """Incrementally grow *combined_path* with any flipped rows not yet present.
+
+    On the first call the file is created with resizable per-frame datasets and
+    row 0 is written. On subsequent calls only the rows whose data is not yet in
+    the file are appended; already-written rows are never re-read."""
+    existing = _existing_row_count(combined_path, frame_count)
+    total_rows = len(flipped_files)
+
+    if existing >= total_rows:
+        _log.info("snake_combiner: combined file already up to date (%d rows)", existing)
+        return
+
+    if existing == 0:
+        _log.info("snake_combiner: creating combined file from row 0")
+        _create_combined(flipped_files[0], combined_path, frame_count)
+        existing = 1
+
+    new_files = flipped_files[existing:]
+    if new_files:
+        _log.info("snake_combiner: appending rows %d-%d to combined file", existing, existing + len(new_files) - 1)
+        _append_rows_to_combined(new_files, combined_path, existing, total_rows, frame_count)
 
 
 def combine_snake_map(
@@ -220,14 +303,20 @@ def combine_snake_map(
     skip_flip: bool = False,
     flipped_dir: Path | None = None,
     data_path: str = _DEFAULT_DATA_PATH,
+    row_shift_frames: int = 0,
 ) -> None:
     """Flip per-row .h5 files according to the snake convention and combine
     them into a single map file. The combined output preserves the schema of a
-    single per-row file (per-frame leading axis grown by a factor of rows)."""
+    single per-row file (per-frame leading axis grown by a factor of rows).
+
+    ``row_shift_frames`` shifts the frame sequence of each reversed (odd) row by
+    that many positions, correcting for motor backlash or other physical offsets.
+    Positive values shift right; negative values shift left.
+    """
     if not input_dir.is_dir():
         raise RuntimeError(f"Input directory not found: {input_dir}")
 
-    target_flipped_dir = flipped_dir or input_dir.with_name(f"{input_dir.name}_flipped")
+    target_flipped_dir = flipped_dir or input_dir / "flipped"
 
     # ``glob`` is non-recursive so files inside ``target_flipped_dir`` are not
     # rediscovered; we only need to skip a combined output that may have been
@@ -238,11 +327,12 @@ def combine_snake_map(
         raise RuntimeError(f"No row files matching {pattern!r} in {input_dir}")
     frame_count = _detect_frame_count(row_files[0], data_path)
     _log.info(
-        "snake_combiner: %d row files, %d frames/row, flipped_dir=%s, output=%s",
+        "snake_combiner: %d row files, %d frames/row, flipped_dir=%s, output=%s, row_shift_frames=%d",
         len(row_files),
         frame_count,
         target_flipped_dir,
         output_path,
+        row_shift_frames,
     )
 
     flipped_files: list[Path] = []
@@ -258,12 +348,87 @@ def combine_snake_map(
             if not dst.exists():
                 raise RuntimeError(f"skip_flip set but flipped row missing: {dst}")
             continue
+        if dst.exists():
+            _log.info("snake_combiner: row %d already flipped, skipping %s", row_one_based, src.name)
+            continue
         _log.info("snake_combiner: row %d %s %s -> %s", row_one_based, "REVERSE" if reverse else "keep   ", src.name, dst)
-        _write_flipped_row(src, dst, frame_count=frame_count, reverse=reverse)
+        _write_flipped_row(src, dst, frame_count=frame_count, reverse=reverse, row_shift_frames=row_shift_frames if reverse else 0)
 
     _log.info("snake_combiner: building combined map file %s", output_path)
     _build_combined(flipped_files, output_path, frame_count=frame_count)
     _log.info("snake_combiner: done")
+
+
+def copy_map_to_target(
+    input_dir: Path,
+    output_dir: Path,
+    pattern: str = "*.h5",
+    flip_odd_rows: bool = False,
+    first_row_reversed: bool = False,
+    data_path: str = _DEFAULT_DATA_PATH,
+    row_shift_frames: int = 0,
+) -> None:
+    """Copy map row files from input_dir to output_dir.
+
+    When flip_odd_rows is True every other row has its per-frame datasets
+    written in reversed order (snake wide-map convention). When False the
+    files are copied verbatim using a binary copy.
+    """
+    import shutil
+
+    if not input_dir.is_dir():
+        raise RuntimeError(f"Input directory not found: {input_dir}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    row_files = _list_row_files(input_dir, pattern)
+
+    frame_count = _detect_frame_count(row_files[0], data_path) if flip_odd_rows else 0
+
+    for i, src in enumerate(row_files):
+        dst = output_dir / src.name
+        if dst.exists():
+            _log.info("copy_map_to_target: skipping existing %s", dst.name)
+            continue
+        if flip_odd_rows:
+            row_one_based = i + 1
+            reverse = (row_one_based % 2 == 0) if not first_row_reversed else (row_one_based % 2 == 1)
+            _log.info("copy_map_to_target: row %d %s %s -> %s", row_one_based, "REVERSE" if reverse else "keep   ", src.name, dst.name)
+            _write_flipped_row(src, dst, frame_count=frame_count, reverse=reverse, row_shift_frames=row_shift_frames if reverse else 0)
+        else:
+            _log.info("copy_map_to_target: copying %s -> %s", src.name, dst.name)
+            shutil.copy2(str(src), str(dst))
+
+    _log.info("copy_map_to_target: done, %d files copied", len(row_files))
+
+
+def run_copy_map(args: dict) -> None:
+    """Entry point used by subprocess / CLI invocations for map file copying."""
+    input_dir = args.get("input_dir", "")
+    output_dir = args.get("output_dir", "")
+    pattern = args.get("pattern") or "*.h5"
+    flip_odd_rows = bool(args.get("flip_odd_rows", False))
+    first_row_reversed = bool(args.get("first_row_reversed", False))
+    data_path = args.get("data_path") or _DEFAULT_DATA_PATH
+    row_shift_frames = int(args.get("row_shift_frames", 0))
+
+    _log.info(
+        "run_copy_map: input_dir=%r output_dir=%r pattern=%r flip_odd_rows=%s row_shift_frames=%d",
+        input_dir, output_dir, pattern, flip_odd_rows, row_shift_frames,
+    )
+
+    if not input_dir or not output_dir:
+        _log.warning("run_copy_map: missing input_dir or output_dir, aborting")
+        return
+
+    copy_map_to_target(
+        input_dir=Path(input_dir),
+        output_dir=Path(output_dir),
+        pattern=pattern,
+        flip_odd_rows=flip_odd_rows,
+        first_row_reversed=first_row_reversed,
+        data_path=data_path,
+        row_shift_frames=row_shift_frames,
+    )
 
 
 def run_combine(args: dict) -> None:
@@ -275,15 +440,17 @@ def run_combine(args: dict) -> None:
     skip_flip = bool(args.get("skip_flip", False))
     flipped_dir_raw = args.get("flipped_dir") or ""
     data_path = args.get("data_path") or _DEFAULT_DATA_PATH
+    row_shift_frames = int(args.get("row_shift_frames", 0))
 
     _log.info(
-        "run_combine: input_dir=%r output_path=%r pattern=%r first_row_reversed=%s skip_flip=%s flipped_dir=%r",
+        "run_combine: input_dir=%r output_path=%r pattern=%r first_row_reversed=%s skip_flip=%s flipped_dir=%r row_shift_frames=%d",
         input_dir,
         output_path,
         pattern,
         first_row_reversed,
         skip_flip,
         flipped_dir_raw,
+        row_shift_frames,
     )
 
     if not input_dir or not output_path:
@@ -298,6 +465,7 @@ def run_combine(args: dict) -> None:
         skip_flip=skip_flip,
         flipped_dir=Path(flipped_dir_raw) if flipped_dir_raw else None,
         data_path=data_path,
+        row_shift_frames=row_shift_frames,
     )
 
 
@@ -312,7 +480,11 @@ if __name__ == "__main__":
     with open(args_file, "r") as fh:
         args_payload = json.load(fh)
 
+    mode = args_payload.get("mode", "combine")
     try:
-        run_combine(args_payload)
+        if mode == "copy":
+            run_copy_map(args_payload)
+        else:
+            run_combine(args_payload)
     except Exception:
-        _log.exception("snake_combiner: unhandled exception")
+        _log.exception("snake_combiner: unhandled exception in mode=%r", mode)

@@ -5,7 +5,7 @@
 CrystalSweep is launched via the command line:
 
 ```bash
-crystalsweep --gui
+crystalsweep
 ```
 
 ## Main Interface
@@ -27,7 +27,7 @@ The main window provides access to all beamline control and data acquisition fea
 
 ## Image Viewer
 
-The built-in area detector viewer (`crystalsweep --gui`) displays live detector images during collection. Use the colormap selector and intensity histogram to adjust the display range.
+The built-in area detector viewer displays live detector images during collection. Use the colormap selector and intensity histogram to adjust the display range.
 
 ## Integration
 

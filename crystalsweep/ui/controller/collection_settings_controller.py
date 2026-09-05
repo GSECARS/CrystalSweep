@@ -127,18 +127,27 @@ class CollectionSettingsController:
     def _on_scan_type_changed(self, scan_type: ScanType) -> None:
         self._model.collection_settings.scan_type = scan_type
         self._apply_type_defaults(scan_type)
+        if scan_type == "step":
+            self._view.collection_table.set_trajectory_scan(True)
         self._sync_trajectory_toggle()
         _log.debug("collection_settings.scan_type = %s", scan_type)
 
     def _sync_trajectory_toggle(self) -> None:
         cs = self._model.collection_settings
+        cfg = self._model.beamline.active
         still_map = cs.scan_type == "still" and cs.map
         wide_flip_map = cs.scan_type == "wide" and cs.map and cs.wide_flip
+        step_scan = cs.scan_type == "step"
 
-        # Trajectory toggle only makes sense for still maps whose map motor
-        # is driven by an XPS controller (the only controller type that
-        # supports the array trajectory used by the still-map row scan).
-        trajectory_visible = still_map and self._map_motor_uses_xps()
+        # Trajectory toggle is relevant for two cases:
+        # - still maps whose map motor uses XPS (array trajectory for row scan)
+        # - step scans whose rotation motor uses XPS (slew trajectory per point)
+        trajectory_visible = (
+            (still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory)
+            or (step_scan and self._rotation_motor_uses_xps())
+        )
+        if not trajectory_visible:
+            self._view.collection_table.set_trajectory_scan(False)
         self._view.collection_table.set_trajectory_visible(trajectory_visible)
 
         keep_shutter_visible = still_map or wide_flip_map
@@ -150,6 +159,14 @@ class CollectionSettingsController:
         # only handles HDF5 row files).
         combine_visible = cs.map and self._model.file_settings.use_hdf5
         self._view.collection_table.set_snake_combine_visible(combine_visible)
+
+    def _rotation_motor_uses_xps(self) -> bool:
+        """Return True if the rotation motor is driven by a Newport XPS controller."""
+        cfg = self._model.beamline.active
+        if cfg.rotation_motor is None:
+            return False
+        controller_types = {c.name: c.type for c in cfg.controllers if c.name}
+        return controller_types.get(cfg.rotation_motor.controller) == "newport_xps"
 
     def _map_motor_uses_xps(self) -> bool:
         """Return True if the currently-selected map motor (or, when map2 is
@@ -371,7 +388,7 @@ class CollectionSettingsController:
         point_index = 0
         for row_idx, pos2 in enumerate(axis2):
             for col_idx, pos1 in enumerate(axis1):
-                label = f"{map_ext}_{frame_number + point_index:0{width}d}"
+                label = f"{map_ext}_{frame_number:0{width}d}_{point_index + 1:0{width}d}"
                 point = self._model.collection.add_point(shorthands, label=label)
                 point.selected = True
                 point.scan_type = cs.scan_type

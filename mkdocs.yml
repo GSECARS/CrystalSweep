@@ -48,7 +48,6 @@ nav:
       - Scan: api/model/scan.md
       - Detector: api/model/detector.md
       - EPICS: api/model/epics.md
-      - Integration: api/model/integration.md
       - Hardware Controllers: api/model/hardware.md
       - File & Settings: api/model/settings.md
       - Utilities: api/model/utilities.md

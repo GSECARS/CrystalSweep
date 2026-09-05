@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/model/validation.py
+# File: crystalsweep/utils/validators.py
 # ----------------------------------------------------------------------------------
 # Purpose:
-# Pydantic validators for collection-table field values.
+# Validators used across the application.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -12,9 +12,9 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import TypeAdapter
 
-__all__ = ["MotorPositionValidator", "ValidationError"]
+__all__ = ["MotorPositionValidator"]
 
 _float_adapter = TypeAdapter(float)
 _int_adapter = TypeAdapter(int)

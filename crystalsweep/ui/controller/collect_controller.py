@@ -16,24 +16,27 @@
 import json
 import logging
 import multiprocessing
+import shutil
 import subprocess
 import sys
 import tempfile
 import threading
 import time as _time
+from pathlib import Path
 from typing import Callable
 
 import wx
 from epics import caget, caput, caput_many
+from wxutils import FlatConfirmDialog, FlatWaitDialog
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
-from crystalsweep.model.motor_limits import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
 from crystalsweep.ui.controller.scan_engine import ScanEngine
 from crystalsweep.ui.view import MainView
-from wxutils import FlatWaitDialog
-from crystalsweep.ui.view.custom.theme import dialog_scheme
+from crystalsweep.ui.view.custom.theme import app_theme
+from crystalsweep.utils import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
+from crystalsweep.utils.output_paths import OutputPaths
 
 __all__ = ["CollectController"]
 
@@ -41,6 +44,33 @@ _log = logging.getLogger(__name__)
 
 _PROGRESS_INTERVAL_MS = 100
 _TRIGGERING_POLL_S = 0.05
+
+
+def _mkdir_safe(path: Path) -> None:
+    """Create path and any missing parents, skipping parents that already exist.
+
+    Windows returns ACCESS_DENIED when CreateDirectory is called on a network
+    share root (e.g. T:\\Data) even though it exists. .exists() also returns
+    False for that root when the process lacks enumeration rights, so the
+    walk-up can overshoot past the real root. Catching PermissionError in the
+    mkdir loop treats such a path as already present and lets subdirectory
+    creation continue normally.
+    """
+    missing: list[Path] = []
+    p = path
+    while True:
+        if p.exists():
+            break
+        missing.append(p)
+        parent = p.parent
+        if parent == p:
+            break
+        p = parent
+    for part in reversed(missing):
+        try:
+            part.mkdir(exist_ok=True)
+        except PermissionError:
+            pass
 
 
 class CollectController:
@@ -55,6 +85,7 @@ class CollectController:
         self._thread: threading.Thread | None = None
         self._start_time: float = 0.0
         self._on_collecting_changed: Callable[[bool], None] | None = None
+        self._on_post_scan: Callable[[], None] | None = None
         self._elapsed_timer = wx.Timer()
         self._elapsed_timer.Bind(wx.EVT_TIMER, self._on_elapsed_tick)
 
@@ -71,6 +102,7 @@ class CollectController:
         self._restore_pv_snapshot: dict[str, object] = {}
         self._monitored_limit_pvs: list[str] = []
         self._aborting_dlg: FlatWaitDialog | None = None
+        self._output_paths: OutputPaths | None = None
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
@@ -79,6 +111,9 @@ class CollectController:
 
     def bind_collecting_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_collecting_changed = callback
+
+    def bind_post_scan(self, callback: Callable[[], None]) -> None:
+        self._on_post_scan = callback
 
     def on_config_applied(self) -> None:
         """Re-subscribe soft-limit monitors for the newly active beamline config."""
@@ -130,7 +165,22 @@ class CollectController:
             self._view.collect.set_status(reason, wx.Colour(220, 80, 40))
             return
 
+        conflicts = self._check_output_conflicts(points)
+        if conflicts:
+            lines = "\n".join(f"  {c}" for c in conflicts[:10])
+            if len(conflicts) > 10:
+                lines += f"\n  ... and {len(conflicts) - 10} more"
+            result = FlatConfirmDialog(
+                self._view,
+                f"The following output paths already exist and may be overwritten:\n\n{lines}\n\nProceed anyway?",
+                "Output already exists",
+                yes_scheme=app_theme.danger_scheme(),
+            ).ShowModal()
+            if result != wx.ID_YES:
+                return
+
         self._abort_event.clear()
+        self._engine.test_mode = self._view.collect.test_mode
         self._start_time = _time.monotonic()
         if self._on_collecting_changed is not None:
             self._on_collecting_changed(True)
@@ -287,7 +337,6 @@ class CollectController:
             title="Collection Aborted",
             message="\n".join(lines),
             status="Cleaning up, please wait\u2026",
-            scheme=dialog_scheme(),
         )
         self._aborting_dlg.Show()
         self._aborting_dlg.Raise()
@@ -383,6 +432,7 @@ class CollectController:
         all_points = self._model.collection.points
         pre_scan_error: str | None = None
         pre_collection_error: str | None = None
+        self._output_paths = self._build_output_paths()
 
         pre_collection_error = self._engine.pre_collection(points, config)
         if pre_collection_error is not None:
@@ -590,6 +640,7 @@ class CollectController:
         scan_type = group_points[0].scan_type
         motor1 = group_points[0].map_motor1
         motor2 = group_points[0].map_motor2
+        map_row_shift = round(group_points[0].map_row_shift) if group_points else 0
         use_trajectory = self._view.collection_table.trajectory_scan
         keep_shutter_open = self._view.collection_table.keep_shutter_open
         if scan_type == "wide" and not self._model.collection_settings.wide_flip:
@@ -597,6 +648,7 @@ class CollectController:
         original_shutter_mode: int = 1
         weights = group_weights if group_weights is not None else [1] * len(group_points)
         map_completed_weight = completed_weight
+        frame_before_map = self._model.file_settings.frame_number
 
         rows: dict[int, list[CollectionPoint]] = {}
         for pt in group_points:
@@ -761,6 +813,16 @@ class CollectController:
                         self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     map_completed_weight += pt_weight
 
+            det = config.active_detector_config if config else None
+            if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5":
+                if scan_type == "still":
+                    self._spawn_snake_combine_for_map(row_shift_frames=map_row_shift)
+                elif scan_type in ("step", "wide"):
+                    _out = self._output_paths
+                    if _out is not None and _out.raw_directory is not None:
+                        wide_flip = scan_type == "wide" and self._model.collection_settings.wide_flip
+                        self._spawn_map_copy_to_target(flip_odd_rows=wide_flip, row_shift_frames=map_row_shift)
+
         if keep_shutter_open:
             self._engine._close_shutter(config)
             self._engine._restore_detector_shutter_control(config, original_shutter_mode)
@@ -778,11 +840,8 @@ class CollectController:
             except Exception as exc:
                 _log.warning("Failed to restore map motor2 %s: %s", motor2, exc)
 
-        if not self._abort_event.is_set() and self._model.file_settings.use_snake_combine:
-            self._spawn_snake_combine_for_map(group_points)
-
-        self._model.file_settings.reset_frame_number()
-        wx.CallAfter(self._view.file_settings.set_frame_number, 0)
+        self._model.file_settings.frame_number = frame_before_map
+        wx.CallAfter(self._view.file_settings.set_frame_number, frame_before_map)
 
     def _run_map_row_trajectory(
         self,
@@ -907,6 +966,8 @@ class CollectController:
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
         wx.CallAfter(self._stop_point_timer, start_idx + n_points - 1, total)
 
         if error_holder:
@@ -964,6 +1025,35 @@ class CollectController:
             return None
         return source_format, extras
 
+    def _build_output_paths(self) -> OutputPaths:
+        """Snapshot the current file settings and config into an OutputPaths helper."""
+        fs = self._model.file_settings
+        config = self._model.beamline.active
+        det = config.active_detector_config if config else None
+        source_format = det.file_format if det else "hdf5"
+        file_ext = OutputPaths.ext_for_format(source_format)
+        result = self._selected_extras()
+        extras = tuple(result[1]) if result else ()
+        raw = config.raw_directory.strip() if config else ""
+        crysalis_active = bool(fs.use_crysalis and fs.crysalis_calibration is not None)
+        fn_path = Path(fs.filename) if fs.filename else Path(".")
+        fn_parent = fn_path.parent
+        full_directory = Path(str(fs.directory)) / fn_parent if fn_parent != Path(".") else Path(str(fs.directory))
+        stem = fn_path.name if fs.filename else ""
+        _log.debug("_build_output_paths: fs.directory=%r fs.filename=%r -> full_directory=%r stem=%r raw=%r", str(fs.directory), fs.filename, str(full_directory), stem, raw)
+        return OutputPaths(
+            directory=full_directory,
+            raw_directory=Path(raw) if raw else None,
+            filename=stem,
+            map_ext=fs.map_ext.strip(),
+            use_ext=fs.use_ext,
+            file_ext=file_ext,
+            file_number_width=det.file_number_width if det else 4,
+            source_format=source_format,
+            extras=extras,
+            use_crysalis=crysalis_active,
+        )
+
     def _launch_format_converter(self, directory: str, basename: str, source_format: str, extras: list[str], width: int, output_dirs: dict[str, str]) -> None:
         """Spawn the format converter as a detached subprocess."""
         args = {
@@ -989,7 +1079,7 @@ class CollectController:
         except Exception as exc:
             _log.warning("Failed to spawn format conversion: %s", exc)
 
-    def _launch_snake_combiner(self, input_dir: str, output_path: str, pattern: str, first_row_reversed: bool, flipped_dir: str | None = None) -> None:
+    def _launch_snake_combiner(self, input_dir: str, output_path: str, pattern: str, first_row_reversed: bool, flipped_dir: str | None = None, row_shift_frames: int = 0) -> None:
         """Spawn the snake-map combiner as a detached subprocess."""
         args = {
             "input_dir": input_dir,
@@ -997,6 +1087,7 @@ class CollectController:
             "pattern": pattern,
             "first_row_reversed": first_row_reversed,
             "flipped_dir": flipped_dir or "",
+            "row_shift_frames": row_shift_frames,
         }
         try:
             tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
@@ -1013,189 +1104,195 @@ class CollectController:
         except Exception as exc:
             _log.warning("Failed to spawn snake combiner: %s", exc)
 
-    def _spawn_snake_combine_for_map(self, group_points: list[CollectionPoint]) -> None:
+    def _spawn_snake_combine_for_map(self, row_shift_frames: int = 0) -> None:
         """Spawn the snake combiner for a finished map collection.
 
-        Inputs are the per-row .h5 files the IOC wrote into the map's folder.
-        Output is a sibling ``<map_stem>_combined.h5`` next to that folder.
-        Snake convention matches ``_run_map_group``: row 0 forward, row 1
-        reversed, etc., so ``first_row_reversed`` is False here.
+        Snake convention matches _run_map_group: row 0 forward, row 1
+        reversed, etc., so first_row_reversed is False here.
         """
-        if not group_points:
+        output = self._output_paths
+        if output is None:
             return
-
-        fs = self._model.file_settings
-        base = fs.filename or ""
-        map_ext = fs.map_ext.strip()
-        folder_suffix = map_ext if map_ext else "map"
-        folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
-        input_dir = f"{str(fs.directory).rstrip('/')}/{folder_name}"
-        map_stem = folder_name
-        output_path = f"{input_dir}/{map_stem}.h5"
-        flipped_dir = f"{input_dir}/{map_stem}_flipped"
-        pattern = f"{map_stem}_*.h5"
-
+        map_pts = self._model.collection.points
+        is_step = any(p.map_group and p.scan_type == "step" for p in map_pts)
         self._launch_snake_combiner(
-            input_dir=input_dir,
-            output_path=output_path,
-            pattern=pattern,
+            input_dir=str(output.map_source_dir()),
+            output_path=str(output.map_combined_path(is_step=is_step)),
+            pattern=output.map_row_pattern(),
             first_row_reversed=False,
-            flipped_dir=flipped_dir,
+            flipped_dir=str(output.map_flipped_dir()),
+            row_shift_frames=row_shift_frames,
         )
 
-    def _spawn_format_conversion(self, point: CollectionPoint, frame_number: int | None = None) -> None:
-        """Spawn the format converter for a collection point.
-
-        Source detector files always stay where the IOC wrote them.
-        Converted files always land under a sibling ``_converted`` folder with
-        one subfolder per format (``cbf``, ``tif``).
-        - Single (non-map): ``<directory>/<basename>_converted/<fmt>/``
-        - Map: ``<map_dir>/<base>_<map_ext>_converted/<fmt>/`` (shared across
-          all points in the map).
-        """
-        result = self._selected_extras()
-        if result is None:
-            return
-        source_format, extras = result
-
-        fs = self._model.file_settings
-        config = self._model.beamline.active
-        det = config.active_detector_config
-        width = det.file_number_width if det else 4
-
-        label = point.label.strip() if fs.use_ext else ""
-        base = fs.filename or ""
-        map_ext = fs.map_ext.strip() if point.map_group else ""
-        directory = str(fs.directory)
-        if point.map_group:
-            folder_suffix = map_ext if map_ext else "map"
-            folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
-            directory = f"{directory.rstrip('/')}/{folder_name}"
-            effective_map_ext = map_ext if map_ext else "map"
-            parts = [p for p in [base, effective_map_ext] if p]
-            map_label = point.label.strip()
+    def _launch_map_copy_to_target(self, input_dir: str, output_dir: str, pattern: str, flip_odd_rows: bool, row_shift_frames: int = 0) -> None:
+        """Spawn the map file copier as a detached subprocess."""
+        args = {
+            "mode": "copy",
+            "input_dir": input_dir,
+            "output_dir": output_dir,
+            "pattern": pattern,
+            "flip_odd_rows": flip_odd_rows,
+            "row_shift_frames": row_shift_frames,
+        }
+        try:
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
             try:
-                filenumber = int(map_label.rsplit("_", 1)[-1])
-            except (ValueError, IndexError):
-                filenumber = frame_number if frame_number is not None else fs.frame_number
-            map_stem = "_".join(parts) if parts else base
-            basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
-            converted_root = f"{directory.rstrip('/')}/{map_stem}_converted"
-        else:
-            parts = [p for p in [base, label] if p]
-            filenumber = frame_number if frame_number is not None else fs.frame_number
-            stem = "_".join(parts) if parts else base
-            basename = f"{stem}_{int(filenumber):0{max(1, width)}d}"
-            converted_root = f"{directory.rstrip('/')}/{basename}_converted"
+                json.dump(args, tmp)
+            finally:
+                tmp.close()
+            subprocess.Popen(
+                [sys.executable, "-m", "crystalsweep.model.snake_combiner", tmp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception as exc:
+            _log.warning("Failed to spawn map file copier: %s", exc)
 
-        output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
+    def _spawn_map_copy_to_target(self, flip_odd_rows: bool = False, row_shift_frames: int = 0) -> None:
+        """Copy all raw map row files to the target map folder after a step or wide map completes."""
+        output = self._output_paths
+        if output is None or output.raw_directory is None:
+            return
+        self._launch_map_copy_to_target(
+            input_dir=str(output.map_source_dir()),
+            output_dir=str(output.directory / output.map_folder_name()),
+            pattern=output.map_row_pattern(),
+            flip_odd_rows=flip_odd_rows,
+            row_shift_frames=row_shift_frames,
+        )
+
+    def _check_output_conflicts(self, points: list) -> list[str]:
+        """Return a list of existing paths that collection would overwrite."""
+        output = self._build_output_paths()
+        fs = self._model.file_settings
+        conflicts: list[str] = []
+        seen: set[str] = set()
+
+        map_groups: set[str] = set()
+        for p in points:
+            if p.map_group:
+                map_groups.add(p.map_group)
+                continue
+            target_dir = output.output_dir(p, fs.frame_number)
+            target = target_dir / f"{output.basename(p, fs.frame_number)}.{output.file_ext}"
+            key = str(target)
+            if key not in seen:
+                seen.add(key)
+                if target.exists():
+                    conflicts.append(str(target))
+
+        for group in sorted(map_groups):
+            map_dir = output.directory / output.map_folder_name()
+            key = str(map_dir)
+            if key not in seen:
+                seen.add(key)
+                if map_dir.is_dir() and any(map_dir.iterdir()):
+                    conflicts.append(f"{map_dir}/ (directory not empty)")
+            is_step = any(p.map_group == group and p.scan_type == "step" for p in points)
+            combined = output.map_combined_path(is_step=is_step)
+            key = str(combined)
+            if key not in seen:
+                seen.add(key)
+                if combined.exists():
+                    conflicts.append(str(combined))
+
+        return conflicts
+
+    def _spawn_file_copy(self, point: CollectionPoint, frame_number: int) -> None:
+        """Copy the raw detector file to the output directory after a non-map point.
+
+        Only runs when raw_directory is configured and the point is not part
+        of a map group. Map row files stay in raw; only the combined output
+        reaches the output directory via the snake combiner.
+        """
+        if point.map_group:
+            return
+        output = self._output_paths
+        if output is None or output.raw_directory is None:
+            return
+
+        raw = output.raw_directory
+        bn = output.basename(point, frame_number)
+        ext = output.file_ext
+        dst_dir = output.output_dir(point, frame_number)
+
+        def _copy() -> None:
+            try:
+                _mkdir_safe(dst_dir)
+                direct = raw / f"{bn}.{ext}"
+                if direct.is_file():
+                    shutil.copy2(str(direct), str(dst_dir / direct.name))
+                    _log.debug("copied %s -> %s", direct, dst_dir)
+                else:
+                    for f in sorted(raw.glob(f"{bn}*")):
+                        shutil.copy2(str(f), str(dst_dir / f.name))
+                        _log.debug("copied %s -> %s", f, dst_dir)
+            except Exception as exc:
+                _log.warning("_spawn_file_copy: %s", exc)
+
+        threading.Thread(target=_copy, daemon=True, name="file-copy").start()
+
+    def _spawn_format_conversion(self, point: CollectionPoint, frame_number: int) -> None:
+        """Spawn the format converter for a non-trajectory collection point."""
+        output = self._output_paths
+        if output is None or not output.extras:
+            return
+
+        bn = output.basename(point, frame_number)
+        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(point, frame_number).items()}
 
         self._launch_format_converter(
-            directory=directory,
-            basename=basename,
-            source_format=source_format,
-            extras=extras,
-            width=width,
+            directory=str(output.source_dir(point)),
+            basename=bn,
+            source_format=output.source_format,
+            extras=list(output.extras),
+            width=output.file_number_width,
             output_dirs=output_dirs,
         )
 
     def _spawn_format_conversion_for_trajectory_row(
         self,
         row_points: list[CollectionPoint],
-        first_frame_number: int | None = None,
     ) -> None:
         """Spawn conversion for a still-trajectory map row.
 
-        The whole row is written to a single multi-frame HDF5 file with the
-        basename of the first point in the row. Converted frames join the
-        shared per-format folder inside the map's ``_converted`` directory.
+        The whole row is one multi-frame file named after the forward-direction
+        first point (lowest map_col), independent of snake direction.
         """
         if not row_points:
             return
-        # Match scan_engine: name files from the forward-direction first point
-        # (lowest map_col), independent of snake direction.
-        ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
-        result = self._selected_extras()
-        if result is None:
+        output = self._output_paths
+        if output is None or not output.extras:
             return
-        source_format, extras = result
 
-        fs = self._model.file_settings
-        config = self._model.beamline.active
-        det = config.active_detector_config
-        width = det.file_number_width if det else 4
-
-        base = fs.filename or ""
-        map_ext = fs.map_ext.strip()
-        folder_suffix = map_ext if map_ext else "map"
-        folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
-        directory = f"{str(fs.directory).rstrip('/')}/{folder_name}"
-        effective_map_ext = map_ext if map_ext else "map"
-        parts = [p for p in [base, effective_map_ext] if p]
-        map_label = ref.label.strip()
-        try:
-            filenumber = int(map_label.rsplit("_", 1)[-1])
-        except (ValueError, IndexError):
-            filenumber = first_frame_number if first_frame_number is not None else fs.frame_number
-        map_stem = "_".join(parts) if parts else base
-        basename = f"{map_stem}_{int(filenumber):0{max(1, width)}d}"
-        converted_root = f"{directory.rstrip('/')}/{map_stem}_converted"
-        output_dirs = {fmt: f"{converted_root}/{fmt}" for fmt in extras}
+        ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
+        fallback_fn = self._model.file_settings.frame_number
+        bn = output.basename(ref, fallback_fn)
+        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(ref, fallback_fn).items()}
 
         self._launch_format_converter(
-            directory=directory,
-            basename=basename,
-            source_format=source_format,
-            extras=extras,
-            width=width,
+            directory=str(output.map_source_dir()),
+            basename=bn,
+            source_format=output.source_format,
+            extras=list(output.extras),
+            width=output.file_number_width,
             output_dirs=output_dirs,
         )
 
-    def _spawn_crysalis_conversion(self, point: CollectionPoint, frame_number: int | None = None) -> None:
+    def _spawn_crysalis_conversion(self, point: CollectionPoint, frame_number: int, config) -> None:
         if point.scan_type != "step":
             return
-        fs = self._model.file_settings
-        if not fs.use_crysalis:
-            return
-        if fs.crysalis_calibration is None:
+        output = self._output_paths
+        if output is None or not output.use_crysalis:
             return
 
-        config = self._model.beamline.active
+        fs = self._model.file_settings
         det = config.active_detector_config
         file_format = det.file_format if det else "hdf5"
 
-        label = point.label.strip() if fs.use_ext else ""
-        base = fs.filename or ""
-        map_ext = fs.map_ext.strip() if point.map_group else ""
-        directory = str(fs.directory)
-        if point.map_group:
-            folder_suffix = map_ext if map_ext else "map"
-            folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
-            directory = f"{directory.rstrip('/')}/{folder_name}"
-            effective_map_ext = map_ext if map_ext else "map"
-            parts = [p for p in [base, effective_map_ext] if p]
-            map_label = point.label.strip()
-            try:
-                filenumber = int(map_label.rsplit("_", 1)[-1])
-            except (ValueError, IndexError):
-                filenumber = frame_number if frame_number is not None else fs.frame_number
-        else:
-            parts = [p for p in [base, label] if p]
-            filenumber = frame_number if frame_number is not None else fs.frame_number
-        basename = "_".join(parts) if parts else base
-
-        # Crysalis output lives under a shared `_converted/crysalis/` folder.
-        # Single (non-map): `<dir>/<basename>_<NNNN>_converted/crysalis/` (flat).
-        # Map: `<map_dir>/<base>_<map_ext>_converted/crysalis/<basename>_<NNNN>/`
-        # (per-point subfolder since the map's `_converted` is shared).
-        det_width = det.file_number_width if det else 4
-        full_basename = f"{basename}_{int(filenumber):0{max(1, det_width)}d}"
-        if point.map_group:
-            converted_root = f"{directory.rstrip('/')}/{basename}_converted"
-            crysalis_output_dir = f"{converted_root}/crysalis/{full_basename}"
-        else:
-            converted_root = f"{directory.rstrip('/')}/{full_basename}_converted"
-            crysalis_output_dir = f"{converted_root}/crysalis"
+        filepath = str(output.crysalis_source_dir(point))
+        crysalis_output_dir = str(output.crysalis_output_dir(point, frame_number))
 
         step_p = point.parse_step_params()
         wide_p = point.parse_wide_params()
@@ -1244,9 +1341,9 @@ class CollectController:
         }
 
         args = {
-            "filepath": directory,
-            "basename": basename,
-            "filenumber": filenumber,
+            "filepath": filepath,
+            "basename": output.stem(point),
+            "filenumber": frame_number,
             "par_file": str(fs.crysalis_calibration),
             "set_file": str(fs.crysalis_set_file) if fs.crysalis_set_file is not None else "",
             "ccd_file": str(fs.crysalis_ccd_file) if fs.crysalis_ccd_file is not None else "",
@@ -1300,6 +1397,7 @@ class CollectController:
         def on_status(phase: str) -> None:
             wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
 
+        frame_number_before = self._model.file_settings.frame_number
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
@@ -1325,6 +1423,8 @@ class CollectController:
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
         wx.CallAfter(self._stop_point_timer, idx, total)
 
         if error_holder:
@@ -1336,8 +1436,9 @@ class CollectController:
             )
             self._abort_event.set()
         else:
-            self._spawn_format_conversion(point)
-            self._spawn_crysalis_conversion(point)
+            self._spawn_file_copy(point, frame_number_before)
+            self._spawn_format_conversion(point, frame_number_before)
+            self._spawn_crysalis_conversion(point, frame_number_before, config)
 
     def _run_step(
         self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1
@@ -1408,6 +1509,8 @@ class CollectController:
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
         wx.CallAfter(self._view.collect.set_progress, idx, total, n_frames, n_frames, (completed_weight + point_weight) / total_weight)
 
         if error_holder:
@@ -1419,8 +1522,9 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._spawn_file_copy(point, frame_number_before)
             self._spawn_format_conversion(point, frame_number_before)
-            self._spawn_crysalis_conversion(point, frame_number_before)
+            self._spawn_crysalis_conversion(point, frame_number_before, config)
 
     def _run_wide(
         self,
@@ -1459,6 +1563,7 @@ class CollectController:
         def on_status(phase: str) -> None:
             wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
 
+        frame_number_before = self._model.file_settings.frame_number
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
 
         try:
@@ -1484,6 +1589,8 @@ class CollectController:
         done_event.wait()
         if self._engine._thread is not None:
             self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
         wx.CallAfter(self._stop_point_timer, idx, total)
 
         if error_holder:
@@ -1496,5 +1603,6 @@ class CollectController:
             self._abort_event.set()
 
         else:
-            self._spawn_format_conversion(point)
-            self._spawn_crysalis_conversion(point)
+            self._spawn_file_copy(point, frame_number_before)
+            self._spawn_format_conversion(point, frame_number_before)
+            self._spawn_crysalis_conversion(point, frame_number_before, config)

@@ -13,7 +13,7 @@
 
 [project]
 name = "crystalsweep"
-version = "0.1.3"
+version = "0.1.4"
 authors = [
     {name = "Christofanis Skordas", email = "55315750+skordaschristofanis@users.noreply.github.com"}
 ]
@@ -36,6 +36,7 @@ dependencies = [
     "h5py>=3.12.1",
     "numpy>=2.4.4",
     "p4p>=4.2.2",
+    "fabio>=2023.10.0",
     "pillow>=11.2.0",
     "pyfai>=2026.3.0",
     "pyopengl>=3.1.10",
@@ -53,6 +54,7 @@ dependencies = [
     "cryio>=2018.5.30",
     "wxmplot>=2026.2.1",
     "wxutils>=2026.3.0",
+    "pyshortcuts>=1.9.10",
     "epicsapps",
 ]
 
@@ -66,9 +68,6 @@ docs = [
     "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=1.0.6",
 ]
-
-[tool.uv.sources]
-epicsapps = { path = "../epicsapps", editable = true }
 
 [project.scripts]
 crystalsweep = "crystalsweep:main"

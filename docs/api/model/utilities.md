@@ -14,21 +14,13 @@ Supporting models and helpers used across the application.
 
 ::: crystalsweep.model.crysalis_converter
 
-## Image Loader
-
-::: crystalsweep.model.image_loader_model
-
-## Area Detector Viewer
-
-::: crystalsweep.model.ad_viewer_model
-
 ## Snake Combiner
 
 ::: crystalsweep.model.snake_combiner
 
 ## Validation
 
-::: crystalsweep.model.validation
+::: crystalsweep.utils.validators
 
 ## Script Model
 

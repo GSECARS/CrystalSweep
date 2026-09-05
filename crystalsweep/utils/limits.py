@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------
 # Project: Crystalsweep
-# File: crystalsweep/model/motor_limits.py
+# File: crystalsweep/utils/motor_limits.py
 # ----------------------------------------------------------------------------------
 # Purpose:
 # Shared helper for reading EPICS motor soft limits and validating positions.
@@ -12,6 +12,7 @@
 # Copyright (c) 2026 NSF SEES, USA
 # ----------------------------------------------------------------------------------
 
+from contextlib import suppress
 from typing import Callable
 
 from epics import caget, camonitor, camonitor_clear
@@ -57,18 +58,14 @@ def subscribe_limit_monitors(pvs: list[str], callback: Callable) -> list[str]:
     for pv in pvs:
         pv_base = pv.removesuffix(".VAL")
         for field in (f"{pv_base}.LLM", f"{pv_base}.HLM"):
-            try:
+            with suppress(Exception):
                 camonitor(field, callback=callback)
                 monitored.append(field)
-            except Exception:
-                pass
     return monitored
 
 
 def clear_limit_monitors(monitored_pvs: list[str]) -> None:
     """Clear all monitors previously set up by *subscribe_limit_monitors*."""
     for pv in monitored_pvs:
-        try:
+        with suppress(Exception):
             camonitor_clear(pv)
-        except Exception:
-            pass

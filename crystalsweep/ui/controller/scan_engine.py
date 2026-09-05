@@ -24,9 +24,9 @@ from crystalsweep.model.beamline_config_model import BeamlineConfig, MotorConfig
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
 from crystalsweep.model.file_settings_model import FileSettingsModel
-from crystalsweep.model.motor_limits import check_soft_limits
 from crystalsweep.model.scan_model import ScanSpec, get_driver
 from crystalsweep.model.script_model import ScriptModel
+from crystalsweep.utils import check_soft_limits
 
 __all__ = ["ScanEngine"]
 
@@ -48,6 +48,7 @@ class ScanEngine:
         self._controllers = controllers
         self._shutter_open = False
         self._abort_event: threading.Event = threading.Event()
+        self.test_mode: bool = False
 
     def _inject_shared_connection(self, params: dict, controller_name: str) -> None:
         if self._controllers is None or not controller_name:
@@ -120,7 +121,7 @@ class ScanEngine:
         Returns an error string if the scan cannot proceed, or None if OK.
         """
         if self._scripts is not None:
-            result = self._scripts.call("pre_scan", point, config)
+            result = self._scripts.call("pre_scan", point, config, self.test_mode)
             if isinstance(result, str):
                 return result
         return None
@@ -128,7 +129,7 @@ class ScanEngine:
     def post_scan(self, point: CollectionPoint, config: BeamlineConfig) -> None:
         """Run post-scan cleanup after each point. Delegates to the user script if available."""
         if self._scripts is not None:
-            self._scripts.call("post_scan", point, config)
+            self._scripts.call("post_scan", point, config, self.test_mode)
 
     def pre_collection(self, points: list[CollectionPoint], config: BeamlineConfig) -> str | None:
         """Run once before the entire collection starts. Delegates to the user script if available.
@@ -136,15 +137,18 @@ class ScanEngine:
         Returns an error string to abort the collection, or None to proceed.
         """
         if self._scripts is not None:
-            result = self._scripts.call("pre_collection", points, config)
+            self._scripts.begin_collection()
+            result = self._scripts.call("pre_collection", points, config, self.test_mode)
             if isinstance(result, str):
+                self._scripts.end_collection()
                 return result
         return None
 
     def post_collection(self, points: list[CollectionPoint], config: BeamlineConfig) -> None:
         """Run once after the entire collection completes. Delegates to the user script if available."""
         if self._scripts is not None:
-            self._scripts.call("post_collection", points, config)
+            self._scripts.call("post_collection", points, config, self.test_mode)
+            self._scripts.end_collection()
 
     def run_still(
         self,
@@ -361,6 +365,13 @@ class ScanEngine:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
 
+                    if self._abort_event.is_set():
+                        on_done()
+                        return
+                    if on_status:
+                        on_status("moving")
+                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
+                    caput(f"{pv_base}.VAL", omega_start, wait=True)
                     if self._abort_event.is_set():
                         on_done()
                         return
@@ -800,8 +811,9 @@ class ScanEngine:
         If either prefix is empty the local path string is used as-is.
         AutoIncrement is disabled when the collection point has a non-empty label.
         """
-        local_dir = str(file_settings.directory)
         det = config.active_detector_config
+        raw = config.raw_directory.strip()
+        local_dir = raw if raw else str(file_settings.directory)
         remote_dir = det.translate_path(local_dir) if det else local_dir
         use_ext = getattr(file_settings, "use_ext", True)
         label = point.label.strip() if use_ext else ""
@@ -813,12 +825,15 @@ class ScanEngine:
             folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
             remote_dir = f"{remote_dir.rstrip('/')}/{folder_name}"
             effective_map_ext = map_ext if map_ext else "map"
-            parts = [p for p in [base, effective_map_ext] if p]
             map_label = point.label.strip()
             try:
-                frame_number = int(map_label.rsplit("_", 1)[-1])
+                label_parts = map_label.rsplit("_", 2)
+                map_frame_str = label_parts[-2]
+                frame_number = int(label_parts[-1])
             except (ValueError, IndexError):
+                map_frame_str = str(file_settings.frame_number)
                 frame_number = file_settings.frame_number
+            parts = [p for p in [base, effective_map_ext, map_frame_str] if p]
         else:
             disable_auto_increment = bool(label)
             parts = [p for p in [base, label] if p]
