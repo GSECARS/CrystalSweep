@@ -150,9 +150,16 @@ class OutputPaths:
         return self.map_source_dir() / "flipped"
 
     def map_combined_path(self) -> Path:
-        """Output path for the combined HDF5 map file, placed inside the map folder."""
+        """Output path for the combined HDF5 map file.
+
+        Goes inside the map folder when there are extra formats or crysalis
+        output (so all map output shares one folder). Otherwise sits as a
+        sibling to the map folder to avoid a single-file subdirectory.
+        """
         folder = self.map_folder_name()
-        return self.directory / folder / f"{folder}.h5"
+        if self.extras or self.use_crysalis:
+            return self.directory / folder / f"{folder}.h5"
+        return self.directory / f"{folder}.h5"
 
     def map_row_pattern(self) -> str:
         """Glob pattern matching all row files written by the IOC."""
