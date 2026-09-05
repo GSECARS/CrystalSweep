@@ -18,8 +18,8 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.theme import app_theme
-from crystalsweep.ui.view.custom.widgets import FlatPanel
-from wxutils import FlatButton, FlatCheckBox, FlatLabel, FlatProgressBar
+from crystalsweep.ui.view.custom.widgets import FlatLabel, FlatPanel
+from wxutils import FlatButton, FlatCheckBox, FlatProgressBar
 
 __all__ = ["CollectView"]
 
@@ -103,7 +103,7 @@ class CollectView(FlatPanel):
 
     def set_status(self, text: str, colour: wx.Colour | None = None) -> None:
         self._status_label.SetLabel(text)
-        self._status_label.SetForegroundColour(colour if colour is not None else app_theme.foreground)
+        self._status_label._custom_fg = colour
         self._status_label.Refresh()
 
     def set_collecting(self, collecting: bool) -> None:

@@ -17,14 +17,14 @@ from typing import Callable
 
 import wx
 from epicsapps.pva_adviewer.ad_viewer_view import ADViewerView
-from wxutils import FlatConfirmDialog, FlatLabel, FlatSplitter, FlatTabbedPanel
+from wxutils import FlatConfirmDialog, FlatSplitter, FlatTabbedPanel
 
 from crystalsweep.assets import LOGO_PNG
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import app_theme
-from crystalsweep.ui.view.custom.widgets import CrystalMenuBar, FlatPanel, ThemedSectionDivider
+from crystalsweep.ui.view.custom.widgets import CrystalMenuBar, FlatLabel, FlatPanel, ThemedSectionDivider
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.preview_view import PreviewView
 

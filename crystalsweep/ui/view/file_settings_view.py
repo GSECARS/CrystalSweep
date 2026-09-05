@@ -22,8 +22,8 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.theme import app_theme
-from crystalsweep.ui.view.custom.widgets import FlatPanel
-from wxutils import FlatCheckBox, FlatLabel, FlatTextCtrl, FlatIconButton, draw_arrow_up, draw_folder, draw_folder_open, draw_refresh
+from crystalsweep.ui.view.custom.widgets import FlatLabel, FlatPanel
+from wxutils import FlatCheckBox, FlatTextCtrl, FlatIconButton, draw_arrow_up, draw_folder, draw_folder_open, draw_refresh
 
 __all__ = ["FileSettingsView"]
 

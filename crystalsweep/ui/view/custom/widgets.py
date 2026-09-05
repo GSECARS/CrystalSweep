@@ -13,11 +13,11 @@
 # ----------------------------------------------------------------------------------
 
 import wx
-from wxutils import FlatLabel, FlatMenuBar, FlatPanel as _FlatPanel, SectionDivider
+from wxutils import FlatLabel as _FlatLabel, FlatMenuBar, FlatPanel as _FlatPanel, SectionDivider
 
 from crystalsweep.ui.view.custom.theme import app_theme
 
-__all__ = ["CrystalMenuBar", "FlatPanel", "ThemedSectionDivider"]
+__all__ = ["CrystalMenuBar", "FlatLabel", "FlatPanel", "ThemedSectionDivider"]
 
 
 class FlatPanel(_FlatPanel):
@@ -32,6 +32,29 @@ class FlatPanel(_FlatPanel):
 
     def GetBackgroundColour(self) -> wx.Colour:
         return app_theme.background
+
+
+class FlatLabel(_FlatLabel):
+    """FlatLabel that paints background and foreground from app_theme.
+
+    wxutils FlatLabel uses get_theme() at paint time, which can return wrong
+    colors if darkdetect fires unreliably at startup. Reading from app_theme
+    (which is explicitly set by AppTheme.__init__) ensures correct colors
+    regardless of OS detection timing.
+    """
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        dc = wx.AutoBufferedPaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
+        w, h = self.GetClientSize()
+        gc.SetBrush(wx.Brush(app_theme.background))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+        fg = self._custom_fg or app_theme.foreground
+        font = self._font or self.GetFont()
+        gc.SetFont(gc.CreateFont(font, fg))
+        _, th = gc.GetTextExtent(self._label)
+        gc.DrawText(self._label, 4, (h - th) / 2)
 
 
 class ThemedSectionDivider(SectionDivider):
