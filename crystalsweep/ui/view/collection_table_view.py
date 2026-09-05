@@ -567,7 +567,7 @@ class _CollectionRow(FlatPanel):
         else:
             self._rot_start_ctrl.Enable(not still)
             self._rot_end_ctrl.Enable(not still)
-            self._step_ctrl.Enable(not still or wide)
+            self._step_ctrl.Enable(not still and not wide)
             self._time_ctrl.Enable(True)
         self._remove_btn.Enable(not disabled)
 
