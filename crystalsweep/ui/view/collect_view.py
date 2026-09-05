@@ -31,6 +31,14 @@ _COLLECT_SCHEME = (
     wx.Colour(200, 255, 220),
 )
 
+_ABORT_SCHEME = (
+    wx.Colour(110, 25, 25),
+    wx.Colour(180, 50, 50),
+    wx.Colour(140, 35, 35),
+    wx.Colour(255, 180, 180),
+    wx.Colour(255, 210, 210),
+)
+
 
 class CollectView(FlatPanel):
     """Status + progress bar (left) and collect/abort button (right)."""
@@ -103,7 +111,7 @@ class CollectView(FlatPanel):
         self._test_mode_toggle.Enable(not collecting)
         if collecting:
             self._collect_btn.SetLabel("Abort")
-            self._collect_btn.SetColorScheme(app_theme.danger_scheme())
+            self._collect_btn.SetColorScheme(_ABORT_SCHEME)
         else:
             self._collect_btn.SetLabel("Collect")
             self._collect_btn.SetColorScheme(_COLLECT_SCHEME)
