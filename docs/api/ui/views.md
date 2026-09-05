@@ -30,24 +30,12 @@ wxPython views and custom widgets.
 
 ::: crystalsweep.ui.view.preview_view
 
-## Area Detector Viewer View
-
-::: crystalsweep.ui.view.ad_viewer_view
-
 ## Custom Widgets
 
 ::: crystalsweep.ui.view.custom.widgets
 
-::: crystalsweep.ui.view.custom.image_canvas
-
-::: crystalsweep.ui.view.custom.integration_plot
-
 ::: crystalsweep.ui.view.custom.intensity_histogram
 
-::: crystalsweep.ui.view.custom.settings_popup
-
 ::: crystalsweep.ui.view.custom.colormaps
-
-::: crystalsweep.ui.view.custom.icons
 
 ::: crystalsweep.ui.view.custom.theme
