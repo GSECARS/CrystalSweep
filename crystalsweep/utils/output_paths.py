@@ -149,15 +149,15 @@ class OutputPaths:
         """Directory for snake-flipped copies of map row files."""
         return self.map_source_dir() / "flipped"
 
-    def map_combined_path(self) -> Path:
+    def map_combined_path(self, is_step: bool = True) -> Path:
         """Output path for the combined HDF5 map file.
 
-        Goes inside the map folder when there are extra formats or crysalis
-        output (so all map output shares one folder). Otherwise sits as a
-        sibling to the map folder to avoid a single-file subdirectory.
+        Goes inside the map folder when there are extra formats, or when the
+        map is a step scan with crysalis enabled (so all output shares one
+        folder). Otherwise sits as a sibling to the map folder.
         """
         folder = self.map_folder_name()
-        if self.extras or self.use_crysalis:
+        if self.extras or (self.use_crysalis and is_step):
             return self.directory / folder / f"{folder}.h5"
         return self.directory / f"{folder}.h5"
 
