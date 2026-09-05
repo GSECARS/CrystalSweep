@@ -36,6 +36,8 @@ class FileSettingsController:
         self._model = model
         self._view = view
         self._on_hdf5_changed_listeners: list = []
+        self._ioc_directory: str = ""
+        self._ioc_filename: str = ""
 
         fs = self._view.file_settings
         fs.bind_filename_changed(self._on_filename_changed)
@@ -105,8 +107,8 @@ class FileSettingsController:
 
         m = self._model.file_settings
         detector = get_detector_model(det.type, det.pv_prefix, det.file_format)
-        directory = det.translate_path(str(m.directory))
-        filename = m.filename
+        directory = self._ioc_directory if self._ioc_directory else det.translate_path(str(m.directory))
+        filename = self._ioc_filename if self._ioc_filename else m.filename
         frame_number = m.frame_number
         file_template = det.file_template
 
@@ -177,10 +179,12 @@ class FileSettingsController:
             if raw and Path(raw) == path:
                 _log.debug("sync_from_detector: skipping directory update, IOC at raw_directory (%r)", local_dir)
             else:
+                self._ioc_directory = directory
                 m.directory = path
                 fs.set_directory(path)
                 _log.debug("sync_from_detector: set m.directory=%r", str(path))
         if update_filename and filename:
+            self._ioc_filename = filename
             m.filename = filename
             fs.set_filename(filename)
             _log.debug("sync_from_detector: filename=%r", filename)
@@ -206,10 +210,12 @@ class FileSettingsController:
 
     def _on_filename_changed(self, value: str) -> None:
         self._model.file_settings.filename = value
+        self._ioc_filename = ""
         _log.debug("file_settings.filename = %r", value)
 
     def _on_directory_changed(self, path: Path) -> None:
         self._model.file_settings.directory = path
+        self._ioc_directory = ""
         _log.debug("file_settings.directory = %s", path)
 
     def _on_frame_changed(self, value: int) -> None:
