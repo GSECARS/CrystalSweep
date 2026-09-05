@@ -814,8 +814,17 @@ class CollectController:
                     map_completed_weight += pt_weight
 
             det = config.active_detector_config if config else None
-            if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5":
+            if not self._abort_event.is_set() and scan_type == "still" and det is not None and det.file_format == "hdf5":
                 self._spawn_snake_combine_for_map(row_shift_frames=map_row_shift)
+
+        det = config.active_detector_config if config else None
+        output = self._output_paths
+        if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5" and output is not None and output.raw_directory is not None:
+            if scan_type == "step":
+                self._spawn_map_copy_to_target(flip_odd_rows=False, row_shift_frames=map_row_shift)
+            elif scan_type == "wide":
+                wide_flip = self._model.collection_settings.wide_flip
+                self._spawn_map_copy_to_target(flip_odd_rows=wide_flip, row_shift_frames=map_row_shift)
 
         if keep_shutter_open:
             self._engine._close_shutter(config)
@@ -1115,6 +1124,44 @@ class CollectController:
             pattern=output.map_row_pattern(),
             first_row_reversed=False,
             flipped_dir=str(output.map_flipped_dir()),
+            row_shift_frames=row_shift_frames,
+        )
+
+    def _launch_map_copy_to_target(self, input_dir: str, output_dir: str, pattern: str, flip_odd_rows: bool, row_shift_frames: int = 0) -> None:
+        """Spawn the map file copier as a detached subprocess."""
+        args = {
+            "mode": "copy",
+            "input_dir": input_dir,
+            "output_dir": output_dir,
+            "pattern": pattern,
+            "flip_odd_rows": flip_odd_rows,
+            "row_shift_frames": row_shift_frames,
+        }
+        try:
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
+            try:
+                json.dump(args, tmp)
+            finally:
+                tmp.close()
+            subprocess.Popen(
+                [sys.executable, "-m", "crystalsweep.model.snake_combiner", tmp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception as exc:
+            _log.warning("Failed to spawn map file copier: %s", exc)
+
+    def _spawn_map_copy_to_target(self, flip_odd_rows: bool = False, row_shift_frames: int = 0) -> None:
+        """Copy all raw map row files to the target map folder after a step or wide map completes."""
+        output = self._output_paths
+        if output is None or output.raw_directory is None:
+            return
+        self._launch_map_copy_to_target(
+            input_dir=str(output.map_source_dir()),
+            output_dir=str(output.directory / output.map_folder_name()),
+            pattern=output.map_row_pattern(),
+            flip_odd_rows=flip_odd_rows,
             row_shift_frames=row_shift_frames,
         )
 

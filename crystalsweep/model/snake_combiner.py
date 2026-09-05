@@ -58,7 +58,7 @@ try:
 except ImportError:
     hdf5plugin = None  # type: ignore[assignment]
 
-__all__ = ["run_combine", "combine_snake_map"]
+__all__ = ["run_combine", "combine_snake_map", "copy_map_to_target", "run_copy_map"]
 
 _log = logging.getLogger(__name__)
 
@@ -359,6 +359,78 @@ def combine_snake_map(
     _log.info("snake_combiner: done")
 
 
+def copy_map_to_target(
+    input_dir: Path,
+    output_dir: Path,
+    pattern: str = "*.h5",
+    flip_odd_rows: bool = False,
+    first_row_reversed: bool = False,
+    data_path: str = _DEFAULT_DATA_PATH,
+    row_shift_frames: int = 0,
+) -> None:
+    """Copy map row files from input_dir to output_dir.
+
+    When flip_odd_rows is True every other row has its per-frame datasets
+    written in reversed order (snake wide-map convention). When False the
+    files are copied verbatim using a binary copy.
+    """
+    import shutil
+
+    if not input_dir.is_dir():
+        raise RuntimeError(f"Input directory not found: {input_dir}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    row_files = _list_row_files(input_dir, pattern)
+
+    frame_count = _detect_frame_count(row_files[0], data_path) if flip_odd_rows else 0
+
+    for i, src in enumerate(row_files):
+        dst = output_dir / src.name
+        if dst.exists():
+            _log.info("copy_map_to_target: skipping existing %s", dst.name)
+            continue
+        if flip_odd_rows:
+            row_one_based = i + 1
+            reverse = (row_one_based % 2 == 0) if not first_row_reversed else (row_one_based % 2 == 1)
+            _log.info("copy_map_to_target: row %d %s %s -> %s", row_one_based, "REVERSE" if reverse else "keep   ", src.name, dst.name)
+            _write_flipped_row(src, dst, frame_count=frame_count, reverse=reverse, row_shift_frames=row_shift_frames if reverse else 0)
+        else:
+            _log.info("copy_map_to_target: copying %s -> %s", src.name, dst.name)
+            shutil.copy2(str(src), str(dst))
+
+    _log.info("copy_map_to_target: done, %d files copied", len(row_files))
+
+
+def run_copy_map(args: dict) -> None:
+    """Entry point used by subprocess / CLI invocations for map file copying."""
+    input_dir = args.get("input_dir", "")
+    output_dir = args.get("output_dir", "")
+    pattern = args.get("pattern") or "*.h5"
+    flip_odd_rows = bool(args.get("flip_odd_rows", False))
+    first_row_reversed = bool(args.get("first_row_reversed", False))
+    data_path = args.get("data_path") or _DEFAULT_DATA_PATH
+    row_shift_frames = int(args.get("row_shift_frames", 0))
+
+    _log.info(
+        "run_copy_map: input_dir=%r output_dir=%r pattern=%r flip_odd_rows=%s row_shift_frames=%d",
+        input_dir, output_dir, pattern, flip_odd_rows, row_shift_frames,
+    )
+
+    if not input_dir or not output_dir:
+        _log.warning("run_copy_map: missing input_dir or output_dir, aborting")
+        return
+
+    copy_map_to_target(
+        input_dir=Path(input_dir),
+        output_dir=Path(output_dir),
+        pattern=pattern,
+        flip_odd_rows=flip_odd_rows,
+        first_row_reversed=first_row_reversed,
+        data_path=data_path,
+        row_shift_frames=row_shift_frames,
+    )
+
+
 def run_combine(args: dict) -> None:
     """Entry point used by subprocess / CLI invocations."""
     input_dir = args.get("input_dir", "")
@@ -408,7 +480,11 @@ if __name__ == "__main__":
     with open(args_file, "r") as fh:
         args_payload = json.load(fh)
 
+    mode = args_payload.get("mode", "combine")
     try:
-        run_combine(args_payload)
+        if mode == "copy":
+            run_copy_map(args_payload)
+        else:
+            run_combine(args_payload)
     except Exception:
-        _log.exception("snake_combiner: unhandled exception")
+        _log.exception("snake_combiner: unhandled exception in mode=%r", mode)
