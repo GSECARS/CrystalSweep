@@ -54,6 +54,7 @@ dependencies = [
     "cryio>=2018.5.30",
     "wxmplot>=2026.2.1",
     "wxutils>=2026.3.0",
+    "pyshortcuts>=1.9.10",
     "epicsapps",
 ]
 
