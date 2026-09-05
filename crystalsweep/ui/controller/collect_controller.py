@@ -46,6 +46,27 @@ _PROGRESS_INTERVAL_MS = 100
 _TRIGGERING_POLL_S = 0.05
 
 
+def _mkdir_safe(path: Path) -> None:
+    """Create path and any missing parents, skipping parents that already exist.
+
+    Windows returns ACCESS_DENIED when CreateDirectory is called on a network
+    share root (e.g. T:\\Data) even though it exists. Walking up from the leaf
+    and only creating the missing portion avoids that error.
+    """
+    missing: list[Path] = []
+    p = path
+    while True:
+        if p.exists():
+            break
+        missing.append(p)
+        parent = p.parent
+        if parent == p:
+            break
+        p = parent
+    for part in reversed(missing):
+        part.mkdir(exist_ok=True)
+
+
 class CollectController:
     """Drives the collect panel: sequential collection loop with per-point hardware scans."""
 
@@ -1144,7 +1165,7 @@ class CollectController:
 
         def _copy() -> None:
             try:
-                dst_dir.mkdir(parents=True, exist_ok=True)
+                _mkdir_safe(dst_dir)
                 direct = raw / f"{bn}.{ext}"
                 if direct.is_file():
                     shutil.copy2(str(direct), str(dst_dir / direct.name))
