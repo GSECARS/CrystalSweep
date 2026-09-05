@@ -45,7 +45,7 @@ class CollectView(FlatPanel):
         self._status_label = FlatLabel(self, label="Ready")
         self._status_label.SetFont(app_theme.scaled_font(13, weight=wx.FONTWEIGHT_BOLD))
 
-        self._progress_bar = FlatProgressBar(self)
+        self._progress_bar = FlatProgressBar(self, progress_scheme=(app_theme.bright_black, app_theme.blue))
 
         self._collect_btn = FlatButton(self, "Collect", color_scheme=_COLLECT_SCHEME, font=app_theme.btn_font())
         self._collect_btn.SetMinSize((120, 42))
