@@ -104,7 +104,7 @@ class OutputPaths:
             return {}
         dest = target if target is not None else self.directory
         if point.map_group:
-            root = dest / self.map_folder_name() / self.map_folder_name()
+            root = dest / self.map_folder_name()
             return {fmt: root / fmt for fmt in self.extras}
         root = dest / self.basename(point, frame_number)
         if point.scan_type == "step":
@@ -120,7 +120,7 @@ class OutputPaths:
         the write location avoids any race with the async file-copy thread.
         """
         if point.map_group:
-            return self.directory / self.map_folder_name()
+            return self.map_source_dir()
         return self.source_dir(point)
 
     def crysalis_output_dir(self, point, frame_number: int) -> Path:
@@ -150,8 +150,9 @@ class OutputPaths:
         return self.map_source_dir() / "flipped"
 
     def map_combined_path(self) -> Path:
-        """Output path for the combined HDF5 map file."""
-        return self.directory / f"{self.map_folder_name()}.h5"
+        """Output path for the combined HDF5 map file, placed inside the map folder."""
+        folder = self.map_folder_name()
+        return self.directory / folder / f"{folder}.h5"
 
     def map_row_pattern(self) -> str:
         """Glob pattern matching all row files written by the IOC."""
@@ -160,4 +161,4 @@ class OutputPaths:
     def _map_conversion_root(self) -> Path:
         """Shared root for all extra-format conversions within a map."""
         folder = self.map_folder_name()
-        return self.directory / folder / folder
+        return self.directory / folder
