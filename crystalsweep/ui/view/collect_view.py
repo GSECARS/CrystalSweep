@@ -18,7 +18,7 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatButton, FlatCheckBox, FlatPanel, FlatProgressBar
+from wxutils import FlatButton, FlatCheckBox, FlatLabel, FlatPanel, FlatProgressBar
 
 __all__ = ["CollectView"]
 
@@ -41,7 +41,7 @@ class CollectView(FlatPanel):
         self._on_abort_cb: Callable[[], None] | None = None
         self._collecting = False
 
-        self._status_label = wx.StaticText(self, label="Ready")
+        self._status_label = FlatLabel(self, label="Ready")
         self._status_label.SetFont(app_theme.scaled_font(13, weight=wx.FONTWEIGHT_BOLD))
 
         self._progress_bar = FlatProgressBar(self)
@@ -52,7 +52,7 @@ class CollectView(FlatPanel):
 
         self._test_mode_toggle = FlatCheckBox(self, "Test mode")
 
-        self._eta_label = wx.StaticText(self, label="")
+        self._eta_label = FlatLabel(self, label="")
         self._eta_label.SetFont(app_theme.scaled_font(11))
 
         top_row = wx.BoxSizer(wx.HORIZONTAL)

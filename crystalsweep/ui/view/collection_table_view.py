@@ -23,7 +23,7 @@
 from typing import Callable
 
 import wx
-from wxutils import FlatButton, FlatCheckBox, FlatCombo, FlatPanel, FlatScrollBar, FlatTextCtrl
+from wxutils import FlatButton, FlatCheckBox, FlatCombo, FlatLabel, FlatPanel, FlatScrollBar, FlatTextCtrl
 
 from crystalsweep.model.collection_model import SCAN_TYPES, CollectionPoint, ScanType
 from crystalsweep.ui.view.custom.theme import app_theme

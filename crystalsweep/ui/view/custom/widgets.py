@@ -13,11 +13,30 @@
 # ----------------------------------------------------------------------------------
 
 import wx
-from wxutils import FlatMenuBar
+from wxutils import FlatLabel, FlatMenuBar, SectionDivider
 
 from crystalsweep.ui.view.custom.theme import app_theme
 
-__all__ = ["CrystalMenuBar"]
+__all__ = ["CrystalMenuBar", "ThemedSectionDivider"]
+
+
+class ThemedSectionDivider(SectionDivider):
+    """SectionDivider that pulls fg and line colors from app_theme at paint time.
+
+    SectionDivider caches colors at init and relies on darkdetect to update
+    them. On Windows, darkdetect does not fire reliably at startup so the
+    divider can be stuck in light-mode colors. Overriding _resolve_colors to
+    read from app_theme and calling it at the start of every paint ensures the
+    colors are always current regardless of OS detection timing.
+    """
+
+    def _resolve_colors(self, is_dark=None) -> None:
+        self._fg = app_theme.foreground
+        self._line = app_theme.bright_black
+
+    def _on_paint(self, event: wx.PaintEvent) -> None:
+        self._resolve_colors()
+        super()._on_paint(event)
 
 
 class CrystalMenuBar(FlatMenuBar):
@@ -25,11 +44,10 @@ class CrystalMenuBar(FlatMenuBar):
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent, height=28)
-        self._config_prefix = wx.StaticText(self, label="")
-        self._config_name = wx.StaticText(self, label="")
-        self._epics_prefix = wx.StaticText(self, label="")
-        self._epics_value = wx.StaticText(self, label="")
-        self._config_name.SetForegroundColour(app_theme.blue)
+        self._config_prefix = FlatLabel(self, label="")
+        self._config_name = FlatLabel(self, label="", fg=app_theme.blue)
+        self._epics_prefix = FlatLabel(self, label="")
+        self._epics_value = FlatLabel(self, label="")
         self._sizer.AddStretchSpacer(1)
         self._sizer.Add(self._epics_prefix, 0, wx.ALIGN_CENTER_VERTICAL)
         self._sizer.Add(self._epics_value, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 16)
@@ -44,6 +62,6 @@ class CrystalMenuBar(FlatMenuBar):
     def set_epics_status(self, online: bool) -> None:
         self._epics_prefix.SetLabel("EPICS: ")
         self._epics_value.SetLabel("Online" if online else "Offline")
-        self._epics_value.SetForegroundColour(app_theme.green if online else app_theme.red)
+        self._epics_value._custom_fg = app_theme.green if online else app_theme.red
         self._epics_value.Refresh()
         self.Layout()

@@ -17,14 +17,14 @@ from typing import Callable
 
 import wx
 from epicsapps.pva_adviewer.ad_viewer_view import ADViewerView
-from wxutils import FlatConfirmDialog, FlatPanel, FlatSplitter, FlatTabbedPanel, SectionDivider
+from wxutils import FlatConfirmDialog, FlatLabel, FlatPanel, FlatSplitter, FlatTabbedPanel
 
 from crystalsweep.assets import LOGO_PNG
 from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import app_theme
-from crystalsweep.ui.view.custom.widgets import CrystalMenuBar
+from crystalsweep.ui.view.custom.widgets import CrystalMenuBar, ThemedSectionDivider
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.preview_view import PreviewView
 
@@ -71,16 +71,16 @@ class MainView(wx.Frame):
         collect_sep.SetBackgroundColour(app_theme.bright_black)
 
         left_sizer = wx.BoxSizer(wx.VERTICAL)
-        left_sizer.Add(SectionDivider(self._left_panel, "File Settings"), 0, wx.EXPAND)
+        left_sizer.Add(ThemedSectionDivider(self._left_panel, "File Settings"), 0, wx.EXPAND)
         left_sizer.Add(self.file_settings, 0, wx.EXPAND)
         left_sizer.AddSpacer(12)
-        left_sizer.Add(SectionDivider(self._left_panel, "Collection Settings"), 0, wx.EXPAND)
+        left_sizer.Add(ThemedSectionDivider(self._left_panel, "Collection Settings"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_settings, 0, wx.EXPAND)
         left_sizer.AddSpacer(12)
-        left_sizer.Add(SectionDivider(self._left_panel, "Collection Points"), 0, wx.EXPAND)
+        left_sizer.Add(ThemedSectionDivider(self._left_panel, "Collection Points"), 0, wx.EXPAND)
         left_sizer.Add(self.collection_table, 1, wx.EXPAND)
         left_sizer.AddSpacer(12)
-        self._centering_divider = SectionDivider(self._left_panel, "Single-Crystal Centering Tools")
+        self._centering_divider = ThemedSectionDivider(self._left_panel, "Single-Crystal Centering Tools")
         left_sizer.Add(self._centering_divider, 0, wx.EXPAND)
         self.centering_tabs = self._build_centering_tabs()
         left_sizer.Add(self.centering_tabs, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
@@ -167,7 +167,7 @@ class MainView(wx.Frame):
         self.preview = PreviewView(tabs)
 
         xrd_page = FlatPanel(tabs)
-        xrd_label = wx.StaticText(xrd_page, label="Coming soon")
+        xrd_label = FlatLabel(xrd_page, label="Coming soon")
         xrd_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
         xrd_sizer = wx.BoxSizer(wx.VERTICAL)
         xrd_sizer.AddStretchSpacer(1)

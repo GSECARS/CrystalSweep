@@ -23,7 +23,7 @@ import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, ScanType
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatButton, FlatCheckBox, FlatPanel, FlatTextCtrl, FlatCombo, FlatTableHeader, FlatTableRow
+from wxutils import FlatButton, FlatCheckBox, FlatLabel, FlatPanel, FlatTextCtrl, FlatCombo, FlatTableHeader, FlatTableRow
 
 __all__ = ["CollectionSettingsView"]
 
@@ -294,8 +294,8 @@ class CollectionSettingsView(FlatPanel):
 
         self.SetSizer(outer)
 
-    def _field_label(self, text: str, font: wx.Font) -> wx.StaticText:
-        lbl = wx.StaticText(self, label=text)
+    def _field_label(self, text: str, font: wx.Font) -> FlatLabel:
+        lbl = FlatLabel(self, label=text)
         lbl.SetFont(font)
         return lbl
 
@@ -381,7 +381,7 @@ class CollectionSettingsView(FlatPanel):
 
     def _make_map_presets(self, label_font: wx.Font) -> wx.Window:
         self._map_presets_panel = FlatPanel(self)
-        self._map_presets_lbl = wx.StaticText(self._map_presets_panel, label="Presets")
+        self._map_presets_lbl = FlatLabel(self._map_presets_panel, label="Presets")
         self._map_presets_lbl.SetFont(label_font)
         lbl = self._map_presets_lbl
         row = wx.BoxSizer(wx.HORIZONTAL)

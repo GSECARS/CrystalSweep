@@ -23,6 +23,7 @@ from crystalsweep.ui.view.custom.theme import app_theme
 from wxutils import (
     FlatButton,
     FlatCheckBox,
+    FlatLabel,
     FlatPanel,
     FlatTextCtrl,
     FlatCombo,
@@ -106,8 +107,8 @@ class _ConfigSaveCallback(Protocol):
     def __call__(self) -> None: ...
 
 
-def _label(parent: wx.Window, text: str, bold: bool = False, secondary: bool = False) -> wx.StaticText:
-    lbl = wx.StaticText(parent, label=text)
+def _label(parent: wx.Window, text: str, bold: bool = False, secondary: bool = False) -> FlatLabel:
+    lbl = FlatLabel(parent, label=text)
     lbl.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD if bold else wx.FONTWEIGHT_NORMAL))
     return lbl
 
@@ -185,15 +186,15 @@ class _DetectorRow(_TableRow):
         self._remove_btn = FlatButton(self, "×", color_scheme=app_theme.danger_scheme(), font=app_theme.btn_font())
         self._remove_btn.SetAction(lambda: on_remove(self))
 
-        self._template_lbl = wx.StaticText(self, label="File template")
+        self._template_lbl = FlatLabel(self, label="File template")
         self._template_lbl.SetFont(app_theme.scaled_font(11))
         self.template_ctrl = FlatTextCtrl(self, value=detector.file_template, placeholder=_PLACEHOLDER_FILE_TEMPLATE)
 
-        self._path_local_lbl = wx.StaticText(self, label="Local prefix")
+        self._path_local_lbl = FlatLabel(self, label="Local prefix")
         self._path_local_lbl.SetFont(app_theme.scaled_font(11))
         self.path_local_ctrl = FlatTextCtrl(self, value=detector.path_prefix_local, placeholder=_PLACEHOLDER_PATH_LOCAL)
 
-        self._path_remote_lbl = wx.StaticText(self, label="Remote prefix")
+        self._path_remote_lbl = FlatLabel(self, label="Remote prefix")
         self._path_remote_lbl.SetFont(app_theme.scaled_font(11))
         self.path_remote_ctrl = FlatTextCtrl(self, value=detector.path_prefix_remote, placeholder=_PLACEHOLDER_PATH_REMOTE)
 
@@ -318,7 +319,7 @@ class _ControllerRow(_TableRow):
         self._params_sizer.Clear(delete_windows=True)
         self._param_ctrls.clear()
         for key, placeholder in _CONTROLLER_TYPE_PARAMS.get(controller_type, []):
-            lbl = wx.StaticText(self._params_panel, label=f"{key}:")
+            lbl = FlatLabel(self._params_panel, label=f"{key}:")
             lbl.SetFont(app_theme.scaled_font(11))
             ctrl = FlatTextCtrl(self._params_panel, value=str(existing.get(key, "")), placeholder=placeholder)
             self._params_sizer.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 2)
@@ -534,8 +535,8 @@ def _restripe(rows: list, sizer: wx.BoxSizer) -> None:
         row.Refresh()
 
 
-def _status_label(parent: FlatPanel) -> wx.StaticText:
-    lbl = wx.StaticText(parent, label="")
+def _status_label(parent: FlatPanel) -> FlatLabel:
+    lbl = FlatLabel(parent, label="")
     lbl.SetFont(app_theme.scaled_font(11))
     return lbl
 
@@ -929,7 +930,7 @@ class CrysalisConfigView(FlatPanel):
             ("Polarization", self._polarization_ctrl),
             ("Pixel size (mm)", self._pixel_size_ctrl),
         ):
-            lbl = wx.StaticText(g_body, label=label_text)
+            lbl = FlatLabel(g_body, label=label_text)
             lbl.SetFont(app_theme.scaled_font(11))
             g_grid.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
             g_grid.Add(ctrl, 0, wx.EXPAND)
@@ -1082,7 +1083,7 @@ class DetectorsConfigView(FlatPanel):
             ("Timeout (s)", self.preview_timeout_ctrl),
             ("Images", self.preview_num_ctrl),
         ):
-            lbl = wx.StaticText(p_body, label=label_text)
+            lbl = FlatLabel(p_body, label=label_text)
             lbl.SetFont(app_theme.scaled_font(11))
             p_grid.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL)
             p_grid.Add(ctrl, 0, wx.EXPAND)

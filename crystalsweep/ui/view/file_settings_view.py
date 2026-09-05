@@ -22,7 +22,7 @@ from typing import Callable
 import wx
 
 from crystalsweep.ui.view.custom.theme import app_theme
-from wxutils import FlatCheckBox, FlatPanel, FlatTextCtrl, FlatIconButton, draw_arrow_up, draw_folder, draw_folder_open, draw_refresh
+from wxutils import FlatCheckBox, FlatLabel, FlatPanel, FlatTextCtrl, FlatIconButton, draw_arrow_up, draw_folder, draw_folder_open, draw_refresh
 
 __all__ = ["FileSettingsView"]
 
@@ -84,8 +84,8 @@ class FileSettingsView(FlatPanel):
         sep.SetBackgroundColour(app_theme.bright_black)
         return sep
 
-    def _field_label(self, text: str, font: wx.Font) -> wx.StaticText:
-        lbl = wx.StaticText(self, label=text)
+    def _field_label(self, text: str, font: wx.Font) -> FlatLabel:
+        lbl = FlatLabel(self, label=text)
         lbl.SetFont(font)
         return lbl
 
