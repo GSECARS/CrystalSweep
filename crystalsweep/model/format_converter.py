@@ -107,6 +107,11 @@ def _load_hdf5_frames(path: Path):
         _log.warning("h5py/numpy not available; skipping %s", path)
         return
 
+    try:
+        import hdf5plugin
+    except ImportError:
+        pass
+
     with h5py.File(str(path), "r") as fh:
         primary: str | None = None
         for candidate in _PRIMARY_HDF5_PATHS:
@@ -306,11 +311,19 @@ if __name__ == "__main__":
         print("Usage: python -m crystalsweep.model.format_converter <json_args_file>", file=sys.stderr)
         sys.exit(1)
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-
     args_file = sys.argv[1]
     with open(args_file, "r") as fh:
         args_payload = json.load(fh)
+
+    log_file = args_payload.get("log_file")
+    if log_file:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(message)s",
+            handlers=[logging.FileHandler(log_file, mode="a", encoding="utf-8")],
+        )
+    else:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     try:
         run_conversion(args_payload)

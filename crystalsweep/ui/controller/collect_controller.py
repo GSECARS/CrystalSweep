@@ -1056,6 +1056,8 @@ class CollectController:
 
     def _launch_format_converter(self, directory: str, basename: str, source_format: str, extras: list[str], width: int, output_dirs: dict[str, str]) -> None:
         """Spawn the format converter as a detached subprocess."""
+        log_dir = Path(directory)
+        log_file = str(log_dir / "format_converter.log")
         args = {
             "directory": directory,
             "basename": basename,
@@ -1063,6 +1065,7 @@ class CollectController:
             "target_formats": extras,
             "file_number_width": width,
             "output_dirs": output_dirs,
+            "log_file": log_file,
         }
         try:
             tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")

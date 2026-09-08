@@ -320,7 +320,7 @@ wheels = [
 
 [[package]]
 name = "crystalsweep"
-version = "0.1.3"
+version = "0.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "bitshuffle" },
@@ -364,7 +364,7 @@ requires-dist = [
     { name = "bitshuffle", specifier = ">=0.5.2" },
     { name = "blosc", specifier = ">=1.11.4" },
     { name = "cryio", specifier = ">=2018.5.30" },
-    { name = "epicsapps", editable = "../epicsapps" },
+    { name = "epicsapps" },
     { name = "fabio", specifier = ">=2023.10.0" },
     { name = "h5py", specifier = ">=3.12.1" },
     { name = "lz4", specifier = ">=4.4.5" },
@@ -461,22 +461,16 @@ wheels = [
 
 [[package]]
 name = "epicsapps"
-source = { editable = "../epicsapps" }
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "bitshuffle" },
-    { name = "blosc" },
     { name = "datetime" },
-    { name = "h5py" },
-    { name = "hdf5plugin" },
     { name = "lmfit" },
-    { name = "lz4" },
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "opencv-python" },
-    { name = "p4p" },
     { name = "psycopg2-binary" },
     { name = "pyepics" },
-    { name = "pyfai" },
     { name = "pyshortcuts" },
     { name = "python-dateutil" },
     { name = "pytz" },
@@ -491,48 +485,10 @@ dependencies = [
     { name = "wxutils" },
     { name = "xraydb" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "bitshuffle", specifier = ">=0.5.2" },
-    { name = "blosc", specifier = ">=1.11.4" },
-    { name = "build", marker = "extra == 'dev'" },
-    { name = "coverage", marker = "extra == 'test'" },
-    { name = "datetime" },
-    { name = "epicsapps", extras = ["dev", "doc", "test"], marker = "extra == 'all'" },
-    { name = "h5py", specifier = ">=3.16.0" },
-    { name = "hdf5plugin", specifier = ">=7.0.0" },
-    { name = "lmfit" },
-    { name = "lz4", specifier = ">=4.4.5" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "numpydoc", marker = "extra == 'doc'" },
-    { name = "opencv-python" },
-    { name = "p4p", specifier = ">=4.2.2" },
-    { name = "psycopg2-binary" },
-    { name = "pyepics" },
-    { name = "pyfai", specifier = ">=2026.5.0" },
-    { name = "pyshortcuts", specifier = ">=1.9.10" },
-    { name = "pytest", marker = "extra == 'test'" },
-    { name = "pytest-cov", marker = "extra == 'test'" },
-    { name = "python-dateutil" },
-    { name = "pytz" },
-    { name = "pyyaml" },
-    { name = "sphinx", marker = "extra == 'doc'" },
-    { name = "sphinx-copybutton", marker = "extra == 'doc'" },
-    { name = "sphinxcontrib-video", marker = "extra == 'doc'" },
-    { name = "sqlalchemy" },
-    { name = "tabulate" },
-    { name = "toml" },
-    { name = "tomli" },
-    { name = "transformations" },
-    { name = "twine", marker = "extra == 'dev'" },
-    { name = "wxmplot", specifier = ">=2026.2.3" },
-    { name = "wxpython", specifier = ">=4.2.5" },
-    { name = "wxutils", specifier = ">=2026.3.0" },
-    { name = "xraydb" },
+sdist = { url = "https://files.pythonhosted.org/packages/48/40/f1d3732a4d9cd59969b5686a95bc874e7a34ddeefaaa3cf3aae20e722a90/epicsapps-2026.1.0.tar.gz", hash = "sha256:837640a81cf2854b7edb46ac917d1df1b2579353bc6c37d587b2cc15f82dd151", size = 14459797, upload-time = "2026-01-29T22:08:03.308Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/bb/2b4497201097ad86ea95442adbb7d97760a7483f1e10fb9ca7005c3ea308/epicsapps-2026.1.0-py3-none-any.whl", hash = "sha256:7645b403110cf72e35b8d0821df96ae0bee3e5ba638e7ceb0e2a2075cbefaeac", size = 527147, upload-time = "2026-01-29T22:08:01.039Z" },
 ]
-provides-extras = ["dev", "doc", "test", "all"]
 
 [[package]]
 name = "epicscorelibs"
