@@ -284,6 +284,63 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
         _log.exception("HDF5 conversion failed for %s", full_basename)
 
 
+def _convert_hdf5_direct(filepath: str, basename: str, filenumber: int, new_directory: str, scan_info: dict) -> None:
+    try:
+        import h5py
+        import numpy as np
+        from cryio import esperanto as esp_mod
+    except ImportError:
+        _log.warning("h5py/cryio not available; skipping HDF5 direct conversion")
+        return
+
+    full_basename = f"{basename}_{filenumber:04d}"
+    h5_path = os.path.join(filepath, f"{full_basename}.h5")
+    _log.info("Converting HDF5 direct via cryio: %s", h5_path)
+
+    rotation_axis = scan_info.get("rotation_axis", "omega")
+    scan_start = scan_info.get("omega_start", 0.0)
+    dscan = scan_info.get("domega", 1.0)
+    image_rotation = int(scan_info.get("image_rotation", 180))
+    image_flip_ud = bool(scan_info.get("image_flip_ud", False))
+    image_flip_lr = bool(scan_info.get("image_flip_lr", True))
+    reverse_frames = bool(scan_info.get("reverse_frames", False))
+
+    try:
+        with h5py.File(h5_path, "r") as f:
+            data = f["entry/data/data"]
+            n_frames = data.shape[0]
+            _log.info("Found %d frames in %s", n_frames, h5_path)
+
+            for i in range(n_frames):
+                frame = data[i].astype(np.int32)
+
+                if image_rotation:
+                    frame = np.rot90(frame, k=image_rotation // 90)
+                if image_flip_ud:
+                    frame = np.flipud(frame)
+                if image_flip_lr:
+                    frame = np.fliplr(frame)
+
+                out_idx = (n_frames - i) if reverse_frames else (i + 1)
+                esp_file = os.path.join(new_directory, f"{full_basename}_1_{out_idx}.esperanto")
+
+                frame_scan = dict(scan_info)
+                if rotation_axis == "phi":
+                    frame_scan["phi"] = scan_start + dscan * i
+                    frame_scan["dphi"] = dscan
+                    frame_scan["omega"] = 0.0
+                    frame_scan["domega"] = 0.0
+                else:
+                    frame_scan["omega"] = scan_start + dscan * i
+
+                esp = esp_mod.EsperantoImage()
+                esp.save(esp_file, frame, **frame_scan)
+
+        _log.info("HDF5 direct conversion complete: %s (%d frames)", full_basename, n_frames)
+    except Exception:
+        _log.exception("HDF5 direct conversion failed for %s", full_basename)
+
+
 def _convert_cbf(filepath: str, basename: str, filenumber: int, new_directory: str, scan_info: dict) -> None:
     try:
         import numpy as np
@@ -346,7 +403,11 @@ def run_conversion(args: dict) -> None:
     _create_crysalis_run(new_directory, full_basename, scan_info)
 
     if file_format == "hdf5":
-        _convert_hdf5(filepath, basename, filenumber, new_directory, scan_info)
+        detector_type = scan_info.get("detector_type", "eiger")
+        if detector_type == "eiger":
+            _convert_hdf5(filepath, basename, filenumber, new_directory, scan_info)
+        else:
+            _convert_hdf5_direct(filepath, basename, filenumber, new_directory, scan_info)
     else:
         _convert_cbf(filepath, basename, filenumber, new_directory, scan_info)
 

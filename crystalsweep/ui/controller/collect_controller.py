@@ -1337,6 +1337,7 @@ class CollectController:
             "Exposure_time": exposure_time,
             "pixel_size": config.crysalis_pixel_size,
             "rotation_axis": config.crysalis_rotation_axis,
+            "detector_type": det.type if det else "eiger",
             "reverse_frames": config.crysalis_reverse_frames,
             "image_rotation": config.crysalis_image_rotation,
             "image_flip_ud": config.crysalis_image_flip_ud,
