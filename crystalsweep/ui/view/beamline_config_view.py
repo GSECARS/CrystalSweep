@@ -922,10 +922,11 @@ class CrysalisConfigView(FlatPanel):
         self._image_rotation_ctrl = FlatTextCtrl(g_body, value="180", placeholder="e.g. 180")
         self._image_rotation_ctrl.SetRestrictToFloat(True)
         self._image_rotation_ctrl.SetMinSize((-1, 28))
+        self._reverse_frames_chk = FlatCheckBox(g_body, "Reverse frame order")
         self._image_flip_ud_chk = FlatCheckBox(g_body, "Flip image up-down")
         self._image_flip_lr_chk = FlatCheckBox(g_body, "Flip image left-right")
 
-        g_grid = wx.FlexGridSizer(rows=11, cols=2, vgap=6, hgap=8)
+        g_grid = wx.FlexGridSizer(rows=12, cols=2, vgap=6, hgap=8)
         g_grid.AddGrowableCol(1, 1)
         for label_text, ctrl in (
             ("Wavelength (Å)", self._wavelength_ctrl),
@@ -936,6 +937,7 @@ class CrysalisConfigView(FlatPanel):
             ("Polarization", self._polarization_ctrl),
             ("Pixel size (mm)", self._pixel_size_ctrl),
             ("Rotation axis", self._rotation_axis_combo),
+            ("Reverse frames", self._reverse_frames_chk),
             ("Image rotation (°)", self._image_rotation_ctrl),
             ("Flip UD", self._image_flip_ud_chk),
             ("Flip LR", self._image_flip_lr_chk),
@@ -973,6 +975,7 @@ class CrysalisConfigView(FlatPanel):
         axis_choices = ["omega", "phi"]
         axis_sel = axis_choices.index(config.crysalis_rotation_axis) if config.crysalis_rotation_axis in axis_choices else 0
         self._rotation_axis_combo.SetSelection(axis_sel)
+        self._reverse_frames_chk.SetValue(config.crysalis_reverse_frames)
         self._image_rotation_ctrl.SetValue(str(config.crysalis_image_rotation))
         self._image_flip_ud_chk.SetValue(config.crysalis_image_flip_ud)
         self._image_flip_lr_chk.SetValue(config.crysalis_image_flip_lr)
@@ -1019,6 +1022,9 @@ class CrysalisConfigView(FlatPanel):
 
     def crysalis_rotation_axis(self) -> str:
         return self._rotation_axis_combo.GetStringSelection() or "omega"
+
+    def crysalis_reverse_frames(self) -> bool:
+        return self._reverse_frames_chk.GetValue()
 
     def crysalis_image_rotation(self) -> int:
         try:

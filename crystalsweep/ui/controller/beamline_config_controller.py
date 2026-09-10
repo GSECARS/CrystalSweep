@@ -224,6 +224,7 @@ class BeamlineConfigController:
         crysalis_polarization = self._crysalis_dlg.config_panel.crysalis_polarization() if self._crysalis_dlg else base.crysalis_polarization
         crysalis_pixel_size = self._crysalis_dlg.config_panel.crysalis_pixel_size() if self._crysalis_dlg else base.crysalis_pixel_size
         crysalis_rotation_axis = self._crysalis_dlg.config_panel.crysalis_rotation_axis() if self._crysalis_dlg else base.crysalis_rotation_axis
+        crysalis_reverse_frames = self._crysalis_dlg.config_panel.crysalis_reverse_frames() if self._crysalis_dlg else base.crysalis_reverse_frames
         crysalis_image_rotation = self._crysalis_dlg.config_panel.crysalis_image_rotation() if self._crysalis_dlg else base.crysalis_image_rotation
         crysalis_image_flip_ud = self._crysalis_dlg.config_panel.crysalis_image_flip_ud() if self._crysalis_dlg else base.crysalis_image_flip_ud
         crysalis_image_flip_lr = self._crysalis_dlg.config_panel.crysalis_image_flip_lr() if self._crysalis_dlg else base.crysalis_image_flip_lr
@@ -273,6 +274,7 @@ class BeamlineConfigController:
             crysalis_polarization=crysalis_polarization,
             crysalis_pixel_size=crysalis_pixel_size,
             crysalis_rotation_axis=crysalis_rotation_axis,
+            crysalis_reverse_frames=crysalis_reverse_frames,
             crysalis_image_rotation=crysalis_image_rotation,
             crysalis_image_flip_ud=crysalis_image_flip_ud,
             crysalis_image_flip_lr=crysalis_image_flip_lr,

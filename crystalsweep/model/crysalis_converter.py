@@ -128,6 +128,7 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
     polarization = scan_info.get("mono", 0.99)
     pixel_size = scan_info.get("pixel_size", 0.075)
     exposure = scan_info.get("Exposure_time", 1.0)
+    reverse_frames = bool(scan_info.get("reverse_frames", False))
     image_rotation = int(scan_info.get("image_rotation", 180))
     image_flip_ud = bool(scan_info.get("image_flip_ud", False))
     image_flip_lr = bool(scan_info.get("image_flip_lr", True))
@@ -265,7 +266,20 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
                 full_basename,
             )
         else:
-            _log.info("HDF5 conversion complete: %s (%d frames)", full_basename, converter.processed_frames)
+            n = converter.processed_frames
+            if reverse_frames and n > 1:
+                frame_template = os.path.join(new_directory, full_basename + "_1_{}.esperanto")
+                for i in range(1, n // 2 + 1):
+                    j = n - i + 1
+                    a = frame_template.format(i)
+                    b = frame_template.format(j)
+                    tmp = a + ".tmp"
+                    os.rename(a, tmp)
+                    os.rename(b, a)
+                    os.rename(tmp, b)
+                _log.info("HDF5 conversion complete: %s (%d frames, reversed)", full_basename, n)
+            else:
+                _log.info("HDF5 conversion complete: %s (%d frames)", full_basename, n)
     except Exception:
         _log.exception("HDF5 conversion failed for %s", full_basename)
 

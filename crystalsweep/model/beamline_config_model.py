@@ -162,6 +162,7 @@ class BeamlineConfig:
     crysalis_polarization: float = 0.99
     crysalis_pixel_size: float = 0.075
     crysalis_rotation_axis: str = "omega"
+    crysalis_reverse_frames: bool = False
     crysalis_image_rotation: int = 180
     crysalis_image_flip_ud: bool = False
     crysalis_image_flip_lr: bool = True
@@ -358,6 +359,7 @@ class BeamlineConfigModel:
             crysalis_polarization=float(data.get("crysalis_polarization", 0.99)),
             crysalis_pixel_size=float(data.get("crysalis_pixel_size", 0.075)),
             crysalis_rotation_axis=str(data.get("crysalis_rotation_axis", "omega")),
+            crysalis_reverse_frames=bool(data.get("crysalis_reverse_frames", False)),
             crysalis_image_rotation=int(data.get("crysalis_image_rotation", 180)),
             crysalis_image_flip_ud=bool(data.get("crysalis_image_flip_ud", False)),
             crysalis_image_flip_lr=bool(data.get("crysalis_image_flip_lr", True)),
@@ -439,6 +441,7 @@ class BeamlineConfigModel:
             "crysalis_polarization": config.crysalis_polarization,
             "crysalis_pixel_size": config.crysalis_pixel_size,
             "crysalis_rotation_axis": config.crysalis_rotation_axis,
+            "crysalis_reverse_frames": config.crysalis_reverse_frames,
             "crysalis_image_rotation": config.crysalis_image_rotation,
             "crysalis_image_flip_ud": config.crysalis_image_flip_ud,
             "crysalis_image_flip_lr": config.crysalis_image_flip_lr,
