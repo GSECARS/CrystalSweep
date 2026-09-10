@@ -129,6 +129,7 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
     pixel_size = scan_info.get("pixel_size", 0.075)
     exposure = scan_info.get("Exposure_time", 1.0)
     image_rotation = int(scan_info.get("image_rotation", 180))
+    image_flip_ud = bool(scan_info.get("image_flip_ud", False))
     image_flip_lr = bool(scan_info.get("image_flip_lr", True))
 
     @dataclass
@@ -169,7 +170,7 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
         beam=[center_x, center_y],
         rotation=image_rotation,
         transpose=False,
-        flip_ud=False,
+        flip_ud=image_flip_ud,
         flip_lr=image_flip_lr,
         alpha=alpha,
         kappa=str(scan_info.get("kappa", 0.0)),

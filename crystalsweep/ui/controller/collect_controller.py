@@ -1338,6 +1338,7 @@ class CollectController:
             "pixel_size": config.crysalis_pixel_size,
             "rotation_axis": config.crysalis_rotation_axis,
             "image_rotation": config.crysalis_image_rotation,
+            "image_flip_ud": config.crysalis_image_flip_ud,
             "image_flip_lr": config.crysalis_image_flip_lr,
             "l1": wavelength,
             "l2": wavelength,

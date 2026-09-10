@@ -163,6 +163,7 @@ class BeamlineConfig:
     crysalis_pixel_size: float = 0.075
     crysalis_rotation_axis: str = "omega"
     crysalis_image_rotation: int = 180
+    crysalis_image_flip_ud: bool = False
     crysalis_image_flip_lr: bool = True
     shutter_pv: str = ""
     shutter_open_value: str = ""
@@ -358,6 +359,7 @@ class BeamlineConfigModel:
             crysalis_pixel_size=float(data.get("crysalis_pixel_size", 0.075)),
             crysalis_rotation_axis=str(data.get("crysalis_rotation_axis", "omega")),
             crysalis_image_rotation=int(data.get("crysalis_image_rotation", 180)),
+            crysalis_image_flip_ud=bool(data.get("crysalis_image_flip_ud", False)),
             crysalis_image_flip_lr=bool(data.get("crysalis_image_flip_lr", True)),
             shutter_pv=str(data.get("shutter_pv", "")),
             shutter_open_value=str(data.get("shutter_open_value", "")),
@@ -438,6 +440,7 @@ class BeamlineConfigModel:
             "crysalis_pixel_size": config.crysalis_pixel_size,
             "crysalis_rotation_axis": config.crysalis_rotation_axis,
             "crysalis_image_rotation": config.crysalis_image_rotation,
+            "crysalis_image_flip_ud": config.crysalis_image_flip_ud,
             "crysalis_image_flip_lr": config.crysalis_image_flip_lr,
             "shutter_pv": config.shutter_pv,
             "shutter_open_value": config.shutter_open_value,
