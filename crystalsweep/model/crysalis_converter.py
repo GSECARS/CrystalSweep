@@ -85,8 +85,9 @@ def _create_crysalis_run(new_directory: str, basename: str, scan_info: dict) -> 
     run_name = os.path.join(new_directory, basename)
     run_file = []
 
+    rotation_axis = scan_info.get("rotation_axis", "omega").upper()
     dscr = crysalis.RunDscr(0)
-    dscr.axis = crysalis.SCAN_AXIS["OMEGA"]
+    dscr.axis = crysalis.SCAN_AXIS[rotation_axis]
     dscr.kappa = scan_info.get("kappa", 0.0)
     dscr.omegaphi = 0
     dscr.start = scan_info.get("omega_start", 0.0)
@@ -116,6 +117,7 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
     h5_path = os.path.join(filepath, f"{full_basename}.h5")
     _log.info("Converting HDF5 via eiger2crysalis: %s", h5_path)
 
+    rotation_axis = scan_info.get("rotation_axis", "omega")
     omega_start = scan_info.get("omega_start", 0.0)
     domega = scan_info.get("domega", 1.0)
     wavelength = scan_info.get("wavelength", 0.2952)
@@ -126,6 +128,8 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
     polarization = scan_info.get("mono", 0.99)
     pixel_size = scan_info.get("pixel_size", 0.075)
     exposure = scan_info.get("Exposure_time", 1.0)
+    image_rotation = int(scan_info.get("image_rotation", 180))
+    image_flip_lr = bool(scan_info.get("image_flip_lr", True))
 
     @dataclass
     class Options:
@@ -151,20 +155,27 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
         images: list = dc_field(default_factory=list)
         verbose: bool = dc_field(default=False)
 
+    if rotation_axis == "phi":
+        omega_option = "0.0"
+        phi_option = f"{omega_start} + {domega} * i"
+    else:
+        omega_option = f"{omega_start} + {domega} * i"
+        phi_option = str(scan_info.get("phi", 0.0))
+
     options = Options(
         output=os.path.join(new_directory, f"{full_basename}_1_{{index}}.esperanto"),
         wavelength=wavelength,
         distance=distance,
         beam=[center_x, center_y],
-        rotation=180,
+        rotation=image_rotation,
         transpose=False,
         flip_ud=False,
-        flip_lr=True,
+        flip_lr=image_flip_lr,
         alpha=alpha,
         kappa=str(scan_info.get("kappa", 0.0)),
         theta=str(scan_info.get("theta", 0.0)),
-        phi=str(scan_info.get("phi", 0.0)),
-        omega=f"{omega_start} + {domega} * i",
+        phi=phi_option,
+        omega=omega_option,
         polarization=polarization,
         images=[h5_path],
     )
@@ -177,8 +188,24 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
             self.mask = numpy.zeros(shape, dtype=dtype)
 
             cx, cy = self.new_beam_center(center_x, center_y, shape)
-            omega_expr = numexpr.NumExpr(self.options.omega)
-            self.scan_type = "omega"
+            self.scan_type = rotation_axis
+
+            if rotation_axis == "phi":
+                phi_expr = numexpr.NumExpr(self.options.phi)
+                axis_headers = {
+                    "dom_s": float(self.options.omega),
+                    "dom_e": float(self.options.omega),
+                    "dph_s": phi_expr,
+                    "dph_e": numexpr.NumExpr(f"{omega_start} + {domega} * (i + 1)"),
+                }
+            else:
+                omega_expr = numexpr.NumExpr(self.options.omega)
+                axis_headers = {
+                    "dom_s": omega_expr,
+                    "dom_e": numexpr.NumExpr(f"{omega_start} + {domega} * (i + 1)"),
+                    "dph_s": float(self.options.phi),
+                    "dph_e": float(self.options.phi),
+                }
 
             return {
                 "delectronsperadu": 1,
@@ -215,14 +242,11 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
                 "dbeta1": wavelength,
                 "dxorigininpix": cx,
                 "dyorigininpix": cy,
-                "dom_s": omega_expr,
-                "dom_e": numexpr.NumExpr(f"{omega_start} + {domega} * (i + 1)"),
+                **axis_headers,
                 "dth_s": float(self.options.theta),
                 "dth_e": float(self.options.theta),
                 "dka_s": float(self.options.kappa),
                 "dka_e": float(self.options.kappa),
-                "dph_s": float(self.options.phi),
-                "dph_e": float(self.options.phi),
             }
 
     try:

@@ -917,8 +917,14 @@ class CrysalisConfigView(FlatPanel):
         self._pixel_size_ctrl = FlatTextCtrl(g_body, value="0.075", placeholder="e.g. 0.075")
         self._pixel_size_ctrl.SetRestrictToFloat(True)
         self._pixel_size_ctrl.SetMinSize((-1, 28))
+        self._rotation_axis_combo = FlatCombo(g_body, choices=["omega", "phi"], selection=0)
+        self._rotation_axis_combo.SetMinSize((-1, 28))
+        self._image_rotation_ctrl = FlatTextCtrl(g_body, value="180", placeholder="e.g. 180")
+        self._image_rotation_ctrl.SetRestrictToFloat(True)
+        self._image_rotation_ctrl.SetMinSize((-1, 28))
+        self._image_flip_lr_chk = FlatCheckBox(g_body, "Flip image left-right")
 
-        g_grid = wx.FlexGridSizer(rows=7, cols=2, vgap=6, hgap=8)
+        g_grid = wx.FlexGridSizer(rows=10, cols=2, vgap=6, hgap=8)
         g_grid.AddGrowableCol(1, 1)
         for label_text, ctrl in (
             ("Wavelength (Å)", self._wavelength_ctrl),
@@ -928,6 +934,9 @@ class CrysalisConfigView(FlatPanel):
             ("Alpha (°)", self._alpha_ctrl),
             ("Polarization", self._polarization_ctrl),
             ("Pixel size (mm)", self._pixel_size_ctrl),
+            ("Rotation axis", self._rotation_axis_combo),
+            ("Image rotation (°)", self._image_rotation_ctrl),
+            ("Flip LR", self._image_flip_lr_chk),
         ):
             lbl = FlatLabel(g_body, label=label_text)
             lbl.SetFont(app_theme.scaled_font(11))
@@ -959,6 +968,11 @@ class CrysalisConfigView(FlatPanel):
         self._alpha_ctrl.SetValue(f"{config.crysalis_alpha:g}")
         self._polarization_ctrl.SetValue(f"{config.crysalis_polarization:g}")
         self._pixel_size_ctrl.SetValue(f"{config.crysalis_pixel_size:g}")
+        axis_choices = ["omega", "phi"]
+        axis_sel = axis_choices.index(config.crysalis_rotation_axis) if config.crysalis_rotation_axis in axis_choices else 0
+        self._rotation_axis_combo.SetSelection(axis_sel)
+        self._image_rotation_ctrl.SetValue(str(config.crysalis_image_rotation))
+        self._image_flip_lr_chk.SetValue(config.crysalis_image_flip_lr)
         self.set_status("")
 
     def crysalis_par_path(self) -> str:
@@ -999,6 +1013,18 @@ class CrysalisConfigView(FlatPanel):
 
     def crysalis_pixel_size(self) -> float:
         return self._float_val(self._pixel_size_ctrl, 0.075)
+
+    def crysalis_rotation_axis(self) -> str:
+        return self._rotation_axis_combo.GetStringSelection() or "omega"
+
+    def crysalis_image_rotation(self) -> int:
+        try:
+            return int(float(self._image_rotation_ctrl.GetValue().strip()))
+        except ValueError:
+            return 180
+
+    def crysalis_image_flip_lr(self) -> bool:
+        return self._image_flip_lr_chk.GetValue()
 
     def set_status(self, text: str, error: bool = False) -> None:
         self._status_label.SetForegroundColour(app_theme.red if error else app_theme.bright_black)
