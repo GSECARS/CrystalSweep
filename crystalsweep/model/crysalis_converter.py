@@ -181,6 +181,9 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
     )
 
     class _Converter(eiger2crysalis.Converter):
+        def geometry_transform(self, image):
+            return numpy.ascontiguousarray(super().geometry_transform(image))
+
         def common_headers(self):
             with h5py.File(h5_path, "r") as f:
                 shape = f["entry/data/data"].shape[1:]
@@ -253,9 +256,17 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
         converter = _Converter(options=options)
         converter.convert_all()
         converter.finish()
-        _log.info("HDF5 conversion complete: %s", full_basename)
+        if not converter.succeeded:
+            _log.error(
+                "HDF5 conversion failed for %s: fabio reported failure - "
+                "check that the HDF5 file is a supported format (EigerImage, LimaImage, SparseImage) "
+                "and that the output directory is writable",
+                full_basename,
+            )
+        else:
+            _log.info("HDF5 conversion complete: %s (%d frames)", full_basename, converter.processed_frames)
     except Exception:
-        _log.exception("HDF5 conversion failed")
+        _log.exception("HDF5 conversion failed for %s", full_basename)
 
 
 def _convert_cbf(filepath: str, basename: str, filenumber: int, new_directory: str, scan_info: dict) -> None:
