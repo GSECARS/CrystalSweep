@@ -53,6 +53,7 @@ class MainView(wx.Frame):
         self._save_config_as_cb: Callable[[], None] | None = None
         self._abort_cb: Callable[[], None] | None = None
 
+        self._menu_check_integration: wx.MenuItem | None = None
         self._collecting = False
         self._splitter = FlatSplitter(self)
         self._splitter.SetSashGravity(0.0)
@@ -216,11 +217,17 @@ class MainView(wx.Frame):
             positioners_item = positioners_menu.Append(wx.ID_ANY, "Positioners\tCtrl+5")
             menu_bar.Append(positioners_menu, "&Positioners")
 
+            view_menu = wx.Menu()
+            self._menu_check_integration = view_menu.AppendCheckItem(wx.ID_ANY, "Show Integration Plot\tCtrl+I")
+            self._menu_check_integration.Check(True)
+            menu_bar.Append(view_menu, "&View")
+
             self.SetMenuBar(menu_bar)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._load_config_cb), load_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._save_config_cb), save_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._save_config_as_cb), save_as_item)
             self.Bind(wx.EVT_MENU, lambda _e: self.Close(), exit_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._on_toggle_integration_plot(), self._menu_check_integration)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_general_cb), general_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_crysalis_cb), crysalis_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_detectors_cb), detectors_item)
@@ -241,6 +248,12 @@ class MainView(wx.Frame):
                 self._on_exit,
             ],
         )
+        bar.AppendMenu(
+            title="View",
+            items=["Toggle Integration Plot"],
+            shortcuts=["Ctrl+I"],
+            callbacks=[self._on_toggle_integration_plot],
+        )
         bar.AppendAction("General", lambda: self._fire(self._open_general_cb))
         bar.AppendAction("CrysAlis", lambda: self._fire(self._open_crysalis_cb))
         bar.AppendAction("Detectors", lambda: self._fire(self._open_detectors_cb))
@@ -248,19 +261,29 @@ class MainView(wx.Frame):
         bar.AppendAction("Positioners", lambda: self._fire(self._open_positioners_cb))
         bar.AppendAction("Scripts", lambda: self._fire(self._open_scripts_cb))
 
+        _toggle_integration_id = wx.NewIdRef()
         accel = wx.AcceleratorTable(
             [
                 wx.AcceleratorEntry(wx.ACCEL_CTRL, ord("Q"), wx.ID_EXIT),
+                wx.AcceleratorEntry(wx.ACCEL_CTRL, ord("I"), _toggle_integration_id),
             ]
         )
         self.SetAcceleratorTable(accel)
         self.Bind(wx.EVT_MENU, lambda _e: self.Close(), id=wx.ID_EXIT)
+        self.Bind(wx.EVT_MENU, lambda _e: self._on_toggle_integration_plot(), _toggle_integration_id)
         return bar
 
     @staticmethod
     def _fire(cb: Callable[[], None] | None) -> None:
         if cb is not None:
             cb()
+
+    def _on_toggle_integration_plot(self) -> None:
+        if self._menu_check_integration is not None:
+            visible = self._menu_check_integration.IsChecked()
+        else:
+            visible = not self.ad_viewer.is_integration_plot_visible()
+        self.ad_viewer.set_integration_plot_visible(visible)
 
     def _on_exit(self) -> None:
         self.Close()
