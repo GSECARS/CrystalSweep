@@ -279,11 +279,13 @@ class MainView(wx.Frame):
             cb()
 
     def _on_toggle_integration_plot(self) -> None:
+        plot = self.ad_viewer._integration_plot
         if self._menu_check_integration is not None:
             visible = self._menu_check_integration.IsChecked()
         else:
-            visible = not self.ad_viewer.is_integration_plot_visible()
-        self.ad_viewer.set_integration_plot_visible(visible)
+            visible = not plot.IsShown()
+        plot.Show(visible)
+        self.ad_viewer.Layout()
 
     def _on_exit(self) -> None:
         self.Close()
