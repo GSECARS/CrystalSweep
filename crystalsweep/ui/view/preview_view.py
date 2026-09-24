@@ -5,8 +5,8 @@
 # ----------------------------------------------------------------------------------
 # Purpose:
 # Preview tab inside the Single-Crystal Centering Tools section.
-# Provides a Start/Stop preview button and step-size selection (predefined or
-# custom), arranged in the first of four columns.
+# Provides a Start/Stop preview button and a step-size field, arranged in the
+# first of four columns.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -44,7 +44,6 @@ def _stop_scheme():
 
 _STEP_PRECISION = 4
 _UM_PER_MM = 1000.0
-_PREDEFINED_STEPS_UM: tuple[float, ...] = (1.0, 2.0, 5.0, 10.0)
 
 
 class _CenteringRow(FlatPanel):
@@ -127,7 +126,7 @@ class PreviewView(FlatPanel):
         self._on_go_current_cb: Callable[[str | None], None] | None = None
         self._on_go_best_cb: Callable[[str | None], None] | None = None
         self._previewing = False
-        self._step_mm: float = _PREDEFINED_STEPS_UM[0] / _UM_PER_MM
+        self._step_mm: float = 0.001
 
         self._centering_rows: dict[str, _CenteringRow] = {}
 
@@ -323,39 +322,21 @@ class PreviewView(FlatPanel):
     def _build_column1(self) -> wx.BoxSizer:
         col = wx.BoxSizer(wx.VERTICAL)
 
-        preset_btn_size = 30
-        preset_gap = 4
-        num_presets = len(_PREDEFINED_STEPS_UM)
-        presets_total_w = preset_btn_size * num_presets + preset_gap * (num_presets - 1)
-
         self._toggle_btn = FlatButton(self, "Start Preview", font=app_theme.btn_font())
-        self._toggle_btn.SetMinSize((presets_total_w, 36))
-        self._toggle_btn.SetMaxSize((presets_total_w, -1))
+        self._toggle_btn.SetMinSize((-1, 36))
         self._toggle_btn.SetAction(self._on_toggle_clicked)
         col.Add(self._toggle_btn, 1, wx.EXPAND | wx.BOTTOM, 10)
 
-        sep = FlatPanel(self, size=(presets_total_w, 1))
+        sep = FlatPanel(self)
         sep.SetBackgroundColour(app_theme.bright_black)
-        sep.SetMinSize((presets_total_w, 1))
-        sep.SetMaxSize((presets_total_w, 1))
-        col.Add(sep)
+        sep.SetMinSize((-1, 1))
+        sep.SetMaxSize((-1, 1))
+        col.Add(sep, 0, wx.EXPAND)
         col.AddSpacer(12)
 
         step_label = FlatLabel(self, label="Step Size")
         step_label.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-        step_label.SetMinSize((presets_total_w, -1))
-        step_label.SetMaxSize((presets_total_w, -1))
         col.Add(step_label, 0, wx.ALIGN_CENTRE_HORIZONTAL | wx.BOTTOM, 4)
-
-        preset_row = wx.BoxSizer(wx.HORIZONTAL)
-        for i, value_um in enumerate(_PREDEFINED_STEPS_UM):
-            btn = FlatButton(self, self._format_um_label(value_um))
-            btn.SetToolTip(f"Set step to {self._format_um_label(value_um)} um")
-            btn.SetMinSize((preset_btn_size, preset_btn_size))
-            btn.SetMaxSize((preset_btn_size, preset_btn_size))
-            btn.SetAction(lambda v=value_um / _UM_PER_MM: self._apply_preset(v))
-            preset_row.Add(btn, 0, wx.LEFT if i > 0 else 0, preset_gap)
-        col.Add(preset_row, 0)
 
         self._custom_ctrl = FlatTextCtrl(
             self,
@@ -363,13 +344,13 @@ class PreviewView(FlatPanel):
             placeholder="mm",
             centered=True,
         )
-        self._custom_ctrl.SetMinSize((presets_total_w, 28))
-        self._custom_ctrl.SetMaxSize((presets_total_w, 28))
+        self._custom_ctrl.SetMinSize((-1, 28))
+        self._custom_ctrl.SetMaxSize((-1, 28))
         self._custom_ctrl.SetRestrictToFloat(True)
         self._custom_ctrl.SetValidator(self._validate_custom_step)
         self._custom_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_custom_committed)
         self._custom_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_custom_committed)
-        col.Add(self._custom_ctrl, 0, wx.TOP, 6)
+        col.Add(self._custom_ctrl, 0, wx.EXPAND)
 
         return col
 
@@ -775,12 +756,6 @@ class PreviewView(FlatPanel):
         return wx.BoxSizer(wx.VERTICAL)
 
     @staticmethod
-    def _format_um_label(value_um: float) -> str:
-        if value_um == int(value_um):
-            return f"{int(value_um)}"
-        return f"{value_um:g}"
-
-    @staticmethod
     def _format_mm(value_mm: float) -> str:
         return MotorPositionValidator(f"{value_mm:.{_STEP_PRECISION}f}", _STEP_PRECISION).formatted
 
@@ -789,12 +764,6 @@ class PreviewView(FlatPanel):
         if raw == "":
             return ""
         return MotorPositionValidator(raw, _STEP_PRECISION).formatted
-
-    def _apply_preset(self, value_mm: float) -> None:
-        self._custom_ctrl.SetValue(self._format_mm(value_mm))
-        self._step_mm = value_mm
-        if self._on_step_changed_cb is not None:
-            self._on_step_changed_cb(value_mm)
 
     def _on_custom_committed(self, event: wx.Event) -> None:
         event.Skip()
