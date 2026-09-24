@@ -5,8 +5,8 @@
 # ----------------------------------------------------------------------------------
 # Purpose:
 # Preview tab inside the Single-Crystal Centering Tools section.
-# Provides a Start/Stop preview button and a step-size field, arranged in the
-# first of four columns.
+# Provides a Start/Stop preview button, step-size input, live motor jog rows,
+# and a combined Original/Current/Best positions table.
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
 #
@@ -45,6 +45,19 @@ def _stop_scheme():
 _STEP_PRECISION = 4
 _UM_PER_MM = 1000.0
 
+_P_ROW_H = 26
+_P_HEADER_H = 30
+_P_MOTOR_W = 108
+_P_VAL_W = 90
+_P_GO_W = 32
+_P_GO_H = 18
+_P_BORDER = wx.Colour(50, 50, 56)
+_P_CELL_PAD = 6
+
+_COL_ORIG = 0
+_COL_CURR = 1
+_COL_BEST = 2
+
 
 class _CenteringRow(FlatPanel):
     """One row in the centering motors column: [label] [<] [live RBV] [>]."""
@@ -63,7 +76,7 @@ class _CenteringRow(FlatPanel):
         self._label = FlatLabel(self, label=label_text)
         self._label.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
 
-        self._left_btn = FlatIconButton(self, draw_chevron_left, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} − step")
+        self._left_btn = FlatIconButton(self, draw_chevron_left, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} - step")
         self._left_btn.Bind(wx.EVT_BUTTON, lambda _e: self._fire(self._on_left_cb))
 
         self._right_btn = FlatIconButton(self, draw_chevron_right, icon_size=self._ARROW_SIZE, tooltip=f"Move {label_text} + step")
@@ -110,8 +123,416 @@ class _CenteringRow(FlatPanel):
             cb(self.spec)
 
 
+class _PosTableRow(FlatPanel):
+    """One painted row in the positions table: motor label + Original/Current/Best values."""
+
+    def __init__(
+        self,
+        parent: wx.Window,
+        label: str,
+        precision: int,
+        col_widths: list[int],
+        alt_bg: bool,
+        is_max: bool = False,
+    ) -> None:
+        super().__init__(parent, size=(-1, _P_ROW_H))
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self._label = label
+        self._precision = max(0, int(precision))
+        self._col_widths = col_widths
+        self._is_max = is_max
+        self._alt_bg = alt_bg
+        self._values: list[float | None] = [None, None, None]
+        self._curr_colour: wx.Colour = app_theme.foreground
+        self._best_colour: wx.Colour = app_theme.foreground
+        self.Bind(wx.EVT_PAINT, self._on_paint)
+
+    def set_value(self, col: int, value: float | None) -> None:
+        self._values[col] = value
+        self.Refresh()
+
+    def set_curr_colour(self, colour: wx.Colour) -> None:
+        self._curr_colour = colour
+        self.Refresh()
+
+    def set_best_colour(self, colour: wx.Colour) -> None:
+        self._best_colour = colour
+        self.Refresh()
+
+    def update_col_widths(self, col_widths: list[int]) -> None:
+        self._col_widths = col_widths
+        self.Refresh()
+
+    def _fmt(self, col: int) -> str:
+        value = self._values[col]
+        if value is None:
+            return "—"
+        try:
+            v = float(value)
+            return f"{v:.4g}" if self._is_max else f"{v:.{self._precision}f}"
+        except (TypeError, ValueError):
+            return "—"
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        w, h = self.GetClientSize()
+        if w <= 0 or h <= 0:
+            return
+        try:
+            dc = wx.AutoBufferedPaintDC(self)
+            gc = wx.GraphicsContext.Create(dc)
+        except Exception:
+            return
+        if gc is None:
+            return
+
+        bg = app_theme.bright_black if self._alt_bg else app_theme.black
+        gc.SetBrush(wx.Brush(bg))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+
+        weight = wx.FONTWEIGHT_BOLD if self._is_max else wx.FONTWEIGHT_NORMAL
+        font = app_theme.scaled_font(12, weight=weight)
+
+        texts = [self._label, self._fmt(_COL_ORIG), self._fmt(_COL_CURR), self._fmt(_COL_BEST)]
+        colours = [app_theme.foreground, app_theme.foreground, self._curr_colour, self._best_colour]
+
+        x = 0
+        for i, (text, cw, colour) in enumerate(zip(texts, self._col_widths, colours)):
+            gc.SetFont(font, colour)
+            tw, th = gc.GetTextExtent(text)
+            text_x = x + _P_CELL_PAD if i == 0 else x + (cw - tw) / 2
+            gc.DrawText(text, text_x, (h - th) / 2)
+            x += cw
+
+        gc.SetPen(wx.Pen(_P_BORDER, 1))
+        gc.StrokeLine(0, h - 1, w, h - 1)
+        x = 0
+        for cw in self._col_widths[:-1]:
+            x += cw
+            gc.StrokeLine(x, 0, x, h)
+
+
+class _PosTableHeader(FlatPanel):
+    """Painted header for the positions table: column labels + Go buttons."""
+
+    def __init__(self, parent: wx.Window, col_widths: list[int]) -> None:
+        super().__init__(parent, size=(-1, _P_HEADER_H))
+        self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
+        self._col_widths = col_widths
+
+        self._go_orig = FlatButton(self, "Go", font=app_theme.btn_font())
+        self._go_orig.SetMinSize((_P_GO_W, _P_GO_H))
+        self._go_orig.Enable(False)
+
+        self._go_curr = FlatButton(self, "Go", font=app_theme.btn_font())
+        self._go_curr.SetMinSize((_P_GO_W, _P_GO_H))
+        self._go_curr.Enable(False)
+
+        self._go_best = FlatButton(self, "Go", font=app_theme.btn_font())
+        self._go_best.SetMinSize((_P_GO_W, _P_GO_H))
+        self._go_best.Enable(False)
+
+        self.Bind(wx.EVT_PAINT, self._on_paint)
+        self.Bind(wx.EVT_SIZE, self._on_size)
+        self._reposition()
+
+    def update_col_widths(self, col_widths: list[int]) -> None:
+        self._col_widths = col_widths
+        self._reposition()
+        self.Refresh()
+
+    def set_go_enabled(self, col: int, enabled: bool) -> None:
+        [self._go_orig, self._go_curr, self._go_best][col].Enable(enabled)
+
+    def _reposition(self) -> None:
+        if len(self._col_widths) < 4:
+            return
+        h = self.GetClientSize().height or _P_HEADER_H
+        btn_y = (h - _P_GO_H) // 2
+        x = self._col_widths[0]
+        for btn, cw in zip([self._go_orig, self._go_curr, self._go_best], self._col_widths[1:]):
+            btn.SetSize(x + cw - _P_GO_W - 2, btn_y, _P_GO_W, _P_GO_H)
+            x += cw
+
+    def _on_size(self, event: wx.SizeEvent) -> None:
+        self._reposition()
+        event.Skip()
+
+    def _on_paint(self, _: wx.PaintEvent) -> None:
+        w, h = self.GetClientSize()
+        if w <= 0 or h <= 0:
+            return
+        try:
+            dc = wx.AutoBufferedPaintDC(self)
+            gc = wx.GraphicsContext.Create(dc)
+        except Exception:
+            return
+        if gc is None:
+            return
+
+        gc.SetBrush(wx.Brush(app_theme.background))
+        gc.SetPen(wx.TRANSPARENT_PEN)
+        gc.DrawRectangle(0, 0, w, h)
+
+        font = app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD)
+        gc.SetFont(font, app_theme.foreground)
+
+        labels = ("Motor", "Original", "Current", "Best")
+        x = 0
+        for i, (label, cw) in enumerate(zip(labels, self._col_widths)):
+            avail_w = (cw - _P_GO_W - 4) if i > 0 else cw
+            tw, th = gc.GetTextExtent(label)
+            gc.DrawText(label, x + max(_P_CELL_PAD, (avail_w - tw) / 2), (h - th) / 2)
+            x += cw
+
+        gc.SetPen(wx.Pen(_P_BORDER, 1))
+        x = 0
+        for cw in self._col_widths[:-1]:
+            x += cw
+            gc.StrokeLine(x, 0, x, h)
+        gc.StrokeLine(0, h - 1, w, h - 1)
+
+
+class _PositionsTable(FlatPanel):
+    """Read-only table: Motor | Original | Current | Best, with Go buttons in the header."""
+
+    def __init__(self, parent: wx.Window) -> None:
+        super().__init__(parent)
+
+        self._motor_keys: list[str] = []
+        self._motor_rows: dict[str, _PosTableRow] = {}
+        self._max_row: _PosTableRow | None = None
+        self._orig_max: float | None = None
+
+        self._on_go_original_cb: Callable[[str | None], None] | None = None
+        self._on_go_current_cb: Callable[[str | None], None] | None = None
+        self._on_go_best_cb: Callable[[str | None], None] | None = None
+
+        self._header = _PosTableHeader(self, self._col_widths())
+        self._header._go_orig.SetAction(lambda: self._on_go_original_cb and self._on_go_original_cb(None))
+        self._header._go_curr.SetAction(lambda: self._on_go_current_cb and self._on_go_current_cb(None))
+        self._header._go_best.SetAction(lambda: self._on_go_best_cb and self._on_go_best_cb(None))
+
+        self._header_border = FlatPanel(self)
+        self._header_border.SetBackgroundColour(_P_BORDER)
+        self._header_border.SetMinSize((-1, 1))
+        self._header_border.SetMaxSize((-1, 1))
+
+        self._rows_panel = FlatPanel(self)
+        self._rows_sizer = wx.BoxSizer(wx.VERTICAL)
+        self._rows_panel.SetSizer(self._rows_sizer)
+
+        self._empty_label = FlatLabel(self, label="No preview snapshot yet.")
+        self._empty_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+        outer.Add(self._header, 0, wx.EXPAND)
+        outer.Add(self._header_border, 0, wx.EXPAND)
+        outer.Add(self._rows_panel, 0, wx.EXPAND)
+        outer.Add(self._empty_label, 0, wx.TOP, 6)
+        self.SetSizer(outer)
+
+        self.Bind(wx.EVT_SIZE, self._on_size)
+
+    def bind_go_original(self, callback: Callable[[str | None], None]) -> None:
+        self._on_go_original_cb = callback
+
+    def bind_go_current(self, callback: Callable[[str | None], None]) -> None:
+        self._on_go_current_cb = callback
+
+    def bind_go_best(self, callback: Callable[[str | None], None]) -> None:
+        self._on_go_best_cb = callback
+
+    def set_original_all(self, positions: list[tuple[str, str, float | None, int]], max_intensity: float | None) -> None:
+        """Rebuild all rows from *positions* and populate the Original column."""
+        self._clear_rows()
+        widths = self._col_widths()
+        for i, (key, label, value, precision) in enumerate(positions):
+            if not key.strip():
+                continue
+            row = _PosTableRow(self._rows_panel, label or key, precision, widths, alt_bg=bool(i % 2))
+            row.set_value(_COL_ORIG, value)
+            self._rows_sizer.Add(row, 0, wx.EXPAND)
+            self._motor_rows[key] = row
+            self._motor_keys.append(key)
+
+        if self._motor_keys:
+            max_alt = bool(len(self._motor_keys) % 2)
+            self._max_row = _PosTableRow(self._rows_panel, "Max intensity", 0, widths, alt_bg=max_alt, is_max=True)
+            self._max_row.set_value(_COL_ORIG, max_intensity)
+            self._rows_sizer.Add(self._max_row, 0, wx.EXPAND)
+            self._orig_max = max_intensity
+
+        has_data = bool(self._motor_keys)
+        self._empty_label.Show(not has_data)
+        self._header.set_go_enabled(_COL_ORIG, has_data)
+        self._rows_panel.Show(has_data)
+        self._rows_panel.Layout()
+        self.Layout()
+
+    def clear_original(self) -> None:
+        self.set_original_all([], None)
+
+    def set_current_all(
+        self,
+        positions: list[tuple[str, str, float | None, int]],
+        max_intensity: float | None,
+        orig_max: float | None,
+    ) -> None:
+        """Populate the Current column values."""
+        if orig_max is not None:
+            self._orig_max = orig_max
+        for key, _label, value, _prec in positions:
+            row = self._motor_rows.get(key)
+            if row is None:
+                continue
+            try:
+                row.set_value(_COL_CURR, value)
+            except RuntimeError:
+                self._motor_rows.pop(key, None)
+        if self._max_row is not None:
+            try:
+                self._max_row.set_value(_COL_CURR, max_intensity)
+                self._max_row.set_curr_colour(self._max_colour(max_intensity))
+            except RuntimeError:
+                self._max_row = None
+        self._header.set_go_enabled(_COL_CURR, bool(positions))
+
+    def clear_current(self) -> None:
+        for row in self._motor_rows.values():
+            try:
+                row.set_value(_COL_CURR, None)
+            except RuntimeError:
+                pass
+        if self._max_row is not None:
+            try:
+                self._max_row.set_value(_COL_CURR, None)
+                self._max_row.set_curr_colour(app_theme.foreground)
+            except RuntimeError:
+                self._max_row = None
+        self._header.set_go_enabled(_COL_CURR, False)
+
+    def update_current(self, key: str, value: float | None) -> None:
+        row = self._motor_rows.get(key)
+        if row is None:
+            return
+        try:
+            row.set_value(_COL_CURR, value)
+        except RuntimeError:
+            self._motor_rows.pop(key, None)
+
+    def update_current_max(self, value: float | None) -> None:
+        if self._max_row is None:
+            return
+        try:
+            self._max_row.set_value(_COL_CURR, value)
+            self._max_row.set_curr_colour(self._max_colour(value))
+        except RuntimeError:
+            self._max_row = None
+
+    def set_best_all(self, positions: list[tuple[str, str, float | None, int]], max_intensity: float | None) -> None:
+        """Populate the Best column values."""
+        for key, _label, value, _prec in positions:
+            row = self._motor_rows.get(key)
+            if row is None:
+                continue
+            try:
+                row.set_value(_COL_BEST, value)
+            except RuntimeError:
+                self._motor_rows.pop(key, None)
+        if self._max_row is not None:
+            try:
+                self._max_row.set_value(_COL_BEST, max_intensity)
+                self._max_row.set_best_colour(self._max_colour(max_intensity))
+            except RuntimeError:
+                self._max_row = None
+        self._header.set_go_enabled(_COL_BEST, bool(positions))
+
+    def clear_best(self) -> None:
+        for row in self._motor_rows.values():
+            try:
+                row.set_value(_COL_BEST, None)
+            except RuntimeError:
+                pass
+        if self._max_row is not None:
+            try:
+                self._max_row.set_value(_COL_BEST, None)
+                self._max_row.set_best_colour(app_theme.foreground)
+            except RuntimeError:
+                self._max_row = None
+        self._header.set_go_enabled(_COL_BEST, False)
+
+    def update_best(self, key: str, value: float | None) -> None:
+        row = self._motor_rows.get(key)
+        if row is None:
+            return
+        try:
+            row.set_value(_COL_BEST, value)
+        except RuntimeError:
+            self._motor_rows.pop(key, None)
+
+    def update_best_max(self, value: float | None) -> None:
+        if self._max_row is None:
+            return
+        try:
+            self._max_row.set_value(_COL_BEST, value)
+            self._max_row.set_best_colour(self._max_colour(value))
+        except RuntimeError:
+            self._max_row = None
+
+    def _max_colour(self, value: float | None) -> wx.Colour:
+        orig = self._orig_max
+        if value is None or orig is None:
+            return app_theme.foreground
+        if value > orig:
+            return app_theme.green
+        if value < orig:
+            return app_theme.red
+        return app_theme.foreground
+
+    def _col_widths(self) -> list[int]:
+        w = self.GetClientSize().width
+        if w <= _P_MOTOR_W:
+            w = _P_MOTOR_W + _P_VAL_W * 3
+        remaining = w - _P_MOTOR_W
+        val_w = remaining // 3
+        last_w = remaining - val_w * 2
+        return [_P_MOTOR_W, val_w, val_w, last_w]
+
+    def _on_size(self, event: wx.SizeEvent) -> None:
+        widths = self._col_widths()
+        self._header.update_col_widths(widths)
+        for row in list(self._motor_rows.values()):
+            try:
+                row.update_col_widths(widths)
+            except RuntimeError:
+                pass
+        if self._max_row is not None:
+            try:
+                self._max_row.update_col_widths(widths)
+            except RuntimeError:
+                self._max_row = None
+        event.Skip()
+
+    def _clear_rows(self) -> None:
+        for row in list(self._motor_rows.values()):
+            self._rows_sizer.Detach(row)
+            row.Destroy()
+        self._motor_rows.clear()
+        self._motor_keys.clear()
+        if self._max_row is not None:
+            self._rows_sizer.Detach(self._max_row)
+            self._max_row.Destroy()
+            self._max_row = None
+        self._orig_max = None
+        self._header.set_go_enabled(_COL_ORIG, False)
+        self._header.set_go_enabled(_COL_CURR, False)
+        self._header.set_go_enabled(_COL_BEST, False)
+        self._rows_panel.Layout()
+
+
 class PreviewView(FlatPanel):
-    """Preview tab: Start/Stop button and step-size selector in column 1."""
+    """Preview tab: Start/Stop button, step-size input, motor jog rows, and positions table."""
 
     def __init__(self, parent: wx.Window) -> None:
         super().__init__(parent)
@@ -122,64 +543,30 @@ class PreviewView(FlatPanel):
         self._on_jog_minus_cb: Callable[[CenteringMotorSpec], None] | None = None
         self._on_jog_plus_cb: Callable[[CenteringMotorSpec], None] | None = None
         self._on_auto_optimize_cb: Callable[[], None] | None = None
-        self._on_go_original_cb: Callable[[str | None], None] | None = None
-        self._on_go_current_cb: Callable[[str | None], None] | None = None
-        self._on_go_best_cb: Callable[[str | None], None] | None = None
         self._previewing = False
         self._step_mm: float = 0.001
 
         self._centering_rows: dict[str, _CenteringRow] = {}
 
-        self._column1 = self._build_column1()
-        self._centering_panel, self._centering_sizer, self._centering_empty_label = self._build_centering_column()
-        (
-            self._originals_panel,
-            self._originals_sizer,
-            self._originals_empty_label,
-        ) = self._build_originals_column()
-        (
-            self._currents_panel,
-            self._currents_sizer,
-            self._currents_empty_label,
-        ) = self._build_currents_column()
-        (
-            self._bests_panel,
-            self._bests_sizer,
-            self._bests_empty_label,
-        ) = self._build_bests_column()
+        self._toggle_btn = FlatButton(self, "Start Preview", font=app_theme.btn_font())
+        self._toggle_btn.SetMinSize((-1, 36))
+        self._toggle_btn.SetAction(self._on_toggle_clicked)
 
+        self._centering_panel, self._centering_sizer, self._centering_empty_label = self._build_centering_column()
+        self._positions_table = _PositionsTable(self)
         self._auto_optimize_panel = self._build_auto_optimize_panel()
 
-        originals_stack = wx.BoxSizer(wx.VERTICAL)
-        originals_stack.Add(self._originals_panel, 0, wx.EXPAND)
-        originals_stack.AddSpacer(12)
-        originals_stack.Add(self._bests_panel, 0, wx.EXPAND)
-
-        currents_stack = wx.BoxSizer(wx.VERTICAL)
-        currents_stack.Add(self._currents_panel, 0, wx.EXPAND)
-        currents_stack.AddSpacer(12)
-        currents_stack.Add(self._auto_optimize_panel, 0, wx.EXPAND)
+        right_col = wx.BoxSizer(wx.VERTICAL)
+        right_col.Add(self._toggle_btn, 0, wx.EXPAND | wx.BOTTOM, 8)
+        right_col.Add(self._auto_optimize_panel, 0, wx.EXPAND)
 
         cols = wx.BoxSizer(wx.HORIZONTAL)
-        cols.Add(self._column1, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 8)
+        cols.Add(self._positions_table, 1, wx.EXPAND | wx.TOP | wx.BOTTOM, 8)
         cols.AddSpacer(12)
-        cols.Add(self._centering_panel, 1, wx.EXPAND | wx.TOP | wx.BOTTOM, 8)
+        cols.Add(self._centering_panel, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 8)
         cols.AddSpacer(12)
-        cols.Add(originals_stack, 1, wx.EXPAND | wx.TOP | wx.BOTTOM, 8)
-        cols.AddSpacer(12)
-        cols.Add(currents_stack, 1, wx.EXPAND | wx.TOP | wx.BOTTOM, 8)
+        cols.Add(right_col, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 8)
         self.SetSizer(cols)
-
-        self._original_rows: list[wx.Window] = []
-        self._current_pair_rows: list[wx.Window] = []
-        self._current_motor_rows: dict[str, tuple[FlatPanel, FlatLabel, int]] = {}
-        self._current_max_row: FlatPanel | None = None
-        self._current_max_value: FlatLabel | None = None
-        self._original_max_intensity: float | None = None
-        self._best_pair_rows: list[wx.Window] = []
-        self._best_motor_rows: dict[str, tuple[FlatPanel, FlatLabel, int]] = {}
-        self._best_max_row: FlatPanel | None = None
-        self._best_max_value: FlatLabel | None = None
 
     def bind_start(self, callback: Callable[[], None]) -> None:
         self._on_start_cb = callback
@@ -204,22 +591,22 @@ class PreviewView(FlatPanel):
         self._on_auto_optimize_cb = callback
 
     def bind_go_original(self, callback: Callable[[str | None], None]) -> None:
-        self._on_go_original_cb = callback
+        self._positions_table.bind_go_original(callback)
 
     def bind_go_current(self, callback: Callable[[str | None], None]) -> None:
-        self._on_go_current_cb = callback
+        self._positions_table.bind_go_current(callback)
 
     def bind_go_best(self, callback: Callable[[str | None], None]) -> None:
-        self._on_go_best_cb = callback
+        self._positions_table.bind_go_best(callback)
 
     @property
     def auto_optimize_range(self) -> float | None:
-        """Read the Range field in raw motor units (mm, deg, …), or None if empty/invalid."""
+        """Read the Range field in raw motor units (mm, deg, ...), or None if empty/invalid."""
         return self._parse_positive_float(self._auto_range_ctrl.GetValue())
 
     @property
     def auto_optimize_step(self) -> float | None:
-        """Read the Step field in raw motor units (mm, deg, …), or None if empty/invalid."""
+        """Read the Step field in raw motor units (mm, deg, ...), or None if empty/invalid."""
         return self._parse_positive_float(self._auto_step_ctrl.GetValue())
 
     def set_auto_optimize_enabled(self, enabled: bool) -> None:
@@ -319,218 +706,84 @@ class PreviewView(FlatPanel):
         for row in self._centering_rows.values():
             row.set_enabled(self._previewing and not collecting)
 
-    def _build_column1(self) -> wx.BoxSizer:
-        col = wx.BoxSizer(wx.VERTICAL)
-
-        self._toggle_btn = FlatButton(self, "Start Preview", font=app_theme.btn_font())
-        self._toggle_btn.SetMinSize((-1, 36))
-        self._toggle_btn.SetAction(self._on_toggle_clicked)
-        col.Add(self._toggle_btn, 1, wx.EXPAND | wx.BOTTOM, 10)
-
-        sep = FlatPanel(self)
-        sep.SetBackgroundColour(app_theme.bright_black)
-        sep.SetMinSize((-1, 1))
-        sep.SetMaxSize((-1, 1))
-        col.Add(sep, 0, wx.EXPAND)
-        col.AddSpacer(12)
-
-        step_label = FlatLabel(self, label="Step Size")
-        step_label.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-        col.Add(step_label, 0, wx.ALIGN_CENTRE_HORIZONTAL | wx.BOTTOM, 4)
-
-        self._custom_ctrl = FlatTextCtrl(
-            self,
-            value=self._format_mm(self._step_mm),
-            placeholder="mm",
-            centered=True,
-        )
-        self._custom_ctrl.SetMinSize((-1, 28))
-        self._custom_ctrl.SetMaxSize((-1, 28))
-        self._custom_ctrl.SetRestrictToFloat(True)
-        self._custom_ctrl.SetValidator(self._validate_custom_step)
-        self._custom_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_custom_committed)
-        self._custom_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_custom_committed)
-        col.Add(self._custom_ctrl, 0, wx.EXPAND)
-
-        return col
-
-    def _build_centering_column(self) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
-        panel = FlatPanel(self)
-
-        sizer = wx.BoxSizer(wx.VERTICAL)
-
-        empty_label = FlatLabel(panel, label="No motors flagged for centering.")
-        empty_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
-        sizer.Add(empty_label, 0)
-
-        panel.SetSizer(sizer)
-        return panel, sizer, empty_label
-
-    def _build_originals_column(self) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
-        panel = FlatPanel(self)
-
-        sizer = wx.BoxSizer(wx.VERTICAL)
-
-        header_row = wx.BoxSizer(wx.HORIZONTAL)
-        header = FlatLabel(panel, label="Original Positions")
-        header.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-        self._originals_go_btn = FlatButton(panel, "Go", font=app_theme.btn_font())
-        self._originals_go_btn.SetMinSize((36, 22))
-        self._originals_go_btn.Enable(False)
-        header_row.Add(header, 0, wx.ALIGN_CENTER_VERTICAL)
-        header_row.Add(self._originals_go_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
-        sizer.Add(header_row, 0, wx.BOTTOM, 6)
-
-        empty_label = FlatLabel(panel, label="No preview snapshot yet.")
-        empty_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
-        sizer.Add(empty_label, 0)
-
-        panel.SetSizer(sizer)
-        return panel, sizer, empty_label
-
     def set_original_positions(
         self,
         positions: list[tuple[str, str, float | None, int]],
         max_intensity: float | None,
     ) -> None:
-        """Replace the Original Positions list."""
-        for row in self._original_rows:
-            self._originals_sizer.Detach(row)
-            row.Destroy()
-        self._original_rows.clear()
-
-        if not positions:
-            self._originals_empty_label.Show()
-            self._originals_go_btn.Enable(False)
-            self._originals_panel.Layout()
-            self.Layout()
-            return
-
-        self._originals_empty_label.Hide()
-        on_go_all = self._make_go_invoker("original", None)
-        self._originals_go_btn.SetAction(lambda: on_go_all())
-        self._originals_go_btn.Enable(True)
-
-        self._add_motor_pair_rows(self._originals_panel, self._originals_sizer, positions, self._original_rows, None)
-
-        max_text = f"{max_intensity:.4g}" if max_intensity is not None else "—"
-        row, _, _ = self._make_snapshot_row(self._originals_panel, "Max intensity", max_text, None)
-        self._originals_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
-        self._original_rows.append(row)
-
-        self._originals_panel.Layout()
-        self.Layout()
-
-    def _make_go_invoker(self, column: str, key: str | None) -> Callable[[], None]:
-        def _invoke() -> None:
-            if column == "original":
-                cb = self._on_go_original_cb
-            elif column == "current":
-                cb = self._on_go_current_cb
-            elif column == "best":
-                cb = self._on_go_best_cb
-            else:
-                return
-            if cb is not None:
-                cb(key)
-
-        return _invoke
+        self._positions_table.set_original_all(positions, max_intensity)
 
     def clear_original_positions(self) -> None:
-        self.set_original_positions([], None)
+        self._positions_table.clear_original()
 
-    def _make_snapshot_row(
+    def set_current_positions(
         self,
-        parent: wx.Window,
-        label_text: str,
-        value_text: str,
-        on_go: Callable[[], None] | None,
-    ) -> tuple[FlatPanel, FlatLabel, FlatButton | None]:
-        row = FlatPanel(parent)
-
-        label = FlatLabel(row, label=label_text)
-        label.SetFont(app_theme.scaled_font(12))
-
-        value = FlatLabel(row, label=value_text)
-        value.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-
-        go_btn: FlatButton | None = None
-        s = wx.BoxSizer(wx.HORIZONTAL)
-        s.Add(label, 0, wx.ALIGN_CENTER_VERTICAL)
-        s.AddStretchSpacer(1)
-        s.Add(value, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
-        row.SetSizer(s)
-        return row, value, go_btn
-
-    def _add_motor_pair_rows(
-        self,
-        parent: FlatPanel,
-        sizer: wx.BoxSizer,
-        items: list[tuple[str, str, float | None, int]],
-        container_list: list[wx.Window],
-        key_map: dict[str, tuple[FlatPanel, FlatLabel, int]] | None,
+        positions: list[tuple[str, str, float | None, int]],
+        max_intensity: float | None,
+        original_max_intensity: float | None,
     ) -> None:
-        """Add motor items to *sizer* two per line. Pair containers go into *container_list*.
-        If *key_map* is provided, maps each item key → (cell_panel, value_label, precision)."""
-        it = iter(items)
-        for left in it:
-            right = next(it, None)
+        self._positions_table.set_current_all(positions, max_intensity, original_max_intensity)
 
-            pair = FlatPanel(parent)
-            pair.SetBackgroundColour(app_theme.black)
-            pair_sizer = wx.BoxSizer(wx.HORIZONTAL)
+    def clear_current_positions(self) -> None:
+        self._positions_table.clear_current()
 
-            l_key, l_label, l_value, l_prec = left
-            l_cell, l_val_lbl, _ = self._make_snapshot_row(pair, l_label, self._format_original_position(l_value, l_prec), None)
-            pair_sizer.Add(l_cell, 1, wx.EXPAND)
-            if key_map is not None:
-                key_map[l_key] = (l_cell, l_val_lbl, l_prec)
+    def update_current_position(self, pv: str, value: float | None) -> None:
+        self._positions_table.update_current(pv, value)
 
-            if right is not None:
-                r_key, r_label, r_value, r_prec = right
-                r_cell, r_val_lbl, _ = self._make_snapshot_row(pair, r_label, self._format_original_position(r_value, r_prec), None)
-                pair_sizer.AddSpacer(12)
-                pair_sizer.Add(r_cell, 1, wx.EXPAND)
-                if key_map is not None:
-                    key_map[r_key] = (r_cell, r_val_lbl, r_prec)
+    def update_current_max_intensity(self, value: float | None) -> None:
+        self._positions_table.update_current_max(value)
 
-            pair.SetSizer(pair_sizer)
-            sizer.Add(pair, 0, wx.EXPAND | wx.BOTTOM, 2)
-            container_list.append(pair)
+    def set_best_positions(
+        self,
+        positions: list[tuple[str, str, float | None, int]],
+        max_intensity: float | None,
+    ) -> None:
+        self._positions_table.set_best_all(positions, max_intensity)
 
-    @staticmethod
-    def _format_original_position(value: float | None, precision: int) -> str:
-        if value is None:
-            return "—"
-        prec = max(0, int(precision))
-        try:
-            return f"{float(value):.{prec}f}"
-        except (TypeError, ValueError):
-            return "—"
+    def clear_best_positions(self) -> None:
+        self._positions_table.clear_best()
 
-    def _build_currents_column(self) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
-        return self._build_snapshot_column("Current Positions", "_currents_go_btn")
+    def update_best_position(self, key: str, value: float | None) -> None:
+        self._positions_table.update_best(key, value)
 
-    def _build_bests_column(self) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
-        return self._build_snapshot_column("Best Positions", "_bests_go_btn")
+    def update_best_max_intensity(self, value: float | None) -> None:
+        self._positions_table.update_best_max(value)
 
-    def _build_snapshot_column(self, title: str, go_btn_attr: str) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
+    def _build_centering_column(self) -> tuple[FlatPanel, wx.BoxSizer, FlatLabel]:
         panel = FlatPanel(self)
-
         sizer = wx.BoxSizer(wx.VERTICAL)
 
-        header_row = wx.BoxSizer(wx.HORIZONTAL)
-        header = FlatLabel(panel, label=title)
-        header.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
-        go_btn = FlatButton(panel, "Go", font=app_theme.btn_font())
-        go_btn.SetMinSize((36, 22))
-        go_btn.Enable(False)
-        setattr(self, go_btn_attr, go_btn)
-        header_row.Add(header, 0, wx.ALIGN_CENTER_VERTICAL)
-        header_row.Add(go_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
-        sizer.Add(header_row, 0, wx.BOTTOM, 6)
+        step_label = FlatLabel(panel, label="Step Size")
+        step_label.SetFont(app_theme.scaled_font(12, weight=wx.FONTWEIGHT_BOLD))
 
-        empty_label = FlatLabel(panel, label="No preview snapshot yet.")
+        self._custom_ctrl = FlatTextCtrl(
+            panel,
+            value=self._format_mm(self._step_mm),
+            placeholder="mm",
+            centered=True,
+        )
+        self._custom_ctrl.SetMinSize((_CenteringRow._VALUE_W, 28))
+        self._custom_ctrl.SetMaxSize((_CenteringRow._VALUE_W, _CenteringRow._ROW_H))
+        self._custom_ctrl.SetRestrictToFloat(True)
+        self._custom_ctrl.SetValidator(self._validate_custom_step)
+        self._custom_ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_custom_committed)
+        self._custom_ctrl.Bind(wx.EVT_TEXT_ENTER, self._on_custom_committed)
+
+        header_row = wx.BoxSizer(wx.HORIZONTAL)
+        header_row.Add(step_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        header_row.AddStretchSpacer(1)
+        header_row.AddSpacer(_CenteringRow._ARROW_SIZE + 8)
+        header_row.Add(self._custom_ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 6)
+        header_row.AddSpacer(_CenteringRow._ARROW_SIZE + 8)
+        sizer.Add(header_row, 0, wx.EXPAND | wx.BOTTOM, 4)
+
+        sep = FlatPanel(panel)
+        sep.SetBackgroundColour(app_theme.bright_black)
+        sep.SetMinSize((-1, 1))
+        sep.SetMaxSize((-1, 1))
+        sizer.Add(sep, 0, wx.EXPAND | wx.BOTTOM, 6)
+
+        empty_label = FlatLabel(panel, label="No motors flagged for centering.")
         empty_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
         sizer.Add(empty_label, 0)
 
@@ -568,192 +821,6 @@ class PreviewView(FlatPanel):
         sizer.Add(inputs_row, 0, wx.EXPAND)
         panel.SetSizer(sizer)
         return panel
-
-    def set_current_positions(
-        self,
-        positions: list[tuple[str, str, float | None, int]],
-        max_intensity: float | None,
-        original_max_intensity: float | None,
-    ) -> None:
-        """Replace the Current Positions list."""
-        self._original_max_intensity = original_max_intensity
-
-        for pair in self._current_pair_rows:
-            self._currents_sizer.Detach(pair)
-            pair.Destroy()
-        self._current_pair_rows.clear()
-        self._current_motor_rows.clear()
-        if self._current_max_row is not None:
-            self._currents_sizer.Detach(self._current_max_row)
-            self._current_max_row.Destroy()
-            self._current_max_row = None
-            self._current_max_value = None
-
-        if not positions:
-            self._currents_empty_label.Show()
-            self._currents_go_btn.Enable(False)
-            self._currents_panel.Layout()
-            self.Layout()
-            return
-
-        self._currents_empty_label.Hide()
-        on_go_all = self._make_go_invoker("current", None)
-        self._currents_go_btn.SetAction(lambda: on_go_all())
-        self._currents_go_btn.Enable(True)
-
-        self._add_motor_pair_rows(
-            self._currents_panel,
-            self._currents_sizer,
-            positions,
-            self._current_pair_rows,
-            self._current_motor_rows,
-        )
-
-        max_text = self._format_max(max_intensity)
-        row, value_label, _ = self._make_snapshot_row(self._currents_panel, "Max intensity", max_text, None)
-        self._currents_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
-        self._current_max_row = row
-        self._current_max_value = value_label
-        self._apply_max_colour(max_intensity)
-
-        self._currents_panel.Layout()
-        self.Layout()
-
-    def clear_current_positions(self) -> None:
-        self.set_current_positions([], None, None)
-
-    def update_current_position(self, key: str, value: float | None) -> None:
-        """Update a single current motor row in place by its PV key."""
-        entry = self._current_motor_rows.get(key)
-        if entry is None:
-            return
-        _row, value_label, precision = entry
-        try:
-            value_label.SetLabel(self._format_original_position(value, precision))
-        except RuntimeError:
-            # Widget was destroyed (e.g. teardown raced with a wx.CallAfter).
-            self._current_motor_rows.pop(key, None)
-
-    def update_current_max_intensity(self, value: float | None) -> None:
-        """Update the live ROI max row and recolour it relative to the original."""
-        if self._current_max_value is None:
-            return
-        try:
-            self._current_max_value.SetLabel(self._format_max(value))
-        except RuntimeError:
-            self._current_max_value = None
-            self._current_max_row = None
-            return
-        self._apply_max_colour(value)
-
-    def set_best_positions(
-        self,
-        positions: list[tuple[str, str, float | None, int]],
-        max_intensity: float | None,
-    ) -> None:
-        """Replace the Best Positions list. *max_intensity* is the running best ROI max."""
-        for pair in self._best_pair_rows:
-            self._bests_sizer.Detach(pair)
-            pair.Destroy()
-        self._best_pair_rows.clear()
-        self._best_motor_rows.clear()
-        if self._best_max_row is not None:
-            self._bests_sizer.Detach(self._best_max_row)
-            self._best_max_row.Destroy()
-            self._best_max_row = None
-            self._best_max_value = None
-
-        if not positions:
-            self._bests_empty_label.Show()
-            self._bests_go_btn.Enable(False)
-            self._bests_panel.Layout()
-            self.Layout()
-            return
-
-        self._bests_empty_label.Hide()
-        on_go_all = self._make_go_invoker("best", None)
-        self._bests_go_btn.SetAction(lambda: on_go_all())
-        self._bests_go_btn.Enable(True)
-
-        self._add_motor_pair_rows(
-            self._bests_panel,
-            self._bests_sizer,
-            positions,
-            self._best_pair_rows,
-            self._best_motor_rows,
-        )
-
-        row, value_label, _ = self._make_snapshot_row(self._bests_panel, "Max intensity", self._format_max(max_intensity), None)
-        self._bests_sizer.Add(row, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 2)
-        self._best_max_row = row
-        self._best_max_value = value_label
-        self._colour_max_label(self._best_max_value, max_intensity)
-
-        self._bests_panel.Layout()
-        self.Layout()
-
-    def clear_best_positions(self) -> None:
-        self.set_best_positions([], None)
-
-    def update_best_position(self, key: str, value: float | None) -> None:
-        entry = self._best_motor_rows.get(key)
-        if entry is None:
-            return
-        _row, value_label, precision = entry
-        try:
-            value_label.SetLabel(self._format_original_position(value, precision))
-        except RuntimeError:
-            self._best_motor_rows.pop(key, None)
-
-    def update_best_max_intensity(self, value: float | None) -> None:
-        if self._best_max_value is None:
-            return
-        try:
-            self._best_max_value.SetLabel(self._format_max(value))
-        except RuntimeError:
-            self._best_max_value = None
-            self._best_max_row = None
-            return
-        if self._colour_max_label(self._best_max_value, value) is None:
-            self._best_max_value = None
-            self._best_max_row = None
-
-    def _apply_max_colour(self, value: float | None) -> None:
-        self._colour_max_label(self._current_max_value, value)
-        if self._current_max_value is None:
-            self._current_max_row = None
-
-    def _colour_max_label(self, label: FlatLabel | None, value: float | None) -> FlatLabel | None:
-        """Apply red/green/neutral colour relative to ``self._original_max_intensity``."""
-        if label is None:
-            return None
-        original = self._original_max_intensity
-        if value is None or original is None:
-            colour = app_theme.foreground
-        elif value < original:
-            colour = app_theme.red
-        elif value > original:
-            colour = app_theme.green
-        else:
-            colour = app_theme.foreground
-        try:
-            label.SetForegroundColour(colour)
-            label.Refresh()
-        except RuntimeError:
-            return None
-        return label
-
-    @staticmethod
-    def _format_max(value: float | None) -> str:
-        if value is None:
-            return "—"
-        try:
-            return f"{float(value):.4g}"
-        except (TypeError, ValueError):
-            return "—"
-
-    def _build_placeholder_column(self) -> wx.BoxSizer:
-        return wx.BoxSizer(wx.VERTICAL)
 
     @staticmethod
     def _format_mm(value_mm: float) -> str:

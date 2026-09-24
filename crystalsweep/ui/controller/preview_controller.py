@@ -102,6 +102,9 @@ class PreviewController:
             # Stop any in-flight preview before tearing down state.
             self._stop_preview(restore=True)
         self._clear_monitors()
+        self._original_snapshot.clear()
+        self._current_snapshot.clear()
+        self._best_snapshot.clear()
         self._view.clear_original_positions()
         self._view.clear_current_positions()
         self._view.clear_best_positions()
@@ -375,9 +378,6 @@ class PreviewController:
         self._original_max_intensity = None
         self._best_max_intensity = None
         self._best_capture_token += 1
-        self._original_snapshot.clear()
-        self._current_snapshot.clear()
-        self._best_snapshot.clear()
 
         detector = self._active_detector()
         acquire_pv = _cam_pv(detector, "Acquire") if detector is not None else ""
