@@ -308,6 +308,7 @@ class _PositionsTable(FlatPanel):
         self._on_go_original_cb: Callable[[str | None], None] | None = None
         self._on_go_current_cb: Callable[[str | None], None] | None = None
         self._on_go_best_cb: Callable[[str | None], None] | None = None
+        self._on_height_needed_cb: Callable[[int], None] | None = None
 
         self._header = _PosTableHeader(self, self._col_widths())
         self._header._go_orig.SetAction(lambda _e=None: self._on_go_original_cb and self._on_go_original_cb(None))
@@ -344,22 +345,24 @@ class _PositionsTable(FlatPanel):
     def bind_go_best(self, callback: Callable[[str | None], None]) -> None:
         self._on_go_best_cb = callback
 
+    def bind_height_needed_changed(self, callback: Callable[[int], None]) -> None:
+        self._on_height_needed_cb = callback
+
     def set_original_all(self, positions: list[tuple[str, str, float | None, int]], max_intensity: float | None) -> None:
         """Rebuild all rows from *positions* and populate the Original column."""
         self._clear_rows()
         widths = self._col_widths()
-        for i, (key, label, value, precision) in enumerate(positions):
+        for key, label, value, precision in positions:
             if not key.strip():
                 continue
-            row = _PosTableRow(self._rows_panel, label or key, precision, widths, alt_bg=bool(i % 2))
+            row = _PosTableRow(self._rows_panel, label or key, precision, widths, alt_bg=False)
             row.set_value(_COL_ORIG, value)
             self._rows_sizer.Add(row, 0, wx.EXPAND)
             self._motor_rows[key] = row
             self._motor_keys.append(key)
 
         if self._motor_keys:
-            max_alt = bool(len(self._motor_keys) % 2)
-            self._max_row = _PosTableRow(self._rows_panel, "Max intensity", 0, widths, alt_bg=max_alt, is_max=True)
+            self._max_row = _PosTableRow(self._rows_panel, "Max intensity", 0, widths, alt_bg=False, is_max=True)
             self._max_row.set_value(_COL_ORIG, max_intensity)
             self._rows_sizer.Add(self._max_row, 0, wx.EXPAND)
             self._orig_max = max_intensity
@@ -370,6 +373,11 @@ class _PositionsTable(FlatPanel):
         self._rows_panel.Show(has_data)
         self._rows_panel.Layout()
         self.Layout()
+
+        n_rows = len(self._motor_keys) + (1 if self._motor_keys else 0)
+        table_h = _P_HEADER_H + 1 + n_rows * _P_ROW_H
+        if self._on_height_needed_cb:
+            self._on_height_needed_cb(table_h)
 
     def clear_original(self) -> None:
         self.set_original_all([], None)
@@ -544,6 +552,9 @@ class PreviewView(FlatPanel):
         self._on_jog_minus_cb: Callable[[CenteringMotorSpec], None] | None = None
         self._on_jog_plus_cb: Callable[[CenteringMotorSpec], None] | None = None
         self._on_auto_optimize_cb: Callable[[], None] | None = None
+        self._on_height_needed_cb: Callable[[int], None] | None = None
+        self._centering_col_h: int = 0
+        self._table_h: int = 0
         self._previewing = False
         self._step_mm: float = 0.001
 
@@ -555,6 +566,7 @@ class PreviewView(FlatPanel):
 
         self._centering_panel, self._centering_sizer, self._centering_empty_label = self._build_centering_column()
         self._positions_table = _PositionsTable(self)
+        self._positions_table.bind_height_needed_changed(self._on_table_height_changed)
         self._auto_optimize_panel = self._build_auto_optimize_panel()
 
         right_col = wx.BoxSizer(wx.VERTICAL)
@@ -599,6 +611,19 @@ class PreviewView(FlatPanel):
 
     def bind_go_best(self, callback: Callable[[str | None], None]) -> None:
         self._positions_table.bind_go_best(callback)
+
+    def bind_height_needed_changed(self, callback: Callable[[int], None]) -> None:
+        self._on_height_needed_cb = callback
+
+    def _on_table_height_changed(self, table_h: int) -> None:
+        self._table_h = table_h
+        self._emit_height_needed()
+
+    def _emit_height_needed(self) -> None:
+        _right_col_h = 108
+        needed = max(self._centering_col_h, self._table_h, _right_col_h) + 16
+        if self._on_height_needed_cb:
+            self._on_height_needed_cb(needed)
 
     @property
     def auto_optimize_range(self) -> float | None:
@@ -649,6 +674,8 @@ class PreviewView(FlatPanel):
         if not specs:
             self._centering_empty_label.Show()
             self._centering_panel.Layout()
+            self._centering_col_h = 0
+            self._emit_height_needed()
             return
 
         self._centering_empty_label.Hide()
@@ -663,6 +690,10 @@ class PreviewView(FlatPanel):
             self._centering_rows[spec.pv] = row
             self._centering_sizer.Add(row, 0, wx.EXPAND | wx.BOTTOM, 4)
         self._centering_panel.Layout()
+
+        n = len(self._centering_rows)
+        self._centering_col_h = 39 + n * (_CenteringRow._ROW_H + 4)
+        self._emit_height_needed()
 
     def update_centering_value(self, pv: str, value: float | None) -> None:
         """Push a new live readback value into the row identified by *pv*."""

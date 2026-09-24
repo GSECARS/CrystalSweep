@@ -167,9 +167,15 @@ class MainView(wx.Frame):
         tabs.SetMinSize((-1, 150))
 
         self.preview = PreviewView(tabs)
+        self.preview.bind_height_needed_changed(self._on_centering_height_changed)
 
         tabs.AddPage("Preview", self.preview)
         return tabs
+
+    def _on_centering_height_changed(self, h: int) -> None:
+        needed = h + 30
+        self.centering_tabs.SetMinSize((-1, max(150, needed)))
+        self._left_panel.Layout()
 
     def _build_menu_bar(self) -> CrystalMenuBar | None:
         if sys.platform == "darwin":
