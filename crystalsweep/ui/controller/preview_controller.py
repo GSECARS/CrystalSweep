@@ -618,6 +618,8 @@ class PreviewController:
                     return
                 try:
                     caput(_val_pv(pv), position, wait=True)
+                    self._current_snapshot[pv] = position
+                    wx.CallAfter(self._view.update_current_position, pv, position)
                 except Exception as exc:
                     _log.warning("Go (%s): failed to move %s to %g: %s", label, pv, position, exc)
 

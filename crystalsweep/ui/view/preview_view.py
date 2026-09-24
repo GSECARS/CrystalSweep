@@ -123,7 +123,7 @@ class _CenteringRow(FlatPanel):
             cb(self.spec)
 
 
-class _PosTableRow(FlatPanel):
+class _PosTableRow(wx.Panel):
     """One painted row in the positions table: motor label + Original/Current/Best values."""
 
     def __init__(
@@ -135,7 +135,8 @@ class _PosTableRow(FlatPanel):
         alt_bg: bool,
         is_max: bool = False,
     ) -> None:
-        super().__init__(parent, size=(-1, _P_ROW_H))
+        super().__init__(parent, style=wx.BORDER_NONE)
+        self.SetMinSize((-1, _P_ROW_H))
         self.SetBackgroundStyle(wx.BG_STYLE_PAINT)
         self._label = label
         self._precision = max(0, int(precision))
@@ -185,7 +186,7 @@ class _PosTableRow(FlatPanel):
         if gc is None:
             return
 
-        bg = app_theme.bright_black if self._alt_bg else app_theme.black
+        bg = app_theme.black if self._alt_bg else app_theme.background
         gc.SetBrush(wx.Brush(bg))
         gc.SetPen(wx.TRANSPARENT_PEN)
         gc.DrawRectangle(0, 0, w, h)
@@ -309,9 +310,9 @@ class _PositionsTable(FlatPanel):
         self._on_go_best_cb: Callable[[str | None], None] | None = None
 
         self._header = _PosTableHeader(self, self._col_widths())
-        self._header._go_orig.SetAction(lambda: self._on_go_original_cb and self._on_go_original_cb(None))
-        self._header._go_curr.SetAction(lambda: self._on_go_current_cb and self._on_go_current_cb(None))
-        self._header._go_best.SetAction(lambda: self._on_go_best_cb and self._on_go_best_cb(None))
+        self._header._go_orig.SetAction(lambda _e=None: self._on_go_original_cb and self._on_go_original_cb(None))
+        self._header._go_curr.SetAction(lambda _e=None: self._on_go_current_cb and self._on_go_current_cb(None))
+        self._header._go_best.SetAction(lambda _e=None: self._on_go_best_cb and self._on_go_best_cb(None))
 
         self._header_border = FlatPanel(self)
         self._header_border.SetBackgroundColour(_P_BORDER)

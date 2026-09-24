@@ -24,7 +24,7 @@ from crystalsweep.ui.view.collect_view import CollectView
 from crystalsweep.ui.view.collection_settings_view import CollectionSettingsView
 from crystalsweep.ui.view.collection_table_view import CollectionTableView
 from crystalsweep.ui.view.custom.theme import app_theme
-from crystalsweep.ui.view.custom.widgets import CrystalMenuBar, FlatLabel, FlatPanel, ThemedSectionDivider
+from crystalsweep.ui.view.custom.widgets import CrystalMenuBar, FlatPanel, ThemedSectionDivider
 from crystalsweep.ui.view.file_settings_view import FileSettingsView
 from crystalsweep.ui.view.preview_view import PreviewView
 
@@ -168,21 +168,7 @@ class MainView(wx.Frame):
 
         self.preview = PreviewView(tabs)
 
-        xrd_page = FlatPanel(tabs)
-        xrd_label = FlatLabel(xrd_page, label="Coming soon")
-        xrd_label.SetFont(app_theme.scaled_font(12, style=wx.FONTSTYLE_ITALIC))
-        xrd_sizer = wx.BoxSizer(wx.VERTICAL)
-        xrd_sizer.AddStretchSpacer(1)
-        xrd_row = wx.BoxSizer(wx.HORIZONTAL)
-        xrd_row.AddStretchSpacer(1)
-        xrd_row.Add(xrd_label, 0, wx.ALIGN_CENTER_VERTICAL)
-        xrd_row.AddStretchSpacer(1)
-        xrd_sizer.Add(xrd_row, 0, wx.EXPAND)
-        xrd_sizer.AddStretchSpacer(1)
-        xrd_page.SetSizer(xrd_sizer)
-
         tabs.AddPage("Preview", self.preview)
-        tabs.AddPage("XRD centering", xrd_page)
         return tabs
 
     def _build_menu_bar(self) -> CrystalMenuBar | None:
