@@ -151,10 +151,7 @@ class CollectController:
         if focused is not None:
             focused.Navigate()
 
-        if self._view.collect.test_mode:
-            points = self._model.collection.points
-        else:
-            points = [p for p in self._model.collection.points if p.selected]
+        points = [p for p in self._model.collection.points if p.selected]
 
         if not points:
             self._view.collect.set_status("No points selected.", wx.Colour(220, 160, 40))
