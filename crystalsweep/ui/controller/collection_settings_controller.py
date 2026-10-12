@@ -58,6 +58,7 @@ class CollectionSettingsController:
         cs.bind_rotation_range_changed(self._on_rotation_range_changed)
         cs.bind_step_size_changed(self._on_step_size_changed)
         cs.bind_wide_flip_changed(self._on_wide_flip_changed)
+        cs.bind_save_gathering_changed(self._on_save_xps_gathering_changed)
         cs.bind_add_point(self._on_add_point)
         cs.bind_update_selected(self._on_update_selected)
 
@@ -75,6 +76,7 @@ class CollectionSettingsController:
         v.set_rotation_range(cs.rotation_range)
         v.set_step_size(cs.step_size)
         v.set_wide_flip(cs.wide_flip)
+        v.set_save_gathering(cs.save_xps_gathering)
         v.set_map_start(cs.map_start)
         v.set_map_end(cs.map_end)
         v.set_map_step(cs.map_step)
@@ -154,6 +156,9 @@ class CollectionSettingsController:
         self._view.collection_table.set_keep_shutter_open_visible(keep_shutter_visible)
         self._view.collection_table.set_use_ext_visible(not cs.map)
         self._view.collection_table.set_map_mode(cs.map)
+
+        gathering_visible = still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory
+        self._view.collection_settings.show_save_gathering(gathering_visible)
 
         # Combine-map only makes sense when the output is HDF5 (the combiner
         # only handles HDF5 row files).
@@ -280,6 +285,10 @@ class CollectionSettingsController:
         self._model.collection_settings.wide_flip = value
         self._sync_trajectory_toggle()
         _log.debug("collection_settings.wide_flip = %s", value)
+
+    def _on_save_xps_gathering_changed(self, value: bool) -> None:
+        self._model.collection_settings.save_xps_gathering = value
+        _log.debug("collection_settings.save_xps_gathering = %s", value)
 
     def _on_rotation_start_changed(self, value: float) -> None:
         cs = self._model.collection_settings

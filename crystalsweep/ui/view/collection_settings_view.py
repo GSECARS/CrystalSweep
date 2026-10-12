@@ -245,6 +245,7 @@ class CollectionSettingsView(FlatPanel):
         self._on_step_size_changed_cb: Callable[[float], None] | None = None
         self._on_map_changed_cb: Callable[[bool], None] | None = None
         self._on_wide_flip_changed_cb: Callable[[bool], None] | None = None
+        self._on_save_xps_gathering_changed_cb: Callable[[bool], None] | None = None
         self._on_map_motor_changed_cb: Callable[[str], None] | None = None
         self._on_map_start_changed_cb: Callable[[float], None] | None = None
         self._on_map_end_changed_cb: Callable[[float], None] | None = None
@@ -376,6 +377,12 @@ class CollectionSettingsView(FlatPanel):
         self._map_toggle = FlatCheckBox(self, "Map")
         self._map_toggle.SetAction(lambda v: self._on_map_toggle_changed(v))
         row.Add(self._map_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+        row.AddSpacer(8)
+
+        self._gathering_toggle = FlatCheckBox(self, "Save gathering")
+        self._gathering_toggle.SetAction(lambda v: self._on_gathering_toggle_changed(v))
+        row.Add(self._gathering_toggle, 0, wx.ALIGN_CENTER_VERTICAL)
+        self._gathering_toggle.Hide()
 
         self._scan_row = row
         return row
@@ -475,6 +482,8 @@ class CollectionSettingsView(FlatPanel):
         self._map_table.Show(show)
         self._map_presets_panel.Show(show)
         self._add_btn.SetLabel("+ Add map points" if show else "+ Add point")
+        if not show:
+            self._gathering_toggle.Hide()
         self._refresh_flip_visibility()
         self.Layout()
         self.GetParent().Layout()
@@ -504,6 +513,7 @@ class CollectionSettingsView(FlatPanel):
             ctrl.Enable(enabled)
         self._map_toggle.Enable(enabled)
         self._flip_toggle.Enable(enabled)
+        self._gathering_toggle.Enable(enabled)
         if not self._map_table.IsShown():
             return
         for row in (self._map_table.row1, self._map_table.row2):
@@ -527,6 +537,14 @@ class CollectionSettingsView(FlatPanel):
 
     def set_wide_flip(self, value: bool) -> None:
         self._flip_toggle.SetValue(value)
+
+    def set_save_gathering(self, value: bool) -> None:
+        self._gathering_toggle.SetValue(value)
+
+    def show_save_gathering(self, visible: bool) -> None:
+        self._gathering_toggle.Show(visible)
+        self.Layout()
+        self.GetParent().Layout()
 
     def set_rotation_start(self, value: float) -> None:
         self._rot_start_ctrl.SetValue(f"{value}")
@@ -605,6 +623,9 @@ class CollectionSettingsView(FlatPanel):
     def bind_wide_flip_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_wide_flip_changed_cb = callback
 
+    def bind_save_gathering_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_save_xps_gathering_changed_cb = callback
+
     def bind_map_motor_changed(self, callback: Callable[[str], None]) -> None:
         self._on_map_motor_changed_cb = callback
 
@@ -677,6 +698,9 @@ class CollectionSettingsView(FlatPanel):
 
     def _on_flip_toggle_changed(self, event: wx.Event) -> None:
         self._fire(self._on_wide_flip_changed_cb, self._flip_toggle.GetValue())
+
+    def _on_gathering_toggle_changed(self, event: wx.Event) -> None:
+        self._fire(self._on_save_xps_gathering_changed_cb, self._gathering_toggle.GetValue())
 
     def _on_map1_motor_choice(self, value: str) -> None:
         self._fire(self._on_map_motor_changed_cb, value)

@@ -675,6 +675,8 @@ class ScanEngine:
         on_error: Callable[[Exception], None],
         on_file_number_updated: Callable[[int], None] | None = None,
         keep_shutter_open: bool = False,
+        save_xps_gathering: bool = False,
+        gathering_output_file: str = "Gather.dat",
     ) -> None:
         """Run a trajectory across one map row, collecting one still frame per point.
 
@@ -764,7 +766,7 @@ class ScanEngine:
                         else:
                             self._open_shutter(config)
 
-                    driver.run_array(lambda i, pos: on_frame(i + 1, n_points), n_points, on_at_start=_open_shutter_at_start)
+                    driver.run_array(lambda i, pos: on_frame(i + 1, n_points), n_points, on_at_start=_open_shutter_at_start, save_gathering=save_xps_gathering, gathering_output_file=gathering_output_file)
                 else:
                     driver.prepare(spec)
                     if self._abort_event.is_set():

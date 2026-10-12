@@ -155,13 +155,15 @@ class NewportXPSModel:
         on_point: Callable[[int, float], None],
         n_points: int,
         on_at_start: Callable[[], None] | None = None,
+        save_gathering: bool = False,
+        gathering_output_file: str = "Gather.dat",
     ) -> None:
         if self._aborted:
             return
         self._xps.arm_trajectory(name="forward", move_to_start=True)
         if on_at_start is not None:
             on_at_start()
-        self._xps.run_trajectory(name="forward", save=False, clean=True, move_to_start=False)
+        self._xps.run_trajectory(name="forward", save=save_gathering, output_file=gathering_output_file, clean=True, move_to_start=False)
         if not self._aborted:
             on_point(n_points - 1, 0.0)
 

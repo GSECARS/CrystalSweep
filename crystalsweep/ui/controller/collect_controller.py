@@ -937,6 +937,15 @@ class CollectController:
             wx.Colour(99, 179, 237),
         )
 
+        save_gathering = self._model.collection_settings.save_xps_gathering
+        gathering_file = "Gather.dat"
+        if save_gathering and self._output_paths is not None and row_points:
+            ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
+            try:
+                gathering_file = str(self._output_paths.map_source_dir() / f"{ref.label}_gathering.dat")
+            except Exception:
+                pass
+
         try:
             self._engine.run_map_row_trajectory(
                 config=config,
@@ -950,6 +959,8 @@ class CollectController:
                 on_error=on_error,
                 on_file_number_updated=self._on_file_number_updated,
                 keep_shutter_open=keep_shutter_open,
+                save_xps_gathering=save_gathering,
+                gathering_output_file=gathering_file,
             )
         except RuntimeError as exc:
             wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
