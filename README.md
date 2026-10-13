@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="crystalsweep/assets/crystalsweep_logo.svg" alt="CrystalSweep logo" width="48" align="absmiddle">
+  <img src="crystalsweep/assets/crystalsweep.svg" alt="CrystalSweep logo" width="48" align="absmiddle">
   &nbsp;CrystalSweep
 </h1>
 
