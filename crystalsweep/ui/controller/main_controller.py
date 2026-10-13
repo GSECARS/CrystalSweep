@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MIT
 
-import sys
 import threading
 
 import wx
@@ -28,6 +27,8 @@ class MainController:
 
         self._model = MainModel()
         self._view = view
+
+        self._setup()
 
         self._file_settings_controller = FileSettingsController(model=self._model, view=self._view)
         self._collection_settings_controller = CollectionSettingsController(model=self._model, view=self._view)
@@ -94,9 +95,8 @@ class MainController:
 
         threading.Thread(target=_worker, daemon=True, name="epics-check").start()
 
-    def run(self) -> None:
-        """Starts the main application loop."""
-        self._view.display_window()
+    def _setup(self) -> None:
+        """Setup configuration."""
         if self._beamline_config_controller.has_active_config():
             self._view.set_active_config_name(self._model.beamline.active.name)
             self._file_settings_controller.apply_crysalis_from_config()

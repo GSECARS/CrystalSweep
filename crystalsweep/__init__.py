@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: MIT
 
+import sys
 from argparse import ArgumentParser
 from importlib.metadata import version
 from pathlib import Path
 
 from wxutils import AppConfig, WxApplication, add_application_arguments, handle_shortcut_arguments
 
-from crystalsweep.ui.controller.main_controller import MainController
-from crystalsweep.ui.view.main_view import MainView
+from crystalsweep.ui.controller import MainController
+from crystalsweep.ui.view import MainView
 
 __version__ = version("crystalsweep")
 __all__ = ["__version__", "main"]
@@ -43,5 +44,5 @@ def main() -> None:
 
     app = WxApplication(APP_CONFIG, False)
     view = MainView(version=__version__, with_inspect=args.inspect)
-    controller = MainController(view=view)
+    MainController(view=view)
     app.run(view)
