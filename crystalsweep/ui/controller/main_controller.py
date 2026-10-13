@@ -28,7 +28,6 @@ class MainController:
         self._model = MainModel()
         self._view = view
 
-        self._setup()
 
         self._file_settings_controller = FileSettingsController(model=self._model, view=self._view)
         self._collection_settings_controller = CollectionSettingsController(model=self._model, view=self._view)
@@ -54,6 +53,8 @@ class MainController:
             view=self._view,
         )
         self._preview_controller = PreviewController(model=self._model, view=self._view.preview)
+
+        self._setup()
 
     def _on_collecting_changed(self, collecting: bool) -> None:
         self._view.set_ui_collecting(collecting)
