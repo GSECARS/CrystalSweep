@@ -29,7 +29,6 @@ from crystalsweep.ui.controller.file_settings_controller import FileSettingsCont
 from crystalsweep.ui.controller.preview_controller import PreviewController
 from crystalsweep.ui.controller.script_editor_controller import ScriptEditorController
 from crystalsweep.ui.view import MainView
-from crystalsweep.ui.view.custom.theme import AppTheme
 
 __all__ = ["MainController"]
 
@@ -37,20 +36,11 @@ __all__ = ["MainController"]
 class MainController:
     """Implements the main controller for the CrystalSweep application. Helps to bridge the gap between the model and view components."""
 
-    def __init__(self, version: str) -> None:
+    def __init__(self, view: MainView) -> None:
         """Initializes the main controller."""
-        if sys.platform == "win32":
-            try:
-                wx.App.SetDPIAwareness(wx.DPI_AWARENESS_CTX_PER_MONITOR_AWARE_V2)
-            except AttributeError:
-                import ctypes
 
-                ctypes.windll.shcore.SetProcessDpiAwareness(2)
-
-        self._app = wx.App(False)
-        self._app_theme = AppTheme()
         self._model = MainModel()
-        self._view = MainView(version=version)
+        self._view = view
 
         self._file_settings_controller = FileSettingsController(model=self._model, view=self._view)
         self._collection_settings_controller = CollectionSettingsController(model=self._model, view=self._view)
@@ -127,4 +117,3 @@ class MainController:
             self._check_epics_status()
         else:
             wx.CallAfter(self._beamline_config_controller.open_general)
-        self._app.MainLoop()
