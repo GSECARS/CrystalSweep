@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/License-MIT-teal.svg)](LICENSE.txt) [![Python](https://img.shields.io/badge/Python-3.14-22558a.svg?logo=python&color=22558a)](https://www.python.org/)
 [![Tests](https://github.com/gsecars/crystalsweep/actions/workflows/tests.yml/badge.svg)](https://github.com/gsecars/crystalsweep/actions/workflows/tests.yml)
 [![Docs](https://github.com/gsecars/crystalsweep/actions/workflows/docs.yml/badge.svg)](https://github.com/gsecars/crystalsweep/actions/workflows/docs.yml)
+[![PyPI](https://img.shields.io/pypi/v/crystalsweep.svg?color=22558a)](https://pypi.org/project/crystalsweep/) 
 
 CrystalSweep is a beamline control and data acquisition software for single-crystal X-ray diffraction experiments. It provides an integrated interface for controlling synchrotron beamline hardware and collecting single-crystal X-ray diffraction data.
 
