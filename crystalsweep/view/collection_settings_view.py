@@ -5,8 +5,8 @@ from typing import Callable
 import wx
 
 from crystalsweep.model.collection_model import SCAN_TYPES, ScanType
-from crystalsweep.ui.view.custom.theme import app_theme
-from crystalsweep.ui.view.custom.widgets import FlatLabel, FlatPanel
+from crystalsweep.view.custom.theme import app_theme
+from crystalsweep.view.custom.widgets import FlatLabel, FlatPanel
 from wxutils import FlatButton, FlatCheckBox, FlatTextCtrl, FlatCombo, FlatTableHeader, FlatTableRow
 
 __all__ = ["CollectionSettingsView"]

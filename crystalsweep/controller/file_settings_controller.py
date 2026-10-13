@@ -8,7 +8,7 @@ import wx
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.detector_model import get_detector_model
-from crystalsweep.ui.view import MainView
+from crystalsweep.view import MainView
 
 __all__ = ["FileSettingsController"]
 
@@ -230,7 +230,7 @@ class FileSettingsController:
                     continue
                 frame_str = label_parts[-2]
                 point_str = label_parts[-1]
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 continue
             new_label = f"{new_ext}_{frame_str}_{point_str}"
             self._model.collection.update_label(index, new_label)

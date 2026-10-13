@@ -10,7 +10,7 @@ from wxutils import FlatMessageDialog
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.beamline_config_model import BeamlineConfig, DetectorConfig, MotorConfig
-from crystalsweep.ui.view.preview_view import CenteringMotorSpec, PreviewView
+from crystalsweep.view.preview_view import CenteringMotorSpec, PreviewView
 from crystalsweep.utils import check_soft_limits
 
 __all__ = ["PreviewController"]
@@ -178,7 +178,7 @@ class PreviewController:
             return
         try:
             numeric: float | None = float(value) if value is not None else None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             numeric = None
         wx.CallAfter(self._view.update_centering_value, setpoint, numeric)
         # Mirror the value into the Current Positions column when previewing.

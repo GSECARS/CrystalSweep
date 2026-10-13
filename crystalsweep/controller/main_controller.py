@@ -6,15 +6,15 @@ import wx
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.beamline_config_model import BeamlineConfig
-from crystalsweep.ui.controller.ad_viewer_controller import ADViewerController
-from crystalsweep.ui.controller.beamline_config_controller import BeamlineConfigController
-from crystalsweep.ui.controller.collect_controller import CollectController
-from crystalsweep.ui.controller.collection_settings_controller import CollectionSettingsController
-from crystalsweep.ui.controller.collection_table_controller import CollectionTableController
-from crystalsweep.ui.controller.file_settings_controller import FileSettingsController
-from crystalsweep.ui.controller.preview_controller import PreviewController
-from crystalsweep.ui.controller.script_editor_controller import ScriptEditorController
-from crystalsweep.ui.view import MainView
+from crystalsweep.controller.ad_viewer_controller import ADViewerController
+from crystalsweep.controller.beamline_config_controller import BeamlineConfigController
+from crystalsweep.controller.collect_controller import CollectController
+from crystalsweep.controller.collection_settings_controller import CollectionSettingsController
+from crystalsweep.controller.collection_table_controller import CollectionTableController
+from crystalsweep.controller.file_settings_controller import FileSettingsController
+from crystalsweep.controller.preview_controller import PreviewController
+from crystalsweep.controller.script_editor_controller import ScriptEditorController
+from crystalsweep.view import MainView
 
 __all__ = ["MainController"]
 
@@ -27,7 +27,6 @@ class MainController:
 
         self._model = MainModel()
         self._view = view
-
 
         self._file_settings_controller = FileSettingsController(model=self._model, view=self._view)
         self._collection_settings_controller = CollectionSettingsController(model=self._model, view=self._view)

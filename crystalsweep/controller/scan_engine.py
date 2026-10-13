@@ -753,7 +753,13 @@ class ScanEngine:
                         else:
                             self._open_shutter(config)
 
-                    driver.run_array(lambda i, pos: on_frame(i + 1, n_points), n_points, on_at_start=_open_shutter_at_start, save_gathering=save_xps_gathering, gathering_output_file=gathering_output_file)
+                    driver.run_array(
+                        lambda i, pos: on_frame(i + 1, n_points),
+                        n_points,
+                        on_at_start=_open_shutter_at_start,
+                        save_gathering=save_xps_gathering,
+                        gathering_output_file=gathering_output_file,
+                    )
                 else:
                     driver.prepare(spec)
                     if self._abort_event.is_set():
@@ -819,7 +825,7 @@ class ScanEngine:
                 label_parts = map_label.rsplit("_", 2)
                 map_frame_str = label_parts[-2]
                 frame_number = int(label_parts[-1])
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 map_frame_str = str(file_settings.frame_number)
                 frame_number = file_settings.frame_number
             parts = [p for p in [base, effective_map_ext, map_frame_str] if p]

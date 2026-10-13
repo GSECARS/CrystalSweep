@@ -8,7 +8,7 @@ from epics import caget
 
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import ScanType
-from crystalsweep.ui.view import MainView
+from crystalsweep.view import MainView
 
 __all__ = ["CollectionSettingsController"]
 
@@ -131,10 +131,7 @@ class CollectionSettingsController:
         # Trajectory toggle is relevant for two cases:
         # - still maps whose map motor uses XPS (array trajectory for row scan)
         # - step scans whose rotation motor uses XPS (slew trajectory per point)
-        trajectory_visible = (
-            (still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory)
-            or step_scan
-        )
+        trajectory_visible = (still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory) or step_scan
         if not trajectory_visible:
             self._view.collection_table.set_trajectory_scan(False)
         self._view.collection_table.set_trajectory_visible(trajectory_visible)
@@ -328,7 +325,7 @@ class CollectionSettingsController:
             if raw is not None:
                 try:
                     point.motor_positions[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
         self._view.collection_table.add_row(point)
         self._notify_points_changed()
@@ -349,7 +346,7 @@ class CollectionSettingsController:
                 return 0.0
             try:
                 return float(caget(motor_cfg.pv) or 0.0)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return 0.0
 
         motor1_cfg = next((m for m in motors if m.shorthand == cs.map_motor), None)
@@ -376,7 +373,7 @@ class CollectionSettingsController:
             if raw is not None:
                 try:
                     motor_snapshot[motor.shorthand] = f"{float(raw):.{motor.precision}f}"
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
 
         group_id = str(uuid.uuid4())

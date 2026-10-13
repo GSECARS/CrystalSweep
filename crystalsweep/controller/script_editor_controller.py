@@ -5,8 +5,8 @@ import logging
 import wx
 
 from crystalsweep.model.script_model import ScriptModel
-from crystalsweep.ui.view.main_view import MainView
-from crystalsweep.ui.view.custom.theme import app_theme
+from crystalsweep.view.main_view import MainView
+from crystalsweep.view.custom.theme import app_theme
 from wxutils import FlatScriptEditorDialog
 
 __all__ = ["ScriptEditorController"]

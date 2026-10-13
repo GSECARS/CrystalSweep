@@ -3,7 +3,7 @@
 import wx
 from wxutils import FlatLabel as _FlatLabel, FlatMenuBar, FlatPanel as _FlatPanel, SectionDivider
 
-from crystalsweep.ui.view.custom.theme import app_theme
+from crystalsweep.view.custom.theme import app_theme
 
 __all__ = ["CrystalMenuBar", "FlatLabel", "FlatPanel", "ThemedSectionDivider"]
 

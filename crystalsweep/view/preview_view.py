@@ -5,8 +5,8 @@ from typing import Callable
 import wx
 from wxutils import FlatButton, FlatIconButton, FlatTextCtrl, StatusField, draw_chevron_left, draw_chevron_right
 
-from crystalsweep.ui.view.custom.theme import app_theme
-from crystalsweep.ui.view.custom.widgets import FlatLabel, FlatPanel
+from crystalsweep.view.custom.theme import app_theme
+from crystalsweep.view.custom.widgets import FlatLabel, FlatPanel
 from crystalsweep.utils import MotorPositionValidator
 
 __all__ = ["CenteringMotorSpec", "PreviewView"]
@@ -100,7 +100,7 @@ class _CenteringRow(FlatPanel):
         else:
             try:
                 text = f"{float(value):.{self._precision}f}"
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 text = "—"
         self._value_box.SetValue(text)
 
@@ -157,7 +157,7 @@ class _PosTableRow(wx.Panel):
         try:
             v = float(value)
             return f"{v:.4g}" if self._is_max else f"{v:.{self._precision}f}"
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return "—"
 
     def _on_paint(self, _: wx.PaintEvent) -> None:

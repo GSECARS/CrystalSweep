@@ -8,7 +8,7 @@ from epicsapps.pva_adviewer.ad_viewer_controller import ADViewerController as Ep
 from epicsapps.pva_adviewer.image_loader_model import ImageLoaderModel
 
 from crystalsweep.model import MainModel
-from crystalsweep.ui.view import MainView
+from crystalsweep.view import MainView
 
 __all__ = ["ADViewerController"]
 
@@ -69,5 +69,5 @@ class ADViewerController(EpicsAppsController):
             return
         try:
             self._ad_model.set_last_roi_max_intensity(float(np.asarray(ys).max()))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self._ad_model.clear_last_roi_max_intensity()

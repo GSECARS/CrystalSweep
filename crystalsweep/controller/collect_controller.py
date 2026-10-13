@@ -19,9 +19,9 @@ from wxutils import FlatConfirmDialog, FlatWaitDialog
 from crystalsweep.model import MainModel
 from crystalsweep.model.collection_model import CollectionPoint
 from crystalsweep.model.detector_model import get_detector_model
-from crystalsweep.ui.controller.scan_engine import ScanEngine
-from crystalsweep.ui.view import MainView
-from crystalsweep.ui.view.custom.theme import app_theme
+from crystalsweep.controller.scan_engine import ScanEngine
+from crystalsweep.view import MainView
+from crystalsweep.view.custom.theme import app_theme
 from crystalsweep.utils import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
 from crystalsweep.utils.output_paths import OutputPaths
 
@@ -212,7 +212,7 @@ class CollectController:
                         continue
                     try:
                         pos = float(raw)
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         continue
                     motor_errors[motor_cfg.shorthand] = bool(check_soft_limits(motor_cfg.pv, pos))
 
@@ -223,13 +223,13 @@ class CollectController:
                         try:
                             pos = float(point.rotation_start)
                             rot_start_error = bool(check_soft_limits(rotation_cfg.pv, pos))
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             pass
                     if point.rotation_end:
                         try:
                             pos = float(point.rotation_end)
                             rot_end_error = bool(check_soft_limits(rotation_cfg.pv, pos))
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             pass
 
                 if any(motor_errors.values()) or rot_start_error or rot_end_error:
@@ -1035,7 +1035,14 @@ class CollectController:
         fn_parent = fn_path.parent
         full_directory = Path(str(fs.directory)) / fn_parent if fn_parent != Path(".") else Path(str(fs.directory))
         stem = fn_path.name if fs.filename else ""
-        _log.debug("_build_output_paths: fs.directory=%r fs.filename=%r -> full_directory=%r stem=%r raw=%r", str(fs.directory), fs.filename, str(full_directory), stem, raw)
+        _log.debug(
+            "_build_output_paths: fs.directory=%r fs.filename=%r -> full_directory=%r stem=%r raw=%r",
+            str(fs.directory),
+            fs.filename,
+            str(full_directory),
+            stem,
+            raw,
+        )
         return OutputPaths(
             directory=full_directory,
             raw_directory=Path(raw) if raw else None,
@@ -1077,7 +1084,9 @@ class CollectController:
         except Exception as exc:
             _log.warning("Failed to spawn format conversion: %s", exc)
 
-    def _launch_snake_combiner(self, input_dir: str, output_path: str, pattern: str, first_row_reversed: bool, flipped_dir: str | None = None, row_shift_frames: int = 0) -> None:
+    def _launch_snake_combiner(
+        self, input_dir: str, output_path: str, pattern: str, first_row_reversed: bool, flipped_dir: str | None = None, row_shift_frames: int = 0
+    ) -> None:
         """Spawn the snake-map combiner as a detached subprocess."""
         args = {
             "input_dir": input_dir,

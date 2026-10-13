@@ -7,7 +7,7 @@ from typing import Callable
 import wx
 
 from crystalsweep.model import BeamlineConfig, MainModel
-from crystalsweep.ui.view import (
+from crystalsweep.view import (
     ControllersConfigDialog,
     CrysalisConfigDialog,
     DetectorsConfigDialog,

@@ -8,7 +8,7 @@ from epics import caget, caput
 
 from crystalsweep.model import BeamlineConfig, MainModel
 from crystalsweep.model.collection_model import ScanType
-from crystalsweep.ui.view.collection_table_view import CollectionTableView
+from crystalsweep.view.collection_table_view import CollectionTableView
 
 __all__ = ["CollectionTableController"]
 
