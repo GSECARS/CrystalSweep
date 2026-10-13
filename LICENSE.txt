@@ -1,7 +1,7 @@
 MIT License
 
-Copyright (c) 2026 GSECARS, The University of Chicago, USA
-Copyright (c) 2026 NSF SEES, USA
+Copyright (c) 2024-2026 GSECARS, University of Chicago, USA
+Copyright (c) 2024-2026 Christofanis Skordas
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
