@@ -55,5 +55,5 @@ def main() -> None:
 
     app = WxApplication(APP_CONFIG, False)
     view = MainView(version=__version__, with_inspect=args.inspect)
-    _controller = MainController(view=view)
+    controller = MainController(view=view)
     app.run(view)
