@@ -107,11 +107,6 @@ def _load_hdf5_frames(path: Path):
         _log.warning("h5py/numpy not available; skipping %s", path)
         return
 
-    try:
-        import hdf5plugin
-    except ImportError:
-        pass
-
     with h5py.File(str(path), "r") as fh:
         primary: str | None = None
         for candidate in _PRIMARY_HDF5_PATHS:
@@ -179,8 +174,8 @@ def _write_hdf5(out_path: Path, data) -> None:
 
 def _write_fabio(out_path: Path, data, target_format: str) -> None:
     if target_format == "tif":
-        from PIL import Image
         import numpy as np
+        from PIL import Image
 
         arr = np.asarray(data)
         Image.fromarray(arr).save(str(out_path))
