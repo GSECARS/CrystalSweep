@@ -407,7 +407,7 @@ requires-dist = [
     { name = "bitshuffle", specifier = ">=0.5.2" },
     { name = "blosc", specifier = ">=1.11.4" },
     { name = "cryio", specifier = ">=2018.5.30" },
-    { name = "epicsapps" },
+    { name = "epicsapps", specifier = ">=2026.2.0" },
     { name = "fabio", specifier = ">=2026.6.0" },
     { name = "h5py", specifier = ">=3.16.0" },
     { name = "lz4", specifier = ">=4.4.5" },
