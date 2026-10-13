@@ -3,7 +3,7 @@
 ## Requirements
 
 - Python 3.14
-- wxPython 4.2.5+
+- wxPython 4.3.1+
 - A working EPICS environment (for beamline control)
 
 ## Install from PyPI
@@ -15,7 +15,7 @@ pip install crystalsweep
 ## Install from Source
 
 ```bash
-git clone https://github.com/GSECARS/CrystalSweep.git
+git clone https://github.com/gsecars/crystalsweep.git
 cd CrystalSweep
 pip install .
 ```
@@ -23,10 +23,10 @@ pip install .
 ### Using uv (recommended for development)
 
 ```bash
-git clone https://github.com/GSECARS/CrystalSweep.git
+git clone https://github.com/gsecars/crystalsweep.git
 cd CrystalSweep
 uv sync
-uv run crystalsweep --gui
+uv run crystalsweep
 ```
 
 ## Platform Notes
@@ -42,5 +42,5 @@ crystalsweep --help
 You should see the CLI help output. To launch the full GUI:
 
 ```bash
-crystalsweep --gui
+crystalsweep
 ```

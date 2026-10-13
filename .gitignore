@@ -24,8 +24,8 @@ Desktop.ini
 .ruff_cache/
 .pytest_cache/
 
-# MkDocs build output
-site/
+# Docs build output
+docs/_build/
 
 # Configuration files
 configs/
