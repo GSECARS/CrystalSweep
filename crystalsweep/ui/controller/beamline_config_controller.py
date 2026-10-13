@@ -1,18 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/controller/beamline_config_controller.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Controller bridging the beamline configuration model and the four modal
-# configuration dialogs (General, Detectors, Controllers, Positioners) plus
-# File-menu load / save / save-as actions.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import logging
 import threading

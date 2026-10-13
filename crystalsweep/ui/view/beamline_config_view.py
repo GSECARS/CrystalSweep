@@ -1,17 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/beamline_config_view.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Beamline configuration panels and modal dialogs: General, Detectors, Controllers,
-# and Positioners (rotation stage + motors) with a consistent table-styled UI.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import sys
 from typing import Callable, Protocol

@@ -1,19 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/controller/preview_controller.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Controller for the Preview tab inside the Single-Crystal Centering Tools
-# section.  Manages the centering-motors column: it builds rows from the active
-# beamline config, subscribes camonitor() on each motor's readback PV, and
-# performs relative caput moves when the user clicks the jog arrows.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import logging
 import threading

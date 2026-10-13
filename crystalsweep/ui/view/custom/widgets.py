@@ -1,16 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/custom/widgets.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Reusable custom wx controls shared across view panels.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import wx
 from wxutils import FlatLabel as _FlatLabel, FlatMenuBar, FlatPanel as _FlatPanel, SectionDivider

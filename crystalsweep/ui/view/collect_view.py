@@ -1,17 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/collect_view.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Bottom-of-left-panel collect section: status label, progress bar with inline
-# point/frame text, and a Collect button that becomes Abort while collecting.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from typing import Callable
 

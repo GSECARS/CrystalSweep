@@ -1,18 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/preview_view.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Preview tab inside the Single-Crystal Centering Tools section.
-# Provides a Start/Stop preview button, step-size input, live motor jog rows,
-# and a combined Original/Current/Best positions table.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from typing import Callable
 

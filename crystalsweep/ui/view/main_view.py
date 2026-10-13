@@ -1,16 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/main_view.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# This file is used to implement the main view for the CrystalSweep application.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import sys
 from typing import Callable
@@ -196,7 +184,7 @@ class MainView(wx.Frame):
             save_item = file_menu.Append(wx.ID_SAVE, "Save config\tCtrl+S")
             save_as_item = file_menu.Append(wx.ID_SAVEAS, "Save config as\tCtrl+Shift+S")
             file_menu.AppendSeparator()
-            
+
             if self.with_inspect:
                 inspect_item = file_menu.Append(wx.ID_ANY, "Show wxPython Inspection Tools\tCtrl+D")
                 self.Bind(wx.EVT_MENU, self._show_inspection_tool, inspect_item)

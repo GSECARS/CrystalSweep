@@ -1,17 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/controller/scan_engine.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Orchestrates scan execution in a background thread. Bridges the collection
-# model (CollectionPoint, BeamlineConfig) and the motion/detector models.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import logging
 import threading

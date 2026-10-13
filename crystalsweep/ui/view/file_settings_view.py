@@ -1,19 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/file_settings_view.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# File settings panel displayed at the top of the left side panel.  Exposes
-# filename, directory path (with folder-browser button), frame number (with
-# reset and update buttons), map extension, image-format checkboxes, and
-# external software toggles with load-calibration buttons.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import sys
 from pathlib import Path

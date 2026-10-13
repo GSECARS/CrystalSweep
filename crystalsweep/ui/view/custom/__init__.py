@@ -1,16 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/custom/__init__.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Custom view widgets: reusable controls, plot canvases, and shared theme/icons.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from epicsapps.pva_adviewer.image_canvas import ImageCanvas
 from epicsapps.pva_adviewer.integration_plot import IntegrationPlot

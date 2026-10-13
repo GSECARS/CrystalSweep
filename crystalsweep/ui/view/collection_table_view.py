@@ -1,24 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/collection_table_view.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Collection-points table panel with a fully custom-painted dark scrollbar and
-# per-row selection checkbox.
-#
-# The table is virtualized: regardless of how many points are added, only a
-# small pool of `_CollectionRow` widgets is realized (enough to fill the
-# viewport plus a small over-scan buffer). As the user scrolls, pooled rows
-# are re-bound to different points instead of being created/destroyed. This
-# keeps the number of native (HWND/GDI) handles bounded and avoids Windows
-# GDI exhaustion when the table contains hundreds or thousands of map points.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from typing import Callable
 

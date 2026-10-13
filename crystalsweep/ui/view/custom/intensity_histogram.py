@@ -1,17 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: CrystalSweep
-# File: crystalsweep/ui/view/custom/intensity_histogram.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# IntensityHistogramWidget: Histogram configured for image intensity display,
-# with log-scale axis and colormap gradient strip.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from wxmplot.histogram import Histogram
 

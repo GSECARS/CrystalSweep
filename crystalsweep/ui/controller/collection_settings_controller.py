@@ -1,17 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/controller/collection_settings_controller.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Controller that bridges CollectionSettingsModel, CollectionSettingsView, and the
-# CollectionTableModel / CollectionTableView, driving the "add point" action.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import logging
 import uuid

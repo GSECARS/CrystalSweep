@@ -1,18 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/utils/output_paths.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Resolves all output file and directory paths for a collection run. Built once
-# from the active file settings and beamline config, then queried by the spawn
-# helpers in CollectController to eliminate duplicated path-derivation logic.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from __future__ import annotations
 

@@ -1,17 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/controller/collect_controller.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Controller for the collect section: wires the Collect / Abort buttons and
-# drives the collection loop using ScanEngine for still scans on the rotation motor.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import json
 import logging

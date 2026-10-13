@@ -1,18 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/controller/script_editor_controller.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Controller for the script editor dialog. Bridges ScriptModel and
-# FlatScriptEditorDialog: opens the dialog, loads hooks.py into the editor,
-# and saves edits back to disk on demand.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import logging
 

@@ -1,18 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/controller/file_settings_controller.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Controller that bridges FileSettingsModel and FileSettingsView: binds all view
-# callbacks, updates the model on every user action, and syncs the view from the
-# model on startup.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import logging
 import threading

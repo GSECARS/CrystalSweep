@@ -1,22 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/custom/theme.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Central theme facade. Call AppTheme() once after wx.App is created; afterwards
-# import and use the module-level app_theme proxy everywhere:
-#
-#     from crystalsweep.ui.view.custom.theme import app_theme
-#     app_theme.red                   # wx.Colour, updated on OS dark/light switch
-#     app_theme.danger_scheme()       # color tuple for FlatButton
-#     app_theme.scaled_font(12)       # wx.Font
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import sys
 from typing import Optional

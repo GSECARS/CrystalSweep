@@ -1,21 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/ui/view/collection_settings_view.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Collection settings panel placed between file settings and the collection table.
-# Shows a scan-type dropdown and dynamically shows/hides the relevant input fields:
-#   still  -> exposure (s)
-#   wide   -> exposure + rotation start / end / range (labelled with shorthand)
-#   step   -> exposure + rotation start / end / range + step size (deg)
-# An "Add point" button appends the current settings as a new collection row.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from typing import Callable
 
