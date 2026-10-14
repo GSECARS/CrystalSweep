@@ -12,6 +12,9 @@ import time as _time
 from pathlib import Path
 from typing import Callable
 
+import h5py
+import numpy as np
+
 import wx
 from epics import caget, caput, caput_many
 from wxutils import FlatConfirmDialog, FlatWaitDialog
@@ -26,6 +29,20 @@ from crystalsweep.utils import check_soft_limits, clear_limit_monitors, subscrib
 from crystalsweep.utils.output_paths import OutputPaths
 
 __all__ = ["CollectController"]
+
+
+def _midpoints(positions: list[float]) -> list[float]:
+    """Return the centre position for each frame in a continuous-scan trajectory.
+
+    The XPS fires a trigger at the midpoint between consecutive scan positions.
+    The last frame is extrapolated one half-step beyond the final position.
+    """
+    if len(positions) <= 1:
+        return list(positions)
+    mids = [(positions[i] + positions[i + 1]) / 2.0 for i in range(len(positions) - 1)]
+    mids.append(positions[-1] + (positions[-1] - positions[-2]) / 2.0)
+    return mids
+
 
 _log = logging.getLogger(__name__)
 
@@ -973,6 +990,7 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._write_map_row_metadata(row_points, epics_positions, motor1, config)
             self._spawn_format_conversion_for_trajectory_row(row_points)
 
     def _wait_for_eiger_triggering(self, pv_prefix: str, done_event: threading.Event | None = None) -> None:
@@ -1258,6 +1276,109 @@ class CollectController:
             output_dirs=output_dirs,
         )
 
+    def _write_map_row_metadata(
+        self,
+        row_points: list[CollectionPoint],
+        epics_positions: list[float],
+        motor1: str,
+        config,
+    ) -> None:
+        """Write per-frame motor positions into entry/instrument/NDAttributes of the row HDF5 file.
+
+        For the scan axis (motor1) the recorded value is the midpoint between consecutive
+        commanded positions - the centre of the detector dwell. All other motors write
+        the actual position of each frame (constant within a row for motor2 and fixed motors).
+        """
+        output = self._output_paths
+        if output is None:
+            return
+        ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
+        fallback_fn = self._model.file_settings.frame_number
+        bn = output.basename(ref, fallback_fn)
+        src_path = output.map_source_dir() / f"{bn}.h5"
+        if not src_path.exists():
+            return
+
+        scan_positions = _midpoints(epics_positions)
+
+        motor_data: dict[str, np.ndarray] = {}
+        for motor_cfg in config.motors:
+            sh = motor_cfg.shorthand
+            desc = motor_cfg.description
+            label = (desc[:1].upper() + desc[1:]) if desc else sh
+            if sh == motor1:
+                motor_data[label] = np.array(scan_positions, dtype=np.float64)
+            else:
+                vals = []
+                for pt in row_points:
+                    try:
+                        vals.append(float(pt.motor_positions.get(sh, "0") or "0"))
+                    except ValueError:
+                        vals.append(0.0)
+                motor_data[label] = np.array(vals, dtype=np.float64)
+
+        try:
+            with h5py.File(src_path, "a") as f:
+                grp = f.require_group("entry/instrument/NDAttributes")
+                for label, data in motor_data.items():
+                    if label in grp:
+                        del grp[label]
+                    grp.create_dataset(label, data=data)
+        except Exception:
+            _log.exception("Failed to write map row metadata to %s", src_path)
+
+    def _write_point_metadata(
+        self,
+        point: CollectionPoint,
+        frame_number: int,
+        config,
+        rotation_positions: list[float] | None = None,
+    ) -> None:
+        """Write motor positions into entry/instrument/NDAttributes of a single-point HDF5 file.
+
+        For stills and wide scans each motor is a 1-element array of the actual position.
+        For step scans rotation_positions holds the per-frame omega values; all other motors
+        repeat their fixed position for each frame.
+        """
+        output = self._output_paths
+        if output is None:
+            return
+        src_dir = output.source_dir(point)
+        bn = output.basename(point, frame_number)
+        src_path = src_dir / f"{bn}.h5"
+        if not src_path.exists():
+            src_path = src_dir / f"{bn}_master.h5"
+        if not src_path.exists():
+            return
+
+        n_frames = len(rotation_positions) if rotation_positions is not None else 1
+        rotation_motor = getattr(config, "rotation_motor", None)
+        rotation_sh = rotation_motor.shorthand if rotation_motor is not None else None
+
+        motor_data: dict[str, np.ndarray] = {}
+        for motor_cfg in config.motors:
+            sh = motor_cfg.shorthand
+            desc = motor_cfg.description
+            label = (desc[:1].upper() + desc[1:]) if desc else sh
+            if sh == rotation_sh and rotation_positions is not None:
+                motor_data[label] = np.array(rotation_positions, dtype=np.float64)
+            else:
+                try:
+                    val = float(point.motor_positions.get(sh, "0") or "0")
+                except ValueError, AttributeError:
+                    val = 0.0
+                motor_data[label] = np.full(n_frames, val, dtype=np.float64)
+
+        try:
+            with h5py.File(src_path, "a") as f:
+                grp = f.require_group("entry/instrument/NDAttributes")
+                for label, data in motor_data.items():
+                    if label in grp:
+                        del grp[label]
+                    grp.create_dataset(label, data=data)
+        except Exception:
+            _log.exception("Failed to write point metadata to %s", src_path)
+
     def _spawn_format_conversion_for_trajectory_row(
         self,
         row_points: list[CollectionPoint],
@@ -1449,6 +1570,7 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._write_point_metadata(point, frame_number_before, config)
             self._spawn_file_copy(point, frame_number_before)
             self._spawn_format_conversion(point, frame_number_before)
             self._spawn_crysalis_conversion(point, frame_number_before, config)
@@ -1535,6 +1657,8 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            rotation_positions = [params.omega_start + i * params.step for i in range(params.n_frames)]
+            self._write_point_metadata(point, frame_number_before, config, rotation_positions=rotation_positions)
             self._spawn_file_copy(point, frame_number_before)
             self._spawn_format_conversion(point, frame_number_before)
             self._spawn_crysalis_conversion(point, frame_number_before, config)
@@ -1616,6 +1740,7 @@ class CollectController:
             self._abort_event.set()
 
         else:
+            self._write_point_metadata(point, frame_number_before, config)
             self._spawn_file_copy(point, frame_number_before)
             self._spawn_format_conversion(point, frame_number_before)
             self._spawn_crysalis_conversion(point, frame_number_before, config)
