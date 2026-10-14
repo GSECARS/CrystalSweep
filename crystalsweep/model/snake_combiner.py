@@ -413,7 +413,11 @@ def run_copy_map(args: dict) -> None:
 
     _log.info(
         "run_copy_map: input_dir=%r output_dir=%r pattern=%r flip_odd_rows=%s row_shift_frames=%d",
-        input_dir, output_dir, pattern, flip_odd_rows, row_shift_frames,
+        input_dir,
+        output_dir,
+        pattern,
+        flip_odd_rows,
+        row_shift_frames,
     )
 
     if not input_dir or not output_dir:

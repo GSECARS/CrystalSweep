@@ -990,6 +990,7 @@ class CollectController:
             )
             self._abort_event.set()
         else:
+            self._write_expected_positions(row_points, epics_positions, motor1, config)
             self._write_map_row_metadata(row_points, epics_positions, motor1, config)
             self._spawn_format_conversion_for_trajectory_row(row_points)
 
@@ -1275,6 +1276,56 @@ class CollectController:
             width=output.file_number_width,
             output_dirs=output_dirs,
         )
+
+    def _write_expected_positions(
+        self,
+        row_points: list[CollectionPoint],
+        epics_positions: list[float],
+        motor1: str,
+        config,
+    ) -> None:
+        """Write a tab-separated file of expected XPS trigger positions for this map row.
+
+        Saved alongside the gathering files as {label}_expected_positions.dat.
+        The scan axis gets midpoint positions; all other motors show their fixed value.
+        """
+        output = self._output_paths
+        if output is None:
+            return
+        ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
+        fallback_fn = self._model.file_settings.frame_number
+        bn = output.basename(ref, fallback_fn)
+        dest = output.map_source_dir() / f"{bn}_expected_positions.dat"
+
+        scan_positions = _midpoints(epics_positions)
+        n = len(row_points)
+
+        motor_cfgs = [m for m in config.motors if m.shorthand]
+        labels = [(m.shorthand, (m.description[:1].upper() + m.description[1:]) if m.description else m.shorthand) for m in motor_cfgs]
+
+        columns: dict[str, list[float]] = {}
+        for motor_cfg, (sh, label) in zip(motor_cfgs, labels):
+            if sh == motor1:
+                columns[label] = scan_positions
+            else:
+                vals = []
+                for pt in row_points:
+                    try:
+                        vals.append(float(pt.motor_positions.get(sh, "0") or "0"))
+                    except ValueError, AttributeError:
+                        vals.append(0.0)
+                columns[label] = vals
+
+        try:
+            col_names = list(columns.keys())
+            header = "Frame\t" + "\t".join(col_names)
+            lines = [header]
+            for i in range(n):
+                row = f"{i + 1}\t" + "\t".join(f"{columns[c][i]:.6f}" for c in col_names)
+                lines.append(row)
+            dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        except Exception:
+            _log.exception("Failed to write expected positions to %s", dest)
 
     def _write_map_row_metadata(
         self,
