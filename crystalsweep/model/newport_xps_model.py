@@ -243,13 +243,16 @@ class NewportXPSModel:
         else:
             xps_positions = [p - offset for p in epics_positions]
 
-        # define_array_trajectory treats input positions as midpoints between trigger
-        # events, so N inputs produce only N-1 pulses. Appending one extrapolated
-        # position shifts nsegments up by 1, and arm_trajectory's PulseOutputSet
-        # (start=2, end=nsegments) then fires exactly N pulses at the correct EPICS
-        # midpoints.
         if len(xps_positions) >= 2:
-            xps_positions = xps_positions + [2 * xps_positions[-1] - xps_positions[-2]]
+            upos = np.array(xps_positions)
+            mid = np.concatenate(
+                [
+                    [2 * upos[0] - upos[1]],
+                    upos,
+                    [2 * upos[-1] - upos[-2], 3 * upos[-1] - 2 * upos[-2]],
+                ]
+            )
+            xps_positions = list(0.5 * (mid[1:] + mid[:-1]))
 
         axis_name = self._axis_name(positioner_name, group_name)
         self._xps.set_trajectory_group(group_name)
