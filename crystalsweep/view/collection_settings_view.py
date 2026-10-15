@@ -487,7 +487,6 @@ class CollectionSettingsView(FlatPanel):
             ctrl.Enable(enabled)
         self._map_toggle.Enable(enabled)
         self._flip_toggle.Enable(enabled)
-        self._gathering_toggle.Enable(enabled)
         if not self._map_table.IsShown():
             return
         for row in (self._map_table.row1, self._map_table.row2):

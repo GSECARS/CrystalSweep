@@ -686,7 +686,8 @@ class CollectController:
 
             sorted_cols = sorted(row, key=lambda p: p.map_col)
             if use_trajectory:
-                snake_forward = row_num % 2 == 0
+                use_snake = self._model.file_settings.use_snake_trajectory
+                snake_forward = (not use_snake) or (row_num % 2 == 0)
                 row_points = sorted_cols if snake_forward else list(reversed(sorted_cols))
             else:
                 row_points = sorted_cols
@@ -760,6 +761,7 @@ class CollectController:
                     completed_weight=map_completed_weight,
                     row_weight=row_weight,
                     total_weight=total_weight,
+                    snake_mode=use_snake,
                 )
                 map_completed_weight += row_weight
             else:
@@ -859,6 +861,7 @@ class CollectController:
         completed_weight: int = 0,
         row_weight: int = 1,
         total_weight: int = 1,
+        snake_mode: bool = False,
     ) -> None:
         n_points = len(row_points)
         exposure = row_points[0].parse_exposure()
@@ -909,7 +912,7 @@ class CollectController:
             while not done_event.is_set():
                 current = int(caget(counter_pv) or 0)
                 if current > last:
-                    snake_reversed = row_num % 2 == 1
+                    snake_reversed = snake_mode and (row_num % 2 == 1)
                     for f in range(last + 1, current + 1):
                         pt_idx = start_idx + (f - 1)
                         pt_fraction = (completed_weight + row_weight * f / n_points) / max(1, total_weight)
@@ -1108,7 +1111,14 @@ class CollectController:
             _log.warning("Failed to spawn format conversion: %s", exc)
 
     def _launch_snake_combiner(
-        self, input_dir: str, output_path: str, pattern: str, first_row_reversed: bool, flipped_dir: str | None = None, row_shift_frames: int = 0
+        self,
+        input_dir: str,
+        output_path: str,
+        pattern: str,
+        first_row_reversed: bool,
+        flipped_dir: str | None = None,
+        row_shift_frames: int = 0,
+        snake_mode: bool = True,
     ) -> None:
         """Spawn the snake-map combiner as a detached subprocess."""
         args = {
@@ -1118,6 +1128,7 @@ class CollectController:
             "first_row_reversed": first_row_reversed,
             "flipped_dir": flipped_dir or "",
             "row_shift_frames": row_shift_frames,
+            "snake_mode": snake_mode,
         }
         try:
             tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
@@ -1145,6 +1156,7 @@ class CollectController:
             return
         map_pts = self._model.collection.points
         is_step = any(p.map_group and p.scan_type == "step" for p in map_pts)
+        use_snake = self._model.file_settings.use_snake_trajectory
         self._launch_snake_combiner(
             input_dir=str(output.map_source_dir()),
             output_path=str(output.map_combined_path(is_step=is_step)),
@@ -1152,6 +1164,7 @@ class CollectController:
             first_row_reversed=False,
             flipped_dir=str(output.map_flipped_dir()),
             row_shift_frames=row_shift_frames,
+            snake_mode=use_snake,
         )
 
     def _launch_map_copy_to_target(self, input_dir: str, output_dir: str, pattern: str, flip_odd_rows: bool, row_shift_frames: int = 0) -> None:

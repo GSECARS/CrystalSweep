@@ -753,6 +753,7 @@ class CollectionTableView(FlatPanel):
         self._on_use_ext_changed_cb: Callable[[bool], None] | None = None
         self._on_keep_shutter_open_changed_cb: Callable[[bool], None] | None = None
         self._on_snake_combine_changed_cb: Callable[[bool], None] | None = None
+        self._on_snake_trajectory_changed_cb: Callable[[bool], None] | None = None
         self._on_min_width_changed_cb: Callable[[int], None] | None = None
 
         self._build_layout()
@@ -784,10 +785,19 @@ class CollectionTableView(FlatPanel):
 
     def set_trajectory_visible(self, visible: bool) -> None:
         self._slew_scan_toggle.Show(visible)
+        self._snake_trajectory_toggle.Show(visible and self._slew_scan_toggle.GetValue())
         self.Layout()
 
     def set_trajectory_scan(self, value: bool) -> None:
         self._slew_scan_toggle.SetValue(value)
+        self._snake_trajectory_toggle.Show(value and self._slew_scan_toggle.IsShown())
+        self.Layout()
+
+    def set_snake_trajectory(self, value: bool) -> None:
+        self._snake_trajectory_toggle.SetValue(value)
+
+    def bind_snake_trajectory_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_snake_trajectory_changed_cb = callback
 
     def set_keep_shutter_open_visible(self, visible: bool) -> None:
         self._keep_shutter_open_toggle.Show(visible)
@@ -829,7 +839,12 @@ class CollectionTableView(FlatPanel):
             self._on_snake_combine_changed_cb(value)
 
     def _on_trajectory_toggled(self, value: bool) -> None:
+        self._snake_trajectory_toggle.Show(value and self._slew_scan_toggle.IsShown())
         self.Layout()
+
+    def _on_snake_trajectory_toggled(self, value: bool) -> None:
+        if self._on_snake_trajectory_changed_cb is not None:
+            self._on_snake_trajectory_changed_cb(value)
 
     def _on_keep_shutter_open_toggled(self, event: wx.Event) -> None:
         if self._on_keep_shutter_open_changed_cb is not None:
@@ -846,6 +861,10 @@ class CollectionTableView(FlatPanel):
     @property
     def trajectory_scan(self) -> bool:
         return self._slew_scan_toggle.GetValue()
+
+    @property
+    def snake_trajectory(self) -> bool:
+        return self._snake_trajectory_toggle.GetValue()
 
     @property
     def slew_scan(self) -> bool:
@@ -883,6 +902,11 @@ class CollectionTableView(FlatPanel):
         self._slew_scan_toggle.Hide()
         self._slew_scan_toggle.SetAction(lambda v: self._on_trajectory_toggled(v))
 
+        self._snake_trajectory_toggle = FlatCheckBox(self, "Snake")
+        self._snake_trajectory_toggle.SetValue(False)
+        self._snake_trajectory_toggle.Hide()
+        self._snake_trajectory_toggle.SetAction(lambda v: self._on_snake_trajectory_toggled(v))
+
         self._use_ext_toggle = FlatCheckBox(self, "Use Ext.")
         self._use_ext_toggle.SetValue(True)
         self._use_ext_toggle.SetAction(lambda v: self._on_use_ext_toggled(v))
@@ -899,6 +923,7 @@ class CollectionTableView(FlatPanel):
         title_row.AddStretchSpacer()
         title_row.Add(self._snake_combine_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._keep_shutter_open_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
+        title_row.Add(self._snake_trajectory_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._slew_scan_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._use_ext_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._delete_selected_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
