@@ -719,8 +719,8 @@ class CollectController:
                     _log.warning("Failed to prepare motor2 move %s: %s", motor2, exc)
             if self._abort_event.is_set():
                 break
-            # For still trajectory scans the trajectory don't caput to start positions
-            skip_motor1_seed = scan_type == "still" and use_trajectory and row_num > 0
+            # For trajectory scans arm_trajectory(move_to_start=True)
+            skip_motor1_seed = scan_type == "still" and use_trajectory
             if motor1_cfg is not None and not skip_motor1_seed:
                 try:
                     pos1_row = float(first_pt.motor_positions.get(motor1, "0") or "0")
