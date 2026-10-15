@@ -18,7 +18,6 @@
 import logging
 from typing import Callable
 
-import numpy as np
 from epics import caget
 
 from crystalsweep.model.scan_model import ScanSpec
@@ -160,10 +159,10 @@ class NewportXPSModel:
     ) -> None:
         if self._aborted:
             return
-        self._xps.arm_trajectory(name="forward", move_to_start=True)
+        traj_name = "backward" if self._reverse else self._TRAJ_NAME
         if on_at_start is not None:
             on_at_start()
-        self._xps.run_trajectory(name="forward", save=save_gathering, output_file=gathering_output_file, clean=True, move_to_start=False)
+        self._xps.run_trajectory(name=traj_name, save=save_gathering, output_file=gathering_output_file, clean=True, move_to_start=False)
         if not self._aborted:
             on_point(n_points - 1, 0.0)
 
@@ -229,30 +228,24 @@ class NewportXPSModel:
     ) -> None:
         if self._xps is None:
             raise RuntimeError("XPS not connected.")
+        if len(epics_positions) < 2:
+            raise ValueError("At least 2 positions required for array trajectory.")
         pv_base = motor_pv.removesuffix(".VAL")
-        try:
-            offset = float(caget(f"{pv_base}.OFF") or 0.0)
-        except Exception:
-            offset = 0.0
         try:
             direction = int(caget(f"{pv_base}.DIR") or 0)
         except Exception:
             direction = 0
-        if direction:
-            xps_positions = [(p - offset) * -1 for p in epics_positions]
-        else:
-            xps_positions = [p - offset for p in epics_positions]
-
+        epics_range = epics_positions[-1] - epics_positions[0]
+        xps_range = -epics_range if direction else epics_range
+        self._reverse = xps_range < 0
+        rng = abs(xps_range)
+        if rng == 0.0:
+            raise ValueError("Array trajectory requires a non-zero scan range.")
+        n = len(epics_positions)
+        step = rng / (n - 0.5)
+        scantime = exposure * n
         axis_name = self._axis_name(positioner_name, group_name)
-        self._xps.set_trajectory_group(group_name)
-        result = self._xps.define_array_trajectory(
-            positions={axis_name: np.array(xps_positions)},
-            dtime=exposure,
-            name="forward",
-            verbose=False,
-        )
-        if result is None:
-            raise RuntimeError(f"define_array_trajectory failed — check positioner name '{axis_name}' against XPS group '{group_name}' axes.")
+        self._define_line_trajectory(group_name, axis_name, 0.0, rng, step, scantime)
 
     def abort(self) -> None:
         self._aborted = True

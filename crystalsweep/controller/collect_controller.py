@@ -719,8 +719,7 @@ class CollectController:
                     _log.warning("Failed to prepare motor2 move %s: %s", motor2, exc)
             if self._abort_event.is_set():
                 break
-            # For trajectory rows arm_trajectory(move_to_start=True)
-            if motor1_cfg is not None and not (scan_type == "still" and use_trajectory):
+            if motor1_cfg is not None:
                 try:
                     pos1_row = float(first_pt.motor_positions.get(motor1, "0") or "0")
                     limit_err = check_soft_limits(motor1_cfg.pv, pos1_row)
