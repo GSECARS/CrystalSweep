@@ -34,6 +34,7 @@ class ControllerConfig:
     name: str
     type: str
     params: dict = field(default_factory=dict)
+    save_xps_gathering: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,6 +295,7 @@ class BeamlineConfigModel:
                 name=str(c.get("name", "")),
                 type=str(c.get("type", "")),
                 params=dict(c.get("params", {})),
+                save_xps_gathering=bool(c.get("save_xps_gathering", False)),
             )
             for c in controllers_data
         )
@@ -412,7 +414,7 @@ class BeamlineConfigModel:
                 }
                 for idx, d in enumerate(config.detectors)
             ],
-            "controllers": [{"name": c.name, "type": c.type, "params": c.params} for c in config.controllers],
+            "controllers": [{"name": c.name, "type": c.type, "params": c.params, "save_xps_gathering": c.save_xps_gathering} for c in config.controllers],
             "motors": [
                 {
                     "shorthand": m.shorthand,

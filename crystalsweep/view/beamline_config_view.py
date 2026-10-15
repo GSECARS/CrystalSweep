@@ -281,7 +281,8 @@ class _ControllerRow(_TableRow):
         self._params_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self._params_panel.SetSizer(self._params_sizer)
         self._param_ctrls: dict[str, FlatTextCtrl] = {}
-        self._build_params(controller.type, controller.params)
+        self._save_gathering_ctrl: FlatCheckBox | None = None
+        self._build_params(controller.type, controller.params, controller.save_xps_gathering)
 
         self._remove_btn = FlatButton(self, "×", color_scheme=app_theme.danger_scheme(), font=app_theme.btn_font())
         self._remove_btn.SetAction(lambda: on_remove(self))
@@ -301,9 +302,10 @@ class _ControllerRow(_TableRow):
         x += widths[2]
         self._place(self._remove_btn, x, widths[3])
 
-    def _build_params(self, controller_type: str, existing: dict) -> None:
+    def _build_params(self, controller_type: str, existing: dict, save_xps_gathering: bool = False) -> None:
         self._params_sizer.Clear(delete_windows=True)
         self._param_ctrls.clear()
+        self._save_gathering_ctrl = None
         for key, placeholder in _CONTROLLER_TYPE_PARAMS.get(controller_type, []):
             lbl = FlatLabel(self._params_panel, label=f"{key}:")
             lbl.SetFont(app_theme.scaled_font(11))
@@ -311,6 +313,9 @@ class _ControllerRow(_TableRow):
             self._params_sizer.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 2)
             self._params_sizer.Add(ctrl, 1, wx.EXPAND | wx.RIGHT, 6)
             self._param_ctrls[key] = ctrl
+        if controller_type == "newport_xps":
+            self._save_gathering_ctrl = FlatCheckBox(self._params_panel, "Save gathering", value=save_xps_gathering)
+            self._params_sizer.Add(self._save_gathering_ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 8)
         self._params_panel.Layout()
 
     def _current_type(self) -> str:
@@ -332,7 +337,13 @@ class _ControllerRow(_TableRow):
 
     def to_controller(self) -> ControllerConfig:
         params = {k: ctrl.GetValue().strip() for k, ctrl in self._param_ctrls.items() if ctrl.GetValue().strip()}
-        return ControllerConfig(name=self.name_ctrl.GetValue().strip(), type=self._current_type(), params=params)
+        save_gathering = self._save_gathering_ctrl.GetValue() if self._save_gathering_ctrl is not None else False
+        return ControllerConfig(
+            name=self.name_ctrl.GetValue().strip(),
+            type=self._current_type(),
+            params=params,
+            save_xps_gathering=save_gathering,
+        )
 
     def controller_name(self) -> str:
         return self.name_ctrl.GetValue().strip()

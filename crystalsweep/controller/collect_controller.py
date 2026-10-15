@@ -941,7 +941,10 @@ class CollectController:
             wx.Colour(99, 179, 237),
         )
 
-        save_gathering = self._model.collection_settings.save_xps_gathering
+        motor_cfg = next((m for m in config.motors if m.shorthand == motor1), None)
+        ctrl_name = motor_cfg.controller if motor_cfg else ""
+        ctrl_cfg = next((c for c in config.controllers if c.name == ctrl_name), None)
+        save_gathering = ctrl_cfg.save_xps_gathering if ctrl_cfg is not None else False
         gathering_file = "Gather.dat"
         if save_gathering and self._output_paths is not None and row_points:
             ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
@@ -990,7 +993,8 @@ class CollectController:
             )
             self._abort_event.set()
         else:
-            self._write_expected_positions(row_points, epics_positions, motor1, config)
+            if save_gathering:
+                self._write_expected_positions(row_points, epics_positions, motor1, config)
             self._write_map_row_metadata(row_points, epics_positions, motor1, config)
             self._spawn_format_conversion_for_trajectory_row(row_points)
 
