@@ -529,7 +529,7 @@ class _CollectionRow(FlatPanel):
 
     def _apply_enabled_states(self, scan_type: ScanType) -> None:
         disabled = self._collecting
-        self._label_ctrl.Enable(not disabled or not self._label_enabled)
+        self._label_ctrl.Enable(not disabled and self._label_enabled)
         for ctrl in self._motor_ctrls.values():
             ctrl.Enable(not disabled)
         if self._get_btn is not None:

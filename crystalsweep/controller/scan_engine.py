@@ -819,16 +819,9 @@ class ScanEngine:
             folder_suffix = map_ext if map_ext else "map"
             folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
             remote_dir = f"{remote_dir.rstrip('/')}/{folder_name}"
-            effective_map_ext = map_ext if map_ext else "map"
-            map_label = point.label.strip()
-            try:
-                label_parts = map_label.rsplit("_", 2)
-                map_frame_str = label_parts[-2]
-                frame_number = int(label_parts[-1])
-            except ValueError, IndexError:
-                map_frame_str = str(file_settings.frame_number)
-                frame_number = file_settings.frame_number
-            parts = [p for p in [base, effective_map_ext, map_frame_str] if p]
+            label = point.label.strip()
+            parts = [p for p in [base, folder_suffix, label] if p]
+            frame_number = 1
         else:
             disable_auto_increment = bool(label)
             parts = [p for p in [base, label] if p]

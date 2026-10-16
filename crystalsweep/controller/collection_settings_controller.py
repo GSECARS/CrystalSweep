@@ -353,7 +353,6 @@ class CollectionSettingsController:
         axis2 = [origin2 + p for p in axis_positions(cs.map2_start, cs.map2_end, cs.map2_points)] if cs.map2_enabled else [None]
 
         fs = self._model.file_settings
-        map_ext = fs.map_ext.strip() if fs.map_ext.strip() else "map"
         frame_number = fs.frame_number
         det = self._model.beamline.active.active_detector_config
         width = det.file_number_width if det is not None else 4
@@ -372,7 +371,7 @@ class CollectionSettingsController:
         point_index = 0
         for row_idx, pos2 in enumerate(axis2):
             for col_idx, pos1 in enumerate(axis1):
-                label = f"{map_ext}_{frame_number:0{width}d}_{point_index + 1:0{width}d}"
+                label = f"{frame_number + point_index:0{width}d}"
                 point = self._model.collection.add_point(shorthands, label=label)
                 point.selected = True
                 point.scan_type = cs.scan_type

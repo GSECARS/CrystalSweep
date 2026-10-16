@@ -45,22 +45,15 @@ class OutputPaths:
     def basename(self, point, frame_number: int) -> str:
         """Full filename with zero-padded frame number.
 
-        For map points the frame number is parsed from the point label (which
-        encodes the row/col position as the IOC uses it). The supplied
-        frame_number is the fallback when parsing fails.
+        For map points the label is used directly as the filename component
+        and the frame number is always 1 (one acquisition per map position).
         """
         w = max(1, self.file_number_width)
         if point.map_group:
             label = point.label.strip()
-            try:
-                label_parts = label.rsplit("_", 2)
-                if len(label_parts) < 3:
-                    raise ValueError
-                map_frame_str = label_parts[-2]
-                num = int(label_parts[-1])
-                return f"{self.stem(point)}_{map_frame_str}_{num:0{w}d}"
-            except (ValueError, IndexError):
-                return f"{self.stem(point)}_{frame_number:0{w}d}"
+            map_ext = self.map_ext or "map"
+            parts = [p for p in [self.filename, map_ext, label] if p]
+            return f"{'_'.join(parts)}_{1:0{w}d}"
         num = frame_number
         return f"{self.stem(point)}_{int(num):0{w}d}"
 

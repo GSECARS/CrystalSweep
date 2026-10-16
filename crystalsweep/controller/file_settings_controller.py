@@ -218,24 +218,19 @@ class FileSettingsController:
         _log.debug("file_settings.map_ext = %r", value)
 
     def _on_map_ext_update(self) -> None:
-        new_ext = self._model.file_settings.map_ext.strip() or "map"
-        points = self._model.collection.points
-        for index, point in enumerate(points):
+        fs = self._model.file_settings
+        det = self._model.beamline.active.active_detector_config if self._model.beamline.active else None
+        width = det.file_number_width if det is not None else 4
+        frame_number = fs.frame_number
+        point_index = 0
+        for index, point in enumerate(self._model.collection.points):
             if not point.map_group:
                 continue
-            label = point.label.strip()
-            try:
-                label_parts = label.rsplit("_", 2)
-                if len(label_parts) < 3:
-                    continue
-                frame_str = label_parts[-2]
-                point_str = label_parts[-1]
-            except ValueError, IndexError:
-                continue
-            new_label = f"{new_ext}_{frame_str}_{point_str}"
+            new_label = f"{frame_number + point_index:0{width}d}"
             self._model.collection.update_label(index, new_label)
             self._view.collection_table.refresh_row(index, point)
-        _log.debug("map ext update: relabelled map points with ext=%r", new_ext)
+            point_index += 1
+        _log.debug("map ext update: relabelled %d map points from frame %d", point_index, frame_number)
 
     def add_hdf5_changed_listener(self, callback) -> None:
         self._on_hdf5_changed_listeners.append(callback)
