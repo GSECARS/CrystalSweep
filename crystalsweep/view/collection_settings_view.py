@@ -167,8 +167,8 @@ class _MapDataRow(FlatTableRow):
             pts = int(self.points_ctrl.GetValue())
         except ValueError:
             return
-        if pts > 1:
-            self.step_ctrl.SetValue(f"{span / (pts - 1):.4f}")
+        if pts >= 1:
+            self.step_ctrl.SetValue(f"{span / pts:.4f}")
 
     def sync_points_from_step(self) -> None:
         try:
@@ -177,7 +177,7 @@ class _MapDataRow(FlatTableRow):
         except ValueError:
             return
         if step > 0:
-            self.points_ctrl.SetValue(str(max(2, round(span / step) + 1)))
+            self.points_ctrl.SetValue(str(max(1, round(span / step))))
 
     def set_choices(self, choices: list[str]) -> None:
         self.motor_combo.SetChoices(choices)
