@@ -722,6 +722,9 @@ class CollectController:
             if motor1_cfg is not None:
                 try:
                     pos1_row = float(first_pt.motor_positions.get(motor1, "0") or "0")
+                    if use_trajectory and len(row_points) >= 2:
+                        second_pos = float(row_points[1].motor_positions.get(motor1, "0") or "0")
+                        pos1_row -= (second_pos - pos1_row) / 2.0
                     limit_err = check_soft_limits(motor1_cfg.pv, pos1_row)
                     if limit_err:
                         wx.CallAfter(wx.MessageBox, f"Soft limit violation — {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)

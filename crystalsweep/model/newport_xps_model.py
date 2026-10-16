@@ -242,7 +242,7 @@ class NewportXPSModel:
         if rng == 0.0:
             raise ValueError("Array trajectory requires a non-zero scan range.")
         n = len(epics_positions)
-        step = rng / (n - 0.5)
+        step = rng / (n - 1)
         scantime = exposure * n
         axis_name = self._axis_name(positioner_name, group_name)
         self._define_line_trajectory(group_name, axis_name, 0.0, rng, step, scantime)
