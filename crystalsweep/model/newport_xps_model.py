@@ -202,6 +202,7 @@ class NewportXPSModel:
             step=step,
             scantime=scantime,
             verbose=False,
+            accel=1,
         )
         if ret is False:
             raise RuntimeError(f"define_line_trajectories failed — check positioner '{axis_name}' in XPS group '{group_name}'.")
