@@ -31,19 +31,6 @@ from crystalsweep.utils.output_paths import OutputPaths
 __all__ = ["CollectController"]
 
 
-def _midpoints(positions: list[float]) -> list[float]:
-    """Return the centre position for each frame in a continuous-scan trajectory.
-
-    The XPS fires a trigger at the midpoint between consecutive scan positions.
-    The last frame is extrapolated one half-step beyond the final position.
-    """
-    if len(positions) <= 1:
-        return list(positions)
-    mids = [(positions[i] + positions[i + 1]) / 2.0 for i in range(len(positions) - 1)]
-    mids.append(positions[-1] + (positions[-1] - positions[-2]) / 2.0)
-    return mids
-
-
 _log = logging.getLogger(__name__)
 
 _PROGRESS_INTERVAL_MS = 100
@@ -1315,7 +1302,7 @@ class CollectController:
         bn = output.basename(ref, fallback_fn)
         dest = output.map_source_dir() / f"{bn}_expected_positions.dat"
 
-        scan_positions = _midpoints(epics_positions)
+        scan_positions = list(epics_positions)
         n = len(row_points)
 
         motor_cfgs = [m for m in config.motors if m.shorthand]
@@ -1368,7 +1355,7 @@ class CollectController:
         if not src_path.exists():
             return
 
-        scan_positions = _midpoints(epics_positions)
+        scan_positions = list(epics_positions)
 
         motor_data: dict[str, np.ndarray] = {}
         for motor_cfg in config.motors:
