@@ -91,7 +91,8 @@ class CollectView(FlatPanel):
     def set_status(self, text: str, colour: wx.Colour | None = None) -> None:
         self._status_label.SetLabel(text)
         self._status_label._custom_fg = colour
-        self._status_label.Refresh()
+        self._status_label.InvalidateBestSize()
+        self.Layout()
 
     def set_collecting(self, collecting: bool) -> None:
         self._collecting = collecting
