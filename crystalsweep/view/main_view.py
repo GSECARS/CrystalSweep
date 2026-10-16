@@ -94,6 +94,8 @@ class MainView(wx.Frame):
         self._menu_bar = self._build_menu_bar()
         self.Bind(wx.EVT_CLOSE, self._close_event_handler)
         self._configure_main_window()
+        self.ad_viewer._integration_plot.Hide()
+        self.ad_viewer.Layout()
 
     def display_window(self) -> None:
         """Displays the main window of the application."""
@@ -215,7 +217,7 @@ class MainView(wx.Frame):
 
             view_menu = wx.Menu()
             self._menu_check_integration = view_menu.AppendCheckItem(wx.ID_ANY, "Show Integration Plot\tCtrl+I")
-            self._menu_check_integration.Check(True)
+            self._menu_check_integration.Check(False)
             menu_bar.Append(view_menu, "&View")
 
             self.SetMenuBar(menu_bar)
