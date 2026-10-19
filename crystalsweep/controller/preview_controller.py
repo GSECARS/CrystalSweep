@@ -241,6 +241,7 @@ class PreviewController:
         period_pv = _cam_pv(detector, "AcquirePeriod")
         num_pv = _cam_pv(detector, "NumImages")
         image_mode_pv = _cam_pv(detector, "ImageMode")
+        trigger_mode_pv = _cam_pv(detector, "TriggerMode")
         acquire_pv = _cam_pv(detector, "Acquire")
 
         exposure = float(cfg.preview_exposure)
@@ -265,7 +266,7 @@ class PreviewController:
             try:
                 # Snapshot current values so we can restore them on stop.
                 snapshot: dict[str, object] = {}
-                for pv in (exposure_pv, period_pv, num_pv, image_mode_pv):
+                for pv in (exposure_pv, period_pv, num_pv, image_mode_pv, trigger_mode_pv):
                     try:
                         current = caget(pv)
                     except Exception:
@@ -297,7 +298,7 @@ class PreviewController:
                 wx.CallAfter(self._view.set_current_positions, currents, max_intensity, max_intensity)
                 wx.CallAfter(self._view.set_best_positions, list(currents), max_intensity)
 
-                # Apply preview settings (continuous image mode = 2 in areaDetector).
+                # Apply preview settings (continuous image mode = 2, trigger mode 4 = continuous).
                 if exposure_pv:
                     caput(exposure_pv, exposure, wait=True)
                 if period_pv:
@@ -306,6 +307,8 @@ class PreviewController:
                     caput(num_pv, num_images, wait=True)
                 if image_mode_pv:
                     caput(image_mode_pv, 2, wait=True)
+                if trigger_mode_pv:
+                    caput(trigger_mode_pv, 4, wait=True)
                 if acquire_pv:
                     caput(acquire_pv, 1)
             except Exception as exc:
