@@ -153,11 +153,6 @@ class CollectionSettingsController:
         self._view.collection_table.set_use_ext_visible(not cs.map)
         self._view.collection_table.set_map_mode(cs.map)
 
-        # Combine-map only makes sense when the output is HDF5 (the combiner
-        # only handles HDF5 row files).
-        combine_visible = cs.map and cs.scan_type == "still" and self._model.file_settings.use_hdf5
-        self._view.collection_table.set_snake_combine_visible(combine_visible)
-
     def _rotation_motor_uses_xps(self) -> bool:
         """Return True if the rotation motor is driven by a Newport XPS controller."""
         cfg = self._model.beamline.active

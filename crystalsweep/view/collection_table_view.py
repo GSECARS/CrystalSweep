@@ -753,7 +753,6 @@ class CollectionTableView(FlatPanel):
         self._on_move_cb: Callable[[int], None] | None = None
         self._on_use_ext_changed_cb: Callable[[bool], None] | None = None
         self._on_keep_shutter_open_changed_cb: Callable[[bool], None] | None = None
-        self._on_snake_combine_changed_cb: Callable[[bool], None] | None = None
         self._on_snake_trajectory_changed_cb: Callable[[bool], None] | None = None
         self._on_min_width_changed_cb: Callable[[int], None] | None = None
 
@@ -770,7 +769,6 @@ class CollectionTableView(FlatPanel):
         self._slew_scan_toggle.Enable(not collecting)
         self._use_ext_toggle.Enable(not collecting)
         self._keep_shutter_open_toggle.Enable(not collecting)
-        self._snake_combine_toggle.Enable(not collecting)
         self._snake_trajectory_toggle.Enable(not collecting)
         self._header.set_collecting(collecting)
         if not collecting:
@@ -821,30 +819,16 @@ class CollectionTableView(FlatPanel):
         self.Layout()
         self._repopulate_visible()
 
-    def set_snake_combine_visible(self, visible: bool) -> None:
-        self._snake_combine_toggle.Show(visible)
-        self.Layout()
-
     def bind_use_ext_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_use_ext_changed_cb = callback
 
     def bind_keep_shutter_open_changed(self, callback: Callable[[bool], None]) -> None:
         self._on_keep_shutter_open_changed_cb = callback
 
-    def bind_snake_combine_changed(self, callback: Callable[[bool], None]) -> None:
-        self._on_snake_combine_changed_cb = callback
-
-    def set_snake_combine(self, value: bool) -> None:
-        self._snake_combine_toggle.SetValue(value)
-
     def _on_use_ext_toggled(self, value: bool) -> None:
         self._repopulate_visible()
         if self._on_use_ext_changed_cb is not None:
             self._on_use_ext_changed_cb(value)
-
-    def _on_snake_combine_toggled(self, value: bool) -> None:
-        if self._on_snake_combine_changed_cb is not None:
-            self._on_snake_combine_changed_cb(value)
 
     def _on_trajectory_toggled(self, value: bool) -> None:
         self._snake_trajectory_toggle.Show(value and self._slew_scan_toggle.IsShown() and self._snake_trajectory_allowed)
@@ -923,13 +907,8 @@ class CollectionTableView(FlatPanel):
         self._keep_shutter_open_toggle.SetAction(lambda v: self._on_keep_shutter_open_toggled(v))
         self._keep_shutter_open_toggle.Hide()
 
-        self._snake_combine_toggle = FlatCheckBox(self, "Combine map")
-        self._snake_combine_toggle.SetAction(lambda v: self._on_snake_combine_toggled(v))
-        self._snake_combine_toggle.Hide()
-
         title_row = wx.BoxSizer(wx.HORIZONTAL)
         title_row.AddStretchSpacer()
-        title_row.Add(self._snake_combine_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._keep_shutter_open_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._snake_trajectory_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._slew_scan_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
