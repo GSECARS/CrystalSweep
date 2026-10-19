@@ -804,6 +804,11 @@ class CollectController:
                         self._run_wide(
                             col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open
                         )
+                        if not self._abort_event.is_set():
+                            _out = self._output_paths
+                            if _out is not None and _out.raw_directory is not None:
+                                wide_flip = self._model.collection_settings.wide_flip
+                                self._spawn_map_copy_to_target(flip_odd_rows=wide_flip, row_shift_frames=map_row_shift)
                     elif scan_type == "step":
                         self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
                     map_completed_weight += pt_weight
@@ -812,11 +817,6 @@ class CollectController:
             if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5":
                 if scan_type == "still":
                     self._spawn_snake_combine_for_map(row_shift_frames=map_row_shift)
-                elif scan_type == "wide":
-                    _out = self._output_paths
-                    if _out is not None and _out.raw_directory is not None:
-                        wide_flip = self._model.collection_settings.wide_flip
-                        self._spawn_map_copy_to_target(flip_odd_rows=wide_flip, row_shift_frames=map_row_shift)
 
         if keep_shutter_open:
             self._engine._close_shutter(config)
