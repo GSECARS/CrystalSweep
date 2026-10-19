@@ -34,7 +34,6 @@ class FileSettingsController:
         fs.bind_frame_reset(self._on_frame_reset)
         fs.bind_frame_update(self._on_frame_update)
         fs.bind_map_ext_changed(self._on_map_ext_changed)
-        fs.bind_map_ext_update(self._on_map_ext_update)
         fs.bind_hdf5_changed(self._on_hdf5_changed)
         fs.bind_cbf_changed(self._on_cbf_changed)
         fs.bind_tif_changed(self._on_tif_changed)
@@ -216,17 +215,6 @@ class FileSettingsController:
     def _on_map_ext_changed(self, value: str) -> None:
         self._model.file_settings.map_ext = value
         _log.debug("file_settings.map_ext = %r", value)
-
-    def _on_map_ext_update(self) -> None:
-        det = self._model.beamline.active.active_detector_config if self._model.beamline.active else None
-        width = det.file_number_width if det is not None else 4
-        for index, point in enumerate(self._model.collection.points):
-            if not point.map_group:
-                continue
-            new_label = f"{point.map_row + 1:0{width}d}_{point.map_col + 1:0{width}d}"
-            self._model.collection.update_label(index, new_label)
-            self._view.collection_table.refresh_row(index, point)
-        _log.debug("map ext update: refreshed map point labels")
 
     def add_hdf5_changed_listener(self, callback) -> None:
         self._on_hdf5_changed_listeners.append(callback)
