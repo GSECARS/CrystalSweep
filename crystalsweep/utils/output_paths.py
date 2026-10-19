@@ -50,11 +50,11 @@ class OutputPaths:
         """
         w = max(1, self.file_number_width)
         if point.map_group:
-            label = point.label.strip()
+            row = max(1, point.map_row + 1) if point.map_row >= 0 else 1
+            col = max(1, point.map_col + 1) if point.map_col >= 0 else frame_number
             map_ext = self.map_ext or "map"
-            parts = [p for p in [self.filename, map_ext, label] if p]
-            seq = max(1, point.map_seq + 1) if point.map_seq >= 0 else frame_number
-            return f"{'_'.join(parts)}_{seq:0{w}d}"
+            parts = [p for p in [self.filename, map_ext, f"{row:0{w}d}"] if p]
+            return f"{'_'.join(parts)}_{col:0{w}d}"
         num = frame_number
         return f"{self.stem(point)}_{int(num):0{w}d}"
 

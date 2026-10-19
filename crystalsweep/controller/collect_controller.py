@@ -1556,8 +1556,10 @@ class CollectController:
         }
 
         if point.map_group:
-            crysalis_basename = f"{output.stem(point)}_{point.label.strip()}"
-            crysalis_filenumber = max(1, point.map_seq + 1)
+            w = output.file_number_width
+            row = max(1, point.map_row + 1) if point.map_row >= 0 else 1
+            crysalis_basename = f"{output.stem(point)}_{row:0{w}d}"
+            crysalis_filenumber = max(1, point.map_col + 1) if point.map_col >= 0 else 1
         else:
             crysalis_basename = output.stem(point)
             crysalis_filenumber = frame_number

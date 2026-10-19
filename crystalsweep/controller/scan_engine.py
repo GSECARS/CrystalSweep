@@ -819,9 +819,10 @@ class ScanEngine:
             folder_suffix = map_ext if map_ext else "map"
             folder_name = f"{base}_{folder_suffix}" if base else folder_suffix
             remote_dir = f"{remote_dir.rstrip('/')}/{folder_name}"
-            label = point.label.strip()
-            parts = [p for p in [base, folder_suffix, label] if p]
-            frame_number = max(1, point.map_seq + 1)
+            width = det.file_number_width if det else 4
+            row = max(1, point.map_row + 1) if point.map_row >= 0 else 1
+            parts = [p for p in [base, folder_suffix, f"{row:0{width}d}"] if p]
+            frame_number = max(1, point.map_col + 1) if point.map_col >= 0 else 1
         else:
             disable_auto_increment = bool(label)
             parts = [p for p in [base, label] if p]
