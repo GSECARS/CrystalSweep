@@ -51,6 +51,8 @@ class CollectionSettingsController:
         self._sync_rotation_shorthand()
         self._sync_map_motors()
         self._sync_view_from_model()
+        self._apply_trajectory_defaults()
+        self._sync_trajectory_toggle()
 
     def _sync_view_from_model(self) -> None:
         cs = self._model.collection_settings
@@ -115,10 +117,19 @@ class CollectionSettingsController:
     def _on_scan_type_changed(self, scan_type: ScanType) -> None:
         self._model.collection_settings.scan_type = scan_type
         self._apply_type_defaults(scan_type)
-        if scan_type == "step":
-            self._view.collection_table.set_trajectory_scan(True)
+        self._apply_trajectory_defaults()
         self._sync_trajectory_toggle()
         _log.debug("collection_settings.scan_type = %s", scan_type)
+
+    def _apply_trajectory_defaults(self) -> None:
+        cs = self._model.collection_settings
+        still_map = cs.scan_type == "still" and cs.map
+        step_non_map = cs.scan_type == "step" and not cs.map
+        if still_map:
+            self._view.collection_table.set_trajectory_scan(True)
+            self._view.collection_table.set_snake_trajectory(True)
+        elif step_non_map:
+            self._view.collection_table.set_trajectory_scan(True)
 
     def _sync_trajectory_toggle(self) -> None:
         cs = self._model.collection_settings
@@ -219,6 +230,7 @@ class CollectionSettingsController:
 
     def _on_map_changed(self, value: bool) -> None:
         self._model.collection_settings.map = value
+        self._apply_trajectory_defaults()
         self._sync_trajectory_toggle()
         _log.debug("collection_settings.map = %s", value)
 
