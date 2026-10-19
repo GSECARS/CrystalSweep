@@ -1708,7 +1708,7 @@ class CollectController:
             print(f"[collect] [{idx}/{total}] {point.label}: ERROR — {exc}")
             done_event.set()
 
-        use_slew = self._view.collection_table.slew_scan
+        use_slew = point.map_group != "" or self._view.collection_table.slew_scan
 
         frame_number_before = self._model.file_settings.frame_number
 

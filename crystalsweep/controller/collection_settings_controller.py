@@ -128,7 +128,8 @@ class CollectionSettingsController:
 
         # Trajectory toggle is relevant for two cases:
         # - still maps whose map motor uses XPS (array trajectory for row scan)
-        # - step scans (non-map) whose rotation motor uses XPS (slew trajectory per point)
+        # - non-map step scans whose rotation motor uses XPS (slew trajectory per point)
+        # Step maps always use slew internally; hide the toggle to keep things simple.
         trajectory_visible = (still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory) or (step_scan and not cs.map)
         if not trajectory_visible:
             self._view.collection_table.set_trajectory_scan(False)
