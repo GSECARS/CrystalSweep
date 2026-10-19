@@ -82,7 +82,7 @@ class CollectionSettingsController:
             cb()
 
     def on_config_applied(self) -> None:
-        """Called when a new beamline config is applied — refresh rotation shorthand and map motors."""
+        """Called when a new beamline config is applied - refresh rotation shorthand and map motors."""
         self._sync_rotation_shorthand()
         self._sync_map_motors()
         self._sync_trajectory_toggle()

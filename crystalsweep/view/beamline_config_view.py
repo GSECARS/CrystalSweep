@@ -118,14 +118,14 @@ class _Section(FlatPanel):
 
 
 class _TableHeader(FlatTableHeader):
-    """CS table header — derives colors from the active theme."""
+    """CS table header - derives colors from the active theme."""
 
     def __init__(self, parent: wx.Window, labels: list[str], proportions: list[int]) -> None:
         super().__init__(parent, labels, proportions, height=_HEADER_H, scheme=(app_theme.background, app_theme.bright_black, app_theme.blue))
 
 
 class _TableRow(FlatTableRow):
-    """CS table row base — derives colors from the active theme."""
+    """CS table row base - derives colors from the active theme."""
 
     def __init__(self, parent: wx.Window, proportions: list[int]) -> None:
         super().__init__(parent, proportions, height=_ROW_H, scheme=(app_theme.background, app_theme.bright_black, app_theme.black))

@@ -558,7 +558,7 @@ class _CollectionRow(FlatPanel):
 
     def _make_commit_handler(self, ctrl: FlatTextCtrl, dispatcher_attr: str) -> Callable[[wx.Event], None]:
         # Look up the dispatcher method by name at fire-time so re-binding the
-        # row to a different point is automatic — the closure only captures the
+        # row to a different point is automatic - the closure only captures the
         # ctrl reference and the bound-method name.
         def _handler(event: wx.Event) -> None:
             getattr(self, dispatcher_attr)(ctrl.GetValue().strip())
@@ -712,7 +712,7 @@ class CollectionTableView(FlatPanel):
         self._rotation_shorthand: str = ""
         self._is_map: bool = False
 
-        # Logical row model — the source of truth for what the table shows.
+        # Logical row model - the source of truth for what the table shows.
         self._points: list[CollectionPoint] = []
         self._selected_flags: list[bool] = []
         self._limit_error_flags: list[bool] = []
@@ -1313,7 +1313,7 @@ class CollectionTableView(FlatPanel):
         n_points = len(self._points)
         needed = self._pool_capacity_needed()
         if n_points == 0 or needed == 0:
-            # Nothing to show — hide all pooled rows but keep them allocated
+            # Nothing to show - hide all pooled rows but keep them allocated
             # so we don't churn HWND/GDI on small data changes.
             for row in self._pool:
                 row.clear_binding()

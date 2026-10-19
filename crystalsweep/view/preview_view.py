@@ -71,7 +71,7 @@ class _CenteringRow(FlatPanel):
         self._value_box = StatusField(self, height=self._ROW_H)
         self._value_box.SetMinSize((self._VALUE_W, self._ROW_H))
         self._value_box.SetMaxSize((self._VALUE_W, self._ROW_H))
-        self._value_box.SetValue("—")
+        self._value_box.SetValue("-")
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(self._label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
@@ -96,12 +96,12 @@ class _CenteringRow(FlatPanel):
 
     def set_value(self, value: float | None) -> None:
         if value is None:
-            text = "—"
+            text = "-"
         else:
             try:
                 text = f"{float(value):.{self._precision}f}"
             except TypeError, ValueError:
-                text = "—"
+                text = "-"
         self._value_box.SetValue(text)
 
     def _fire(self, cb: Callable[[CenteringMotorSpec], None] | None) -> None:
@@ -153,12 +153,12 @@ class _PosTableRow(wx.Panel):
     def _fmt(self, col: int) -> str:
         value = self._values[col]
         if value is None:
-            return "—"
+            return "-"
         try:
             v = float(value)
             return f"{v:.4g}" if self._is_max else f"{v:.{self._precision}f}"
         except TypeError, ValueError:
-            return "—"
+            return "-"
 
     def _on_paint(self, _: wx.PaintEvent) -> None:
         w, h = self.GetClientSize()

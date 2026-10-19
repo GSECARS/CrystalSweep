@@ -205,7 +205,7 @@ class NewportXPSModel:
             accel=1,
         )
         if ret is False:
-            raise RuntimeError(f"define_line_trajectories failed — check positioner '{axis_name}' in XPS group '{group_name}'.")
+            raise RuntimeError(f"define_line_trajectories failed - check positioner '{axis_name}' in XPS group '{group_name}'.")
         traj = self._xps.trajectories.get(self._TRAJ_NAME, {})
         if traj:
             _log.info(

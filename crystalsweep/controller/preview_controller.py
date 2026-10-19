@@ -402,7 +402,7 @@ class PreviewController:
         prev_best = self._best_max_intensity
         if prev_best is not None and value <= prev_best:
             return
-        # New running best — capture the motor positions at this moment.
+        # New running best - capture the motor positions at this moment.
         self._best_max_intensity = value
         self._best_capture_token += 1
         token = self._best_capture_token
@@ -573,7 +573,7 @@ class PreviewController:
                 wx.CallAfter(self._view.set_auto_optimize_enabled, bool(self._current_specs))
 
     def _show_limit_error(self, err: str) -> None:
-        FlatMessageDialog(self._view, f"Soft limit violation — {err}", "Soft Limit Violation").ShowModal()
+        FlatMessageDialog(self._view, f"Soft limit violation - {err}", "Soft Limit Violation").ShowModal()
 
     def _on_go_original(self, key: str | None) -> None:
         self._dispatch_go(self._original_snapshot, key, "original")

@@ -46,7 +46,7 @@ class FileSettingsController:
         self.sync_from_detector()
 
     def sync_from_detector(self) -> None:
-        """Fetch FilePath, FileName and FileNumber from the active detector — updates all three fields."""
+        """Fetch FilePath, FileName and FileNumber from the active detector - updates all three fields."""
         self._push_file_number_width()
         self._sync_format_from_detector()
         self._fetch_from_detector(update_directory=True, update_filename=True, update_frame=True)

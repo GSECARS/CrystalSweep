@@ -43,7 +43,7 @@ class DetectorModel(Protocol):
     """Protocol for area detector models."""
 
     def frames_captured(self) -> int:
-        """Return the current value of NumImagesCounter_RBV — frames acquired so far."""
+        """Return the current value of NumImagesCounter_RBV - frames acquired so far."""
         ...
 
     def save_hdf5(self) -> None:

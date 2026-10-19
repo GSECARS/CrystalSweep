@@ -48,7 +48,7 @@ class ADViewerController(EpicsAppsController):
         self.subscribe(pv_name)
 
     # ------------------------------------------------------------------
-    # ROI max intensity mirroring — used by the preview controller to
+    # ROI max intensity mirroring - used by the preview controller to
     # track peak signal while sweeping the sample.
     # ------------------------------------------------------------------
 

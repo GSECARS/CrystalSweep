@@ -25,7 +25,7 @@ class ScanEngine:
 
     Supported scan types
     --------------------
-    still  — trigger one detector frame without moving the rotation motor.
+    still  - trigger one detector frame without moving the rotation motor.
     """
 
     def __init__(self, script_model: ScriptModel | None = None, controllers=None) -> None:
@@ -286,7 +286,7 @@ class ScanEngine:
                     for chk_pos in (omega_start, omega_end):
                         limit_err = check_soft_limits(rotation_cfg.pv, chk_pos)
                         if limit_err:
-                            on_error(ValueError(f"Soft limit violation — {limit_err}"))
+                            on_error(ValueError(f"Soft limit violation - {limit_err}"))
                             return
                     if file_settings is not None:
                         remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
@@ -310,7 +310,7 @@ class ScanEngine:
                         angle = omega_start + frame_idx * step_size
                         limit_err = check_soft_limits(rotation_cfg.pv, angle)
                         if limit_err:
-                            on_error(ValueError(f"Soft limit violation — {limit_err}"))
+                            on_error(ValueError(f"Soft limit violation - {limit_err}"))
                             return
                         caput(f"{pv_base}.VAL", angle, wait=True)
                         detector.collect_frame(exposure)
@@ -524,7 +524,7 @@ class ScanEngine:
                 for chk_pos in (omega_start, omega_end):
                     limit_err = check_soft_limits(rotation_cfg.pv, chk_pos)
                     if limit_err:
-                        on_error(ValueError(f"Soft limit violation — {limit_err}"))
+                        on_error(ValueError(f"Soft limit violation - {limit_err}"))
                         return
                 if file_settings is not None:
                     remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
@@ -542,7 +542,7 @@ class ScanEngine:
                     on_done()
                     return
 
-                # 2. Prepare the driver — for EpicsScanModel this sets the
+                # 2. Prepare the driver - for EpicsScanModel this sets the
                 #    motor velocity so the slew start→end takes exactly
                 #    `exposure` seconds. The original velocity is restored by
                 #    driver.run / driver.abort.

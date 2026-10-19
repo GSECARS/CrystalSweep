@@ -507,7 +507,7 @@ class CollectController:
 
             wx.CallAfter(
                 self._view.collect.set_status,
-                f"[{idx}/{total}] {point.label} — pre-scan…",
+                f"[{idx}/{total}] {point.label} - pre-scan…",
                 wx.Colour(99, 179, 237),
             )
 
@@ -523,7 +523,7 @@ class CollectController:
 
             wx.CallAfter(
                 self._view.collect.set_status,
-                f"[{idx}/{total}] {point.label} — {point.scan_type}…",
+                f"[{idx}/{total}] {point.label} - {point.scan_type}…",
                 wx.Colour(99, 179, 237),
             )
 
@@ -690,7 +690,7 @@ class CollectController:
 
             wx.CallAfter(
                 self._view.collect.set_status,
-                f"[map {row_num + 1}/{n_rows}] row {row_num} — moving…",
+                f"[map {row_num + 1}/{n_rows}] row {row_num} - moving…",
                 wx.Colour(99, 179, 237),
             )
 
@@ -701,7 +701,7 @@ class CollectController:
                     pos2 = float(first_pt.motor_positions.get(motor2, "0") or "0")
                     limit_err = check_soft_limits(motor2_cfg.pv, pos2)
                     if limit_err:
-                        wx.CallAfter(wx.MessageBox, f"Soft limit violation — {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+                        wx.CallAfter(wx.MessageBox, f"Soft limit violation - {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
                         self._abort_event.set()
                         break
                     pvs.append(motor2_cfg.pv)
@@ -718,7 +718,7 @@ class CollectController:
                         pos1_row -= (second_pos - pos1_row) / 2.0
                     limit_err = check_soft_limits(motor1_cfg.pv, pos1_row)
                     if limit_err:
-                        wx.CallAfter(wx.MessageBox, f"Soft limit violation — {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+                        wx.CallAfter(wx.MessageBox, f"Soft limit violation - {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
                         self._abort_event.set()
                         break
                     pvs.append(motor1_cfg.pv)
@@ -768,7 +768,7 @@ class CollectController:
                             pos1 = float(col_pt.motor_positions.get(motor1, "0") or "0")
                             limit_err = check_soft_limits(motor1_cfg.pv, pos1)
                             if limit_err:
-                                wx.CallAfter(wx.MessageBox, f"Soft limit violation — {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+                                wx.CallAfter(wx.MessageBox, f"Soft limit violation - {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
                                 self._abort_event.set()
                                 break
                             caput(motor1_cfg.pv, pos1, wait=True)
@@ -789,7 +789,7 @@ class CollectController:
 
                     wx.CallAfter(
                         self._view.collect.set_status,
-                        f"[map] {col_pt.label} — {col_pt.scan_type}…",
+                        f"[map] {col_pt.label} - {col_pt.scan_type}…",
                         wx.Colour(99, 179, 237),
                     )
 
@@ -1620,11 +1620,11 @@ class CollectController:
 
         def on_error(exc: Exception) -> None:
             error_holder.append(exc)
-            print(f"[collect] [{idx}/{total}] {point.label}: ERROR — {exc}")
+            print(f"[collect] [{idx}/{total}] {point.label}: ERROR - {exc}")
             done_event.set()
 
         def on_status(phase: str) -> None:
-            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
+            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} - {phase}", wx.Colour(99, 179, 237))
 
         frame_number_before = self._model.file_settings.frame_number
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
@@ -1691,7 +1691,7 @@ class CollectController:
         frame_holder: list[tuple[int, int]] = [(0, n_frames)]
 
         def on_status(phase: str) -> None:
-            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
+            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} - {phase}", wx.Colour(99, 179, 237))
 
         def on_frame(frame: int, total_frames: int) -> None:
             frame_holder[0] = (frame, total_frames)
@@ -1712,7 +1712,7 @@ class CollectController:
 
         def on_error(exc: Exception) -> None:
             error_holder.append(exc)
-            print(f"[collect] [{idx}/{total}] {point.label}: ERROR — {exc}")
+            print(f"[collect] [{idx}/{total}] {point.label}: ERROR - {exc}")
             done_event.set()
 
         use_slew = point.map_group != "" or self._view.collection_table.slew_scan
@@ -1789,11 +1789,11 @@ class CollectController:
 
         def on_error(exc: Exception) -> None:
             error_holder.append(exc)
-            print(f"[collect] [{idx}/{total}] {point.label}: ERROR — {exc}")
+            print(f"[collect] [{idx}/{total}] {point.label}: ERROR - {exc}")
             done_event.set()
 
         def on_status(phase: str) -> None:
-            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} — {phase}", wx.Colour(99, 179, 237))
+            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} - {phase}", wx.Colour(99, 179, 237))
 
         frame_number_before = self._model.file_settings.frame_number
         wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)

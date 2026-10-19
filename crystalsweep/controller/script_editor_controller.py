@@ -28,7 +28,7 @@ class ScriptEditorController:
         if self._dialog is None:
             self._dialog = FlatScriptEditorDialog(
                 self._view,
-                title="Script Editor — hooks.py",
+                title="Script Editor - hooks.py",
                 syntax_scheme=app_theme.syntax_scheme(),
             )
             self._dialog.bind_save(self._on_save)
@@ -42,7 +42,7 @@ class ScriptEditorController:
         try:
             self._model.save_source(source)
             self._dialog.set_status(
-                f"Saved — {self._model.hooks_path.name}",
+                f"Saved - {self._model.hooks_path.name}",
                 ok_color=app_theme.green,
                 error_color=app_theme.red,
             )

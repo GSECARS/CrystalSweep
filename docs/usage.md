@@ -12,10 +12,10 @@ crystalsweep
 
 The main window provides access to all beamline control and data acquisition features:
 
-- **File Settings** — configure output paths and file naming
-- **Collection Settings** — set exposure time, number of frames, oscillation range
-- **Collection Table** — queue and manage multiple data collection runs
-- **Beamline Config** — hardware connection settings (EPICS PVs, motor names)
+- **File Settings** - configure output paths and file naming
+- **Collection Settings** - set exposure time, number of frames, oscillation range
+- **Collection Table** - queue and manage multiple data collection runs
+- **Beamline Config** - hardware connection settings (EPICS PVs, motor names)
 
 ## Data Collection
 

@@ -22,7 +22,7 @@ class AppTheme:
 
     Call ``AppTheme()`` once right after ``wx.App`` is created (in the main
     controller).  Everywhere else import the module-level ``app_theme`` proxy
-    and use it directly — colors are instance attributes updated automatically
+    and use it directly - colors are instance attributes updated automatically
     on OS-level dark/light mode switches.
     """
 
@@ -126,7 +126,7 @@ class AppTheme:
 class _AppThemeProxy:
     """Proxy so ``from theme import app_theme`` resolves to the singleton at access time.
 
-    Safe to import before ``AppTheme()`` has been called — attribute resolution
+    Safe to import before ``AppTheme()`` has been called - attribute resolution
     is deferred until first use.
     """
 
@@ -134,7 +134,7 @@ class _AppThemeProxy:
 
     def __getattr__(self, name: str):
         if AppTheme._instance is None:
-            raise AttributeError("app_theme not initialized — call AppTheme() first")
+            raise AttributeError("app_theme not initialized - call AppTheme() first")
         return getattr(AppTheme._instance, name)
 
 

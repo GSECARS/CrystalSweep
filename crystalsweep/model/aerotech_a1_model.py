@@ -6,7 +6,7 @@
 # Purpose:
 # Slew-scan model for Aerotech Automation1 controllers using the pyautomation library.
 # Executes a single continuous trajectory (start → end) with hardware-timed
-# detector pulses — one pulse per point, all triggered by the controller.
+# detector pulses - one pulse per point, all triggered by the controller.
 #
 # Required controller_params (from ControllerConfig.params):
 #   ip              - controller IP address
