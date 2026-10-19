@@ -74,6 +74,7 @@ class CollectController:
         self._engine = ScanEngine(script_model=model.scripts, controllers=model.controllers)
         self._engine._abort_event = self._abort_event
         self._thread: threading.Thread | None = None
+        self._in_map_collection: bool = False
         self._start_time: float = 0.0
         self._on_collecting_changed: Callable[[bool], None] | None = None
         self._on_post_scan: Callable[[], None] | None = None
@@ -336,6 +337,8 @@ class CollectController:
         self._aborting_dlg = None
 
     def _on_file_number_updated(self, file_number: int) -> None:
+        if self._in_map_collection:
+            return
         self._model.file_settings.frame_number = file_number
         wx.CallAfter(self._view.file_settings.set_frame_number, file_number)
 
@@ -637,6 +640,7 @@ class CollectController:
         weights = group_weights if group_weights is not None else [1] * len(group_points)
         map_completed_weight = completed_weight
         frame_before_map = self._model.file_settings.frame_number
+        self._in_map_collection = True
 
         rows: dict[int, list[CollectionPoint]] = {}
         for pt in group_points:
@@ -831,6 +835,7 @@ class CollectController:
             except Exception as exc:
                 _log.warning("Failed to restore map motor2 %s: %s", motor2, exc)
 
+        self._in_map_collection = False
         self._model.file_settings.frame_number = frame_before_map
         wx.CallAfter(self._view.file_settings.set_frame_number, frame_before_map)
 
