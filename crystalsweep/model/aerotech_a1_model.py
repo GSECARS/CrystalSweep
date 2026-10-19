@@ -125,14 +125,22 @@ class AerotechA1Model:
             _log.info("AerotechA1Model aborted before run_trajectory()")
             return
 
-        self._automation._move_to_starting_position()
+        traj = self._automation._active_trajectory
+        current_pos = self._automation._controller.get_current_position(self._automation.axis[0])
+        self._automation._pre_trj_position = current_pos
+        move_to_start = traj.start_position - current_pos
+        taxi_move = -traj.taxi_distance * traj.travel_direction
+        self._automation._controller.move_linear(
+            self._automation.axis[0],
+            distance=move_to_start + taxi_move,
+            speed=traj.base_velocity,
+        )
         if on_at_start is not None:
             on_at_start()
         self._automation._pso.enable_modules()
         import time as _time
 
         _time.sleep(0.1)
-        traj = self._automation._active_trajectory
         total_distance = traj.distance + abs(traj.taxi_distance)
         self._automation._controller.move_linear(
             self._automation.axis[0],
