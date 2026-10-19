@@ -160,8 +160,11 @@ class NewportXPSModel:
         if self._aborted:
             return
         traj_name = "backward" if self._reverse else self._TRAJ_NAME
-        if on_at_start is not None:
+        self._xps.arm_trajectory(name=traj_name, move_to_start=False)
+        if on_at_start is not None and not self._aborted:
             on_at_start()
+        if self._aborted:
+            return
         self._xps.run_trajectory(name=traj_name, save=save_gathering, output_file=gathering_output_file, clean=True, move_to_start=False)
         if not self._aborted:
             on_point(n_points - 1, 0.0)
