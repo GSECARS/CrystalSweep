@@ -328,16 +328,19 @@ class FileSettingsView(FlatPanel):
         if format_key == "hdf5":
             self._hdf5_toggle.SetValue(True)
             self._hdf5_toggle.Enable(False)
+            self._fire(self._on_hdf5_changed_cb, True)
         else:
             self._hdf5_toggle.Enable(True)
         if format_key == "cbf":
             self._cbf_toggle.SetValue(True)
             self._cbf_toggle.Enable(False)
+            self._fire(self._on_cbf_changed_cb, True)
         else:
             self._cbf_toggle.Enable(True)
         if format_key == "tif":
             self._tif_toggle.SetValue(True)
             self._tif_toggle.Enable(False)
+            self._fire(self._on_tif_changed_cb, True)
         else:
             self._tif_toggle.Enable(True)
 
