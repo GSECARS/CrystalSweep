@@ -353,8 +353,6 @@ class CollectionSettingsController:
         axis1 = [origin1 + p for p in axis_positions(cs.map_start, cs.map_end, cs.map_points)]
         axis2 = [origin2 + p for p in axis_positions(cs.map2_start, cs.map2_end, cs.map2_points)] if cs.map2_enabled else [None]
 
-        fs = self._model.file_settings
-        frame_number = fs.frame_number
         det = self._model.beamline.active.active_detector_config
         width = det.file_number_width if det is not None else 4
 
@@ -368,12 +366,12 @@ class CollectionSettingsController:
                     pass
 
         group_id = str(uuid.uuid4())
-        group_label = f"{frame_number:0{width}d}"
         new_points: list = []
         point_index = 0
         for row_idx, pos2 in enumerate(axis2):
             for col_idx, pos1 in enumerate(axis1):
-                point = self._model.collection.add_point(shorthands, label=group_label)
+                point_label = f"{row_idx + 1:0{width}d}_{col_idx + 1:0{width}d}"
+                point = self._model.collection.add_point(shorthands, label=point_label)
                 point.selected = True
                 point.scan_type = cs.scan_type
                 point.time = str(cs.exposure)
