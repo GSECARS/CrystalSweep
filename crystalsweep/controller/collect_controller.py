@@ -808,10 +808,10 @@ class CollectController:
             if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5":
                 if scan_type == "still":
                     self._spawn_snake_combine_for_map(row_shift_frames=map_row_shift)
-                elif scan_type in ("step", "wide"):
+                elif scan_type == "wide":
                     _out = self._output_paths
                     if _out is not None and _out.raw_directory is not None:
-                        wide_flip = scan_type == "wide" and self._model.collection_settings.wide_flip
+                        wide_flip = self._model.collection_settings.wide_flip
                         self._spawn_map_copy_to_target(flip_odd_rows=wide_flip, row_shift_frames=map_row_shift)
 
         if keep_shutter_open:
@@ -1231,16 +1231,41 @@ class CollectController:
         return conflicts
 
     def _spawn_file_copy(self, point: CollectionPoint, frame_number: int) -> None:
-        """Copy the raw detector file to the output directory after a non-map point.
+        """Copy the raw detector file to the output directory.
 
-        Only runs when raw_directory is configured and the point is not part
-        of a map group. Map row files stay in raw; only the combined output
-        reaches the output directory via the snake combiner.
+        For non-map points: copies the point file from raw_directory immediately.
+        For step map points: copies just that point's file from the map source
+        directory so it is available in the output directory right after the scan
+        finishes, without waiting for the rest of the map to complete.
+        Wide map points are handled as a batch by _spawn_map_copy_to_target.
         """
-        if point.map_group:
-            return
         output = self._output_paths
         if output is None or output.raw_directory is None:
+            return
+
+        if point.map_group:
+            if point.scan_type != "step":
+                return
+            src_dir = output.map_source_dir()
+            dst_dir = output.directory / output.map_folder_name()
+            bn = output.basename(point, frame_number)
+            ext = output.file_ext
+
+            def _copy_map() -> None:
+                try:
+                    _mkdir_safe(dst_dir)
+                    direct = src_dir / f"{bn}.{ext}"
+                    if direct.is_file():
+                        shutil.copy2(str(direct), str(dst_dir / direct.name))
+                        _log.debug("copied map point %s -> %s", direct, dst_dir)
+                    else:
+                        for f in sorted(src_dir.glob(f"{bn}*")):
+                            shutil.copy2(str(f), str(dst_dir / f.name))
+                            _log.debug("copied map point %s -> %s", f, dst_dir)
+                except Exception as exc:
+                    _log.warning("_spawn_file_copy (map point): %s", exc)
+
+            threading.Thread(target=_copy_map, daemon=True, name="file-copy").start()
             return
 
         raw = output.raw_directory
