@@ -70,6 +70,7 @@ class CollectionSettingsController:
         v.set_map2_end(cs.map2_end)
         v.set_map2_step(cs.map2_step)
         v.set_map2_points(cs.map2_points)
+        self._refresh_map_point_count()
 
     def add_points_changed_listener(self, callback) -> None:
         self._on_points_changed.append(callback)
@@ -209,6 +210,12 @@ class CollectionSettingsController:
         self._model.collection_settings.exposure = value
         _log.debug("collection_settings.exposure = %s", value)
 
+    def _refresh_map_point_count(self) -> None:
+        cs = self._model.collection_settings
+        n_cols = max(1, cs.map_points)
+        n_rows = max(1, cs.map2_points) if cs.map2_enabled else 1
+        self._view.collection_settings.set_map_point_count(n_rows, n_cols)
+
     def _on_map_changed(self, value: bool) -> None:
         self._model.collection_settings.map = value
         self._sync_trajectory_toggle()
@@ -233,11 +240,13 @@ class CollectionSettingsController:
 
     def _on_map_points_changed(self, value: int) -> None:
         self._model.collection_settings.map_points = value
+        self._refresh_map_point_count()
         _log.debug("collection_settings.map_points = %d", value)
 
     def _on_map2_enabled_changed(self, value: bool) -> None:
         self._model.collection_settings.map2_enabled = value
         self._sync_trajectory_toggle()
+        self._refresh_map_point_count()
         _log.debug("collection_settings.map2_enabled = %s", value)
 
     def _on_map2_motor_changed(self, value: str) -> None:
@@ -259,6 +268,7 @@ class CollectionSettingsController:
 
     def _on_map2_points_changed(self, value: int) -> None:
         self._model.collection_settings.map2_points = value
+        self._refresh_map_point_count()
         _log.debug("collection_settings.map2_points = %d", value)
 
     def _on_wide_flip_changed(self, value: bool) -> None:

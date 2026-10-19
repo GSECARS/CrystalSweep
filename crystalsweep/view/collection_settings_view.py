@@ -262,7 +262,11 @@ class CollectionSettingsView(FlatPanel):
 
         outer.Add(self._make_map_presets(label_font), 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP | wx.BOTTOM, 10)
         self._map_presets_panel.Hide()
-        outer.AddSpacer(8)
+
+        self._map_count_lbl = FlatLabel(self, label="")
+        self._map_count_lbl.SetFont(app_theme.scaled_font(11))
+        self._map_count_lbl.Hide()
+        outer.Add(self._map_count_lbl, 0, wx.ALIGN_CENTER | wx.BOTTOM, 6)
 
         btn_row = wx.BoxSizer(wx.HORIZONTAL)
         self._add_btn = FlatButton(self, "+ Add point", font=app_theme.btn_font())
@@ -453,10 +457,20 @@ class CollectionSettingsView(FlatPanel):
         self.Layout()
         self.GetParent().Layout()
 
+    def set_map_point_count(self, rows: int, cols: int) -> None:
+        count = rows * cols
+        if rows > 1 and cols > 1:
+            self._map_count_lbl.SetLabel(f"{count} points ({rows}×{cols})")
+        else:
+            self._map_count_lbl.SetLabel(f"{count} point{'s' if count != 1 else ''}")
+        self.Layout()
+        self.GetParent().Layout()
+
     def _refresh_map_row(self) -> None:
         show = self._map_toggle.GetValue()
         self._map_table.Show(show)
         self._map_presets_panel.Show(show)
+        self._map_count_lbl.Show(show)
         self._add_btn.SetLabel("+ Add map points" if show else "+ Add point")
         self._refresh_flip_visibility()
         self.Layout()
