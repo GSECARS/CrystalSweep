@@ -821,7 +821,7 @@ class ScanEngine:
             remote_dir = f"{remote_dir.rstrip('/')}/{folder_name}"
             label = point.label.strip()
             parts = [p for p in [base, folder_suffix, label] if p]
-            frame_number = 1
+            frame_number = max(1, point.map_seq + 1)
         else:
             disable_auto_increment = bool(label)
             parts = [p for p in [base, label] if p]

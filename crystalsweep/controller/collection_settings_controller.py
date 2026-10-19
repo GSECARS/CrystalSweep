@@ -367,12 +367,12 @@ class CollectionSettingsController:
                     pass
 
         group_id = str(uuid.uuid4())
+        group_label = f"{frame_number:0{width}d}"
         new_points: list = []
         point_index = 0
         for row_idx, pos2 in enumerate(axis2):
             for col_idx, pos1 in enumerate(axis1):
-                label = f"{frame_number + point_index:0{width}d}"
-                point = self._model.collection.add_point(shorthands, label=label)
+                point = self._model.collection.add_point(shorthands, label=group_label)
                 point.selected = True
                 point.scan_type = cs.scan_type
                 point.time = str(cs.exposure)
@@ -394,6 +394,7 @@ class CollectionSettingsController:
                 point.map_group = group_id
                 point.map_row = row_idx
                 point.map_col = col_idx
+                point.map_seq = point_index
                 point.map_motor1 = cs.map_motor
                 point.map_motor2 = cs.map2_motor if cs.map2_enabled else ""
                 new_points.append(point)

@@ -53,7 +53,8 @@ class OutputPaths:
             label = point.label.strip()
             map_ext = self.map_ext or "map"
             parts = [p for p in [self.filename, map_ext, label] if p]
-            return f"{'_'.join(parts)}_{1:0{w}d}"
+            seq = max(1, point.map_seq + 1) if point.map_seq >= 0 else frame_number
+            return f"{'_'.join(parts)}_{seq:0{w}d}"
         num = frame_number
         return f"{self.stem(point)}_{int(num):0{w}d}"
 

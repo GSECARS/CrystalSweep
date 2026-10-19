@@ -1530,10 +1530,17 @@ class CollectController:
             "monotype": "SYNCHROTRON",
         }
 
+        if point.map_group:
+            crysalis_basename = f"{output.stem(point)}_{point.label.strip()}"
+            crysalis_filenumber = max(1, point.map_seq + 1)
+        else:
+            crysalis_basename = output.stem(point)
+            crysalis_filenumber = frame_number
+
         args = {
             "filepath": filepath,
-            "basename": output.stem(point),
-            "filenumber": frame_number,
+            "basename": crysalis_basename,
+            "filenumber": crysalis_filenumber,
             "par_file": str(fs.crysalis_calibration),
             "set_file": str(fs.crysalis_set_file) if fs.crysalis_set_file is not None else "",
             "ccd_file": str(fs.crysalis_ccd_file) if fs.crysalis_ccd_file is not None else "",

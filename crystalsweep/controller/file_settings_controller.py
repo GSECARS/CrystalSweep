@@ -222,15 +222,18 @@ class FileSettingsController:
         det = self._model.beamline.active.active_detector_config if self._model.beamline.active else None
         width = det.file_number_width if det is not None else 4
         frame_number = fs.frame_number
-        point_index = 0
+        group_labels: dict[str, str] = {}
+        next_frame = frame_number
         for index, point in enumerate(self._model.collection.points):
             if not point.map_group:
                 continue
-            new_label = f"{frame_number + point_index:0{width}d}"
+            if point.map_group not in group_labels:
+                group_labels[point.map_group] = f"{next_frame:0{width}d}"
+                next_frame += 1
+            new_label = group_labels[point.map_group]
             self._model.collection.update_label(index, new_label)
             self._view.collection_table.refresh_row(index, point)
-            point_index += 1
-        _log.debug("map ext update: relabelled %d map points from frame %d", point_index, frame_number)
+        _log.debug("map ext update: relabelled map groups %s", list(group_labels.values()))
 
     def add_hdf5_changed_listener(self, callback) -> None:
         self._on_hdf5_changed_listeners.append(callback)
