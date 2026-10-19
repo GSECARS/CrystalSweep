@@ -128,6 +128,7 @@ class CollectionSettingsController:
         if still_map:
             self._view.collection_table.set_trajectory_scan(True)
             self._view.collection_table.set_snake_trajectory(True)
+            self._model.file_settings.use_snake_trajectory = True
         elif step_non_map:
             self._view.collection_table.set_trajectory_scan(True)
 
