@@ -134,6 +134,7 @@ class CollectionSettingsController:
         trajectory_visible = (still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory) or (step_scan and not cs.map)
         if not trajectory_visible:
             self._view.collection_table.set_trajectory_scan(False)
+        self._view.collection_table.set_snake_trajectory_allowed(still_map)
         self._view.collection_table.set_trajectory_visible(trajectory_visible)
 
         keep_shutter_visible = still_map or wide_flip_map

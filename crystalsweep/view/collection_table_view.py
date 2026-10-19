@@ -719,6 +719,7 @@ class CollectionTableView(FlatPanel):
         self._field_errors: list[tuple[dict[str, bool], bool, bool]] = []
         self._active_index: int | None = None
         self._collecting: bool = False
+        self._snake_trajectory_allowed: bool = False
 
         # Pool of realized row widgets.
         self._pool: list[_CollectionRow] = []
@@ -786,13 +787,19 @@ class CollectionTableView(FlatPanel):
 
     def set_trajectory_visible(self, visible: bool) -> None:
         self._slew_scan_toggle.Show(visible)
-        self._snake_trajectory_toggle.Show(visible and self._slew_scan_toggle.GetValue())
+        self._snake_trajectory_toggle.Show(visible and self._slew_scan_toggle.GetValue() and self._snake_trajectory_allowed)
         self.Layout()
 
     def set_trajectory_scan(self, value: bool) -> None:
         self._slew_scan_toggle.SetValue(value)
-        self._snake_trajectory_toggle.Show(value and self._slew_scan_toggle.IsShown())
+        self._snake_trajectory_toggle.Show(value and self._slew_scan_toggle.IsShown() and self._snake_trajectory_allowed)
         self.Layout()
+
+    def set_snake_trajectory_allowed(self, allowed: bool) -> None:
+        self._snake_trajectory_allowed = allowed
+        if not allowed:
+            self._snake_trajectory_toggle.Show(False)
+            self.Layout()
 
     def set_snake_trajectory(self, value: bool) -> None:
         self._snake_trajectory_toggle.SetValue(value)
@@ -840,7 +847,7 @@ class CollectionTableView(FlatPanel):
             self._on_snake_combine_changed_cb(value)
 
     def _on_trajectory_toggled(self, value: bool) -> None:
-        self._snake_trajectory_toggle.Show(value and self._slew_scan_toggle.IsShown())
+        self._snake_trajectory_toggle.Show(value and self._slew_scan_toggle.IsShown() and self._snake_trajectory_allowed)
         self.Layout()
 
     def _on_snake_trajectory_toggled(self, value: bool) -> None:
