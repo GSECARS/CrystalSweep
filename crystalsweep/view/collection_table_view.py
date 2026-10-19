@@ -770,6 +770,7 @@ class CollectionTableView(FlatPanel):
         self._use_ext_toggle.Enable(not collecting)
         self._keep_shutter_open_toggle.Enable(not collecting)
         self._snake_combine_toggle.Enable(not collecting)
+        self._snake_trajectory_toggle.Enable(not collecting)
         self._header.set_collecting(collecting)
         if not collecting:
             self._active_index = None
