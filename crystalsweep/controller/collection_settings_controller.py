@@ -225,6 +225,15 @@ class CollectionSettingsController:
         self._model.collection_settings.map = value
         self._apply_trajectory_defaults()
         self._sync_trajectory_toggle()
+        if not value:
+            had_map_points = False
+            for i, pt in enumerate(self._model.collection.points):
+                if pt.map_group:
+                    had_map_points = True
+                    self._model.collection.clear_map_fields(i)
+                    self._view.collection_table.refresh_row(i, self._model.collection.points[i])
+            if had_map_points:
+                self._notify_points_changed()
         _log.debug("collection_settings.map = %s", value)
 
     def _on_map_motor_changed(self, value: str) -> None:

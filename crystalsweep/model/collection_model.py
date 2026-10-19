@@ -172,6 +172,17 @@ class CollectionTableModel:
         if 0 <= index < len(self._points):
             self._points[index].time = value
 
+    def clear_map_fields(self, index: int) -> None:
+        if 0 <= index < len(self._points):
+            pt = self._points[index]
+            pt.map_group = ""
+            pt.map_row = -1
+            pt.map_col = -1
+            pt.map_seq = -1
+            pt.map_motor1 = ""
+            pt.map_motor2 = ""
+            pt.map_row_shift = 0.0
+
     def set_selected(self, index: int, selected: bool) -> None:
         if 0 <= index < len(self._points):
             self._points[index].selected = selected
