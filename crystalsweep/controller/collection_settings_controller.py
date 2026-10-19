@@ -433,8 +433,13 @@ class CollectionSettingsController:
             self._model.collection.update_scan_type(index, cs.scan_type)
             self._model.collection.update_time(index, str(cs.exposure))
             if cs.scan_type in ("wide", "step"):
-                self._model.collection.update_rotation_start(index, str(cs.rotation_start + cs.beam_angle))
-                self._model.collection.update_rotation_end(index, str(cs.rotation_end + cs.beam_angle))
+                point = self._model.collection.points[index]
+                rot_start = cs.rotation_start + cs.beam_angle
+                rot_end = cs.rotation_end + cs.beam_angle
+                if cs.scan_type == "wide" and cs.wide_flip and point.map_seq >= 0 and point.map_seq % 2 == 1:
+                    rot_start, rot_end = rot_end, rot_start
+                self._model.collection.update_rotation_start(index, str(rot_start))
+                self._model.collection.update_rotation_end(index, str(rot_end))
             else:
                 self._model.collection.update_rotation_start(index, "")
                 self._model.collection.update_rotation_end(index, "")
