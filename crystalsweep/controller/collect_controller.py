@@ -423,6 +423,8 @@ class CollectController:
         all_points = self._model.collection.points
         pre_scan_error: str | None = None
         pre_collection_error: str | None = None
+        raw_dir = config.raw_directory.strip() if config else ""
+        self._engine.session_subdir = _time.strftime("%Y%m%d_%H%M%S") if raw_dir else None
         self._output_paths = self._build_output_paths()
 
         pre_collection_error = self._engine.pre_collection(points, config)
@@ -615,6 +617,8 @@ class CollectController:
         else:
             wx.CallAfter(self._view.collect.set_progress, total, total, point_fraction=1.0)
             wx.CallAfter(self._view.collect.set_status, "Done", wx.Colour(99, 179, 237))
+
+        self._engine.session_subdir = None
 
     def _run_map_group(
         self,
@@ -1050,6 +1054,8 @@ class CollectController:
         result = self._selected_extras()
         extras = tuple(result[1]) if result else ()
         raw = config.raw_directory.strip() if config else ""
+        if raw and self._engine.session_subdir:
+            raw = raw.rstrip("/\\") + "/" + self._engine.session_subdir
         crysalis_active = bool(fs.use_crysalis and fs.crysalis_calibration is not None)
         fn_path = Path(fs.filename) if fs.filename else Path(".")
         fn_parent = fn_path.parent

@@ -36,6 +36,7 @@ class ScanEngine:
         self._shutter_open = False
         self._abort_event: threading.Event = threading.Event()
         self.test_mode: bool = False
+        self.session_subdir: str | None = None
 
     def _inject_shared_connection(self, params: dict, controller_name: str) -> None:
         if self._controllers is None or not controller_name:
@@ -177,7 +178,7 @@ class ScanEngine:
                     on_done()
                     return
                 if file_settings is not None:
-                    remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
+                    remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config, self.session_subdir)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                 if self._abort_event.is_set():
                     on_done()
@@ -289,7 +290,9 @@ class ScanEngine:
                             on_error(ValueError(f"Soft limit violation - {limit_err}"))
                             return
                     if file_settings is not None:
-                        remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
+                        remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(
+                            file_settings, point, config, self.session_subdir
+                        )
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                     if self._abort_event.is_set():
                         on_done()
@@ -349,7 +352,9 @@ class ScanEngine:
                         on_done()
                         return
                     if file_settings is not None:
-                        remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
+                        remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(
+                            file_settings, point, config, self.session_subdir
+                        )
                         saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
 
                     if self._abort_event.is_set():
@@ -527,7 +532,7 @@ class ScanEngine:
                         on_error(ValueError(f"Soft limit violation - {limit_err}"))
                         return
                 if file_settings is not None:
-                    remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config)
+                    remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, point, config, self.session_subdir)
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                 if self._abort_event.is_set():
                     on_done()
@@ -728,7 +733,9 @@ class ScanEngine:
                     on_done()
                     return
                 if file_settings is not None and ref_point is not None:
-                    remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(file_settings, ref_point, config)
+                    remote_dir, filename, frame_number, disable_inc, file_template = self._resolve_file_info(
+                        file_settings, ref_point, config, self.session_subdir
+                    )
                     saved_auto_inc = detector.set_file_info(remote_dir, filename, frame_number, disable_inc, file_template)
                 if self._abort_event.is_set():
                     on_done()
@@ -798,6 +805,7 @@ class ScanEngine:
         file_settings: "FileSettingsModel",
         point: "CollectionPoint",
         config: "BeamlineConfig",
+        session_subdir: str | None = None,
     ) -> tuple[str, str, int, bool, str]:
         """Return (remote_directory, filename, frame_number, disable_auto_increment, file_template) for the given point.
 
@@ -808,6 +816,8 @@ class ScanEngine:
         """
         det = config.active_detector_config
         raw = config.raw_directory.strip()
+        if session_subdir and raw:
+            raw = raw.rstrip("/\\") + "/" + session_subdir
         local_dir = raw if raw else str(file_settings.directory)
         remote_dir = det.translate_path(local_dir) if det else local_dir
         use_ext = getattr(file_settings, "use_ext", True)
