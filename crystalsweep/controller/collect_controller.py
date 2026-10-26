@@ -95,6 +95,7 @@ class CollectController:
         self._monitored_limit_pvs: list[str] = []
         self._aborting_dlg: FlatWaitDialog | None = None
         self._output_paths: OutputPaths | None = None
+        self._combine_proc: subprocess.Popen | None = None
 
         self._view.collect.bind_collect(self._on_collect)
         self._view.collect.bind_abort(self._on_abort)
@@ -645,6 +646,7 @@ class CollectController:
         map_completed_weight = completed_weight
         frame_before_map = self._model.file_settings.frame_number
         self._in_map_collection = True
+        self._combine_proc = None
 
         rows: dict[int, list[CollectionPoint]] = {}
         for pt in group_points:
@@ -1119,7 +1121,7 @@ class CollectController:
         flipped_dir: str | None = None,
         row_shift_frames: int = 0,
         snake_mode: bool = True,
-    ) -> None:
+    ) -> subprocess.Popen | None:
         """Spawn the snake-map combiner as a detached subprocess."""
         args = {
             "input_dir": input_dir,
@@ -1136,7 +1138,7 @@ class CollectController:
                 json.dump(args, tmp)
             finally:
                 tmp.close()
-            subprocess.Popen(
+            return subprocess.Popen(
                 [sys.executable, "-m", "crystalsweep.model.snake_combiner", tmp.name],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -1144,18 +1146,24 @@ class CollectController:
             )
         except Exception as exc:
             _log.warning("Failed to spawn snake combiner: %s", exc)
+            return None
 
     def _spawn_snake_combine_for_map(self, row_shift_frames: int = 0) -> None:
-        """Spawn the snake combiner for a finished map collection.
+        """Spawn the snake combiner after a row completes.
 
-        Snake convention matches _run_map_group: row 0 forward, row 1
-        reversed, etc., so first_row_reversed is False here.
+        Waits for any previously spawned combiner to finish before launching a
+        new one, ensuring rows are never appended to the combined file by two
+        concurrent processes. Snake convention matches _run_map_group: row 0
+        forward, row 1 reversed, etc., so first_row_reversed is False here.
         """
+        if self._combine_proc is not None:
+            self._combine_proc.wait()
+            self._combine_proc = None
         output = self._output_paths
         if output is None:
             return
         use_snake = self._model.file_settings.use_snake_trajectory
-        self._launch_snake_combiner(
+        self._combine_proc = self._launch_snake_combiner(
             input_dir=str(output.map_source_dir()),
             output_path=str(output.map_combined_path()),
             pattern=output.map_row_pattern(),
