@@ -1148,12 +1148,10 @@ class CollectController:
         output = self._output_paths
         if output is None:
             return
-        map_pts = self._model.collection.points
-        is_step = any(p.map_group and p.scan_type == "step" for p in map_pts)
         use_snake = self._model.file_settings.use_snake_trajectory
         self._launch_snake_combiner(
             input_dir=str(output.map_source_dir()),
-            output_path=str(output.map_combined_path(is_step=is_step)),
+            output_path=str(output.map_combined_path()),
             pattern=output.map_row_pattern(),
             first_row_reversed=False,
             flipped_dir=str(output.map_flipped_dir()),
@@ -1249,8 +1247,7 @@ class CollectController:
                 seen.add(key)
                 if map_dir.is_dir() and any(map_dir.iterdir()):
                     conflicts.append(f"{map_dir}/ (directory not empty)")
-            is_step = any(p.map_group == group and p.scan_type == "step" for p in points)
-            combined = output.map_combined_path(is_step=is_step)
+            combined = output.map_combined_path()
             key = str(combined)
             if key not in seen:
                 seen.add(key)
