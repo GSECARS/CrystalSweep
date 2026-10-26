@@ -144,6 +144,18 @@ class OutputPaths:
         """Glob pattern matching all row files written by the IOC."""
         return f"{self.map_folder_name()}_*.{self.file_ext}"
 
+    def map_row_file_pattern(self, row: int) -> str:
+        """Glob pattern matching files written by the IOC for a single map row (0-indexed)."""
+        w = max(1, self.file_number_width)
+        suffix = self.map_ext or "map"
+        row1 = max(1, row + 1)
+        parts = [p for p in [self.filename, suffix, f"{row1:0{w}d}"] if p]
+        return f"{'_'.join(parts)}_*.{self.file_ext}"
+
+    def map_raw_dir(self) -> Path:
+        """Target subdirectory for raw files within the map output folder."""
+        return self.directory / self.map_folder_name() / "raw"
+
     def _map_conversion_root(self) -> Path:
         """Shared root for all extra-format conversions within a map."""
         folder = self.map_folder_name()

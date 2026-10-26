@@ -399,6 +399,42 @@ class TestMapRowPattern:
         assert output.map_row_pattern() == "map_*.h5"
 
 
+class TestMapRowFilePattern:
+    """Verify map_row_file_pattern() returns a glob for a single row's files."""
+
+    def test_row_zero_becomes_one_based(self):
+        output = _make_output(filename="s", map_ext="map", file_ext="h5", file_number_width=4)
+        assert output.map_row_file_pattern(0) == "s_map_0001_*.h5"
+
+    def test_row_four_becomes_five(self):
+        output = _make_output(filename="s", map_ext="map", file_ext="h5", file_number_width=4)
+        assert output.map_row_file_pattern(4) == "s_map_0005_*.h5"
+
+    def test_cbf_extension(self):
+        output = _make_output(filename="run", map_ext="scan", file_ext="cbf", file_number_width=4)
+        assert output.map_row_file_pattern(1) == "run_scan_0002_*.cbf"
+
+    def test_without_filename(self):
+        output = _make_output(filename="", map_ext="", file_ext="h5", file_number_width=4)
+        assert output.map_row_file_pattern(0) == "map_0001_*.h5"
+
+
+class TestMapRawDir:
+    """Verify map_raw_dir() returns the raw subdirectory within the map output folder."""
+
+    def test_is_raw_inside_map_folder(self):
+        output = _make_output(directory="/out", filename="s", map_ext="map")
+        assert output.map_raw_dir() == Path("/out/s_map/raw")
+
+    def test_uses_custom_map_ext(self):
+        output = _make_output(directory="/data", filename="run", map_ext="scan")
+        assert output.map_raw_dir() == Path("/data/run_scan/raw")
+
+    def test_ignores_raw_directory(self):
+        output = _make_output(directory="/out", raw_directory="/raw", filename="s", map_ext="map")
+        assert output.map_raw_dir() == Path("/out/s_map/raw")
+
+
 class TestMapConversionRoot:
     """Verify _map_conversion_root() nests the map folder twice inside the output directory."""
 

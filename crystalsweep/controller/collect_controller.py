@@ -993,6 +993,7 @@ class CollectController:
                 self._write_expected_positions(row_points, epics_positions, motor1, config)
             self._write_map_row_metadata(row_points, epics_positions, motor1, config)
             self._spawn_format_conversion_for_trajectory_row(row_points)
+            self._spawn_raw_map_row_copy(row_points)
 
     def _wait_for_eiger_triggering(self, pv_prefix: str, done_event: threading.Event | None = None) -> None:
         prefix = pv_prefix.strip()
@@ -1186,17 +1187,40 @@ class CollectController:
             _log.warning("Failed to spawn map file copier: %s", exc)
 
     def _spawn_map_copy_to_target(self, flip_odd_rows: bool = False, row_shift_frames: int = 0) -> None:
-        """Copy all raw map row files to the target map folder after a step or wide map completes."""
+        """Copy all raw map row files to the target map raw folder."""
         output = self._output_paths
         if output is None or output.raw_directory is None:
             return
         self._launch_map_copy_to_target(
             input_dir=str(output.map_source_dir()),
-            output_dir=str(output.directory / output.map_folder_name()),
+            output_dir=str(output.map_raw_dir()),
             pattern=output.map_row_pattern(),
             flip_odd_rows=flip_odd_rows,
             row_shift_frames=row_shift_frames,
         )
+
+    def _spawn_raw_map_row_copy(self, row_points: list[CollectionPoint]) -> None:
+        """Copy the just-completed trajectory row files to the target map raw folder."""
+        output = self._output_paths
+        if output is None or output.raw_directory is None:
+            return
+        if not row_points:
+            return
+        row = row_points[0].map_row
+        src_dir = output.map_source_dir()
+        dst_dir = output.map_raw_dir()
+        pattern = output.map_row_file_pattern(row)
+
+        def _copy() -> None:
+            try:
+                _mkdir_safe(dst_dir)
+                for f in sorted(src_dir.glob(pattern)):
+                    shutil.copy2(str(f), str(dst_dir / f.name))
+                    _log.debug("copied map row %d file %s -> %s", row, f, dst_dir)
+            except Exception as exc:
+                _log.warning("_spawn_raw_map_row_copy: %s", exc)
+
+        threading.Thread(target=_copy, daemon=True, name="file-copy").start()
 
     def _check_output_conflicts(self, points: list) -> list[str]:
         """Return a list of existing paths that collection would overwrite."""
@@ -1252,7 +1276,7 @@ class CollectController:
             if point.scan_type != "step":
                 return
             src_dir = output.map_source_dir()
-            dst_dir = output.directory / output.map_folder_name()
+            dst_dir = output.map_raw_dir()
             bn = output.basename(point, frame_number)
             ext = output.file_ext
 
