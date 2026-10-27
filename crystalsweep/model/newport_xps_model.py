@@ -187,7 +187,9 @@ class NewportXPSModel:
         return -delta if direction else delta
 
     def _safe_accel(self, group_name: str, axis_name: str, stop_xps: float, step: float, scantime: float) -> float | None:
-        """Compute the largest acceleration that keeps the cubic-spline ramp joint acceleration within the stage's hardware limit."""
+        """Compute the largest acceleration that keeps the PVT ramp within the stage's limit."""
+        _MIN_RAMP_DIST = 5.0e-6
+
         stages = getattr(self._xps, "stages", {})
         stage_info = None
         for variant in (axis_name, axis_name.upper(), axis_name.lower(), axis_name.title()):
@@ -201,15 +203,32 @@ class NewportXPSModel:
         max_velo = stage_info.get("max_velo")
         if not max_accel or max_accel <= 0:
             return None
-        distance = abs(stop_xps) + abs(step)
-        v = distance / scantime
+        abs_step = abs(step)
+        if abs_step <= 0:
+            return None
+
+        # Mirror define_line_trajectories: npulses shifts scantime slightly.
+        npulses = int((abs(stop_xps) + abs_step * 1.1) / abs_step)
+        if npulses > 1:
+            scantime_eff = (scantime / (npulses - 1)) * npulses
+        else:
+            scantime_eff = scantime
+        distance = abs(stop_xps) + abs_step
+        v = distance / scantime_eff
         if max_velo and v > max_velo:
             v = max_velo
-        if v <= 0 or abs(step) <= 0:
+        if v <= 0:
             return None
-        discriminant = v * v + 12.0 * abs(step) * max_accel
-        accel = v * (math.sqrt(discriminant) - v) / (6.0 * abs(step))
-        return min(accel, max_accel)
+
+        # unclamped rampdist. a_joint = 3*step/T^2 + V/T = max_accel.
+        T1 = 6.0 * abs_step / (math.sqrt(v * v + 12.0 * abs_step * max_accel) - v)
+        if 0.5 * v * T1 >= _MIN_RAMP_DIST:
+            return min(v / T1, max_accel)
+
+        # rampdist clamped. a_joint = 6*offset/T^2 - 2*V/T = max_accel.
+        offset = 0.5 * abs_step + _MIN_RAMP_DIST
+        T2 = 6.0 * offset / (v + math.sqrt(v * v + 6.0 * offset * max_accel))
+        return min(v / T2, max_accel)
 
     def _define_line_trajectory(
         self,
