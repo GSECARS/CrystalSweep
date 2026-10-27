@@ -146,11 +146,26 @@ class CollectionSettingsController:
         trajectory_visible = (still_map and self._map_motor_uses_xps() and cfg.still_map_trajectory) or (step_scan and not cs.map)
         self._view.collection_table.set_snake_trajectory_allowed(still_map)
         self._view.collection_table.set_trajectory_visible(trajectory_visible)
+        self._sync_trajectory_velocity(show=trajectory_visible and still_map)
 
         keep_shutter_visible = still_map or wide_flip_map
         self._view.collection_table.set_keep_shutter_open_visible(keep_shutter_visible)
         self._view.collection_table.set_use_ext_visible(not cs.map)
         self._view.collection_table.set_map_mode(cs.map)
+
+    def _sync_trajectory_velocity(self, show: bool = True) -> None:
+        """Update the velocity hint next to the trajectory toggle for still maps."""
+        cs = self._model.collection_settings
+        still_map_traj = show and cs.scan_type == "still" and cs.map
+        if not still_map_traj or cs.exposure <= 0 or cs.map_step <= 0:
+            self._view.collection_table.set_trajectory_velocity(None)
+            return
+        v_mm_s = cs.map_step / cs.exposure
+        if v_mm_s < 1.0:
+            text = f"v = {v_mm_s * 1000:.2f} μm/s"
+        else:
+            text = f"v = {v_mm_s:.3f} mm/s"
+        self._view.collection_table.set_trajectory_velocity(text)
 
     def _rotation_motor_uses_xps(self) -> bool:
         """Return True if the rotation motor is driven by a Newport XPS controller."""
@@ -214,6 +229,7 @@ class CollectionSettingsController:
 
     def _on_exposure_changed(self, value: float) -> None:
         self._model.collection_settings.exposure = value
+        self._sync_trajectory_velocity()
         _log.debug("collection_settings.exposure = %s", value)
 
     def _refresh_map_point_count(self) -> None:
@@ -252,6 +268,7 @@ class CollectionSettingsController:
 
     def _on_map_step_changed(self, value: float) -> None:
         self._model.collection_settings.map_step = value
+        self._sync_trajectory_velocity()
         _log.debug("collection_settings.map_step = %s", value)
 
     def _on_map_points_changed(self, value: int) -> None:

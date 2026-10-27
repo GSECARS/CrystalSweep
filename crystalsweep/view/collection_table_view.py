@@ -786,6 +786,17 @@ class CollectionTableView(FlatPanel):
     def set_trajectory_visible(self, visible: bool) -> None:
         self._slew_scan_toggle.Show(visible)
         self._snake_trajectory_toggle.Show(visible and self._slew_scan_toggle.GetValue() and self._snake_trajectory_allowed)
+        if not visible:
+            self._traj_velocity_label.Hide()
+        self.Layout()
+
+    def set_trajectory_velocity(self, text: str | None) -> None:
+        """Show or hide the scan velocity hint next to the trajectory toggle."""
+        if text:
+            self._traj_velocity_label.SetLabel(text)
+            self._traj_velocity_label.Show()
+        else:
+            self._traj_velocity_label.Hide()
         self.Layout()
 
     def set_trajectory_scan(self, value: bool) -> None:
@@ -889,6 +900,10 @@ class CollectionTableView(FlatPanel):
         self._clear_btn.SetMinSize((70, 22))
         self._clear_btn.SetAction(self._on_clear_clicked)
 
+        self._traj_velocity_label = wx.StaticText(self, label="")
+        self._traj_velocity_label.SetForegroundColour(app_theme.bright_black)
+        self._traj_velocity_label.Hide()
+
         self._slew_scan_toggle = FlatCheckBox(self, "Trajectory scanning")
         self._slew_scan_toggle.SetValue(True)
         self._slew_scan_toggle.Hide()
@@ -911,6 +926,7 @@ class CollectionTableView(FlatPanel):
         title_row.AddStretchSpacer()
         title_row.Add(self._keep_shutter_open_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._snake_trajectory_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
+        title_row.Add(self._traj_velocity_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._slew_scan_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._use_ext_toggle, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
         title_row.Add(self._delete_selected_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 4)
