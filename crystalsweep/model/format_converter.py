@@ -134,13 +134,19 @@ def _load_hdf5_frames(path: Path):
         if ndattr_grp is not None:
             for key in ndattr_grp:
                 node = ndattr_grp[key]
-                if isinstance(node, h5py.Dataset):
-                    nd_arrays[str(key)] = node[...]
+                if not isinstance(node, h5py.Dataset):
+                    continue
+                try:
+                    arr = np.atleast_1d(np.asarray(node[...], dtype=np.float64))
+                    if len(arr) > 0:
+                        nd_arrays[str(key)] = arr
+                except TypeError, ValueError:
+                    pass
 
         ds = fh[primary]
         data = ds[...]
         if data.ndim == 2:
-            meta = {k: float(v[0]) for k, v in nd_arrays.items() if len(v) > 0} if nd_arrays else {}
+            meta = {k: float(v[0]) for k, v in nd_arrays.items()} if nd_arrays else {}
             yield 0, np.asarray(data), meta
         else:
             for i in range(data.shape[0]):
