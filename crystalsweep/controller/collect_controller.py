@@ -1274,9 +1274,10 @@ class CollectController:
         """Copy the raw detector file to the output directory.
 
         For non-map points: copies the point file from raw_directory immediately.
-        For step map points: copies just that point's file from the map source
-        directory so it is available in the output directory right after the scan
-        finishes, without waiting for the rest of the map to complete.
+        For still map points: copies the point file into the map raw/ subfolder
+        (alongside the combined file that is created at the end).
+        For step map points: copies the point file directly into the map folder
+        (no combined file, so no raw/ subfolder needed).
         Wide map points are handled as a batch by _spawn_map_copy_to_target.
         """
         output = self._output_paths
@@ -1284,10 +1285,10 @@ class CollectController:
             return
 
         if point.map_group:
-            if point.scan_type != "step":
+            if point.scan_type == "wide":
                 return
             src_dir = output.map_source_dir()
-            dst_dir = output.map_dir()
+            dst_dir = output.map_raw_dir() if point.scan_type == "still" else output.map_dir()
             bn = output.basename(point, frame_number)
             ext = output.file_ext
 
