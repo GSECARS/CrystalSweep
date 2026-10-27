@@ -130,6 +130,7 @@ def _load_hdf5_frames(path: Path):
             _log.info("hdf5: no canonical path found in %s, using largest dataset %r", path, primary)
 
         nd_arrays: dict[str, np.ndarray] = {}
+        nd_strings: dict[str, str] = {}
         ndattr_grp = fh.get("entry/instrument/NDAttributes")
         if ndattr_grp is not None:
             for key in ndattr_grp:
@@ -141,16 +142,28 @@ def _load_hdf5_frames(path: Path):
                     if len(arr) > 0:
                         nd_arrays[str(key)] = arr
                 except TypeError, ValueError:
-                    pass
+                    try:
+                        raw = node[...]
+                        if isinstance(raw, bytes):
+                            nd_strings[str(key)] = raw.decode("utf-8", errors="replace").strip()
+                        elif isinstance(raw, np.ndarray) and raw.dtype.kind in ("S", "U"):
+                            val = np.atleast_1d(raw)[0]
+                            if isinstance(val, bytes):
+                                val = val.decode("utf-8", errors="replace")
+                            nd_strings[str(key)] = str(val).strip()
+                    except Exception:
+                        pass
 
         ds = fh[primary]
         data = ds[...]
         if data.ndim == 2:
-            meta = {k: float(v[0]) for k, v in nd_arrays.items()} if nd_arrays else {}
+            meta: dict = {k: float(v[0]) for k, v in nd_arrays.items()}
+            meta.update(nd_strings)
             yield 0, np.asarray(data), meta
         else:
             for i in range(data.shape[0]):
-                meta = {k: float(v[i] if i < len(v) else v[-1]) for k, v in nd_arrays.items()} if nd_arrays else {}
+                meta = {k: float(v[i] if i < len(v) else v[-1]) for k, v in nd_arrays.items()}
+                meta.update(nd_strings)
                 yield i, np.asarray(data[i]), meta
 
 
@@ -211,21 +224,40 @@ def _tif_header_text(metadata: dict) -> str:
     return "".join(lines)
 
 
+_TIFF_MOTOR_TAG_BASE = 65010
+
+
 def _write_fabio(out_path: Path, data, target_format: str, metadata: dict | None = None) -> None:
     if target_format == "tif":
+        import math
         import numpy as np
         from PIL import Image, TiffImagePlugin
 
         arr = np.asarray(data)
         img = Image.fromarray(arr)
+        tiffinfo = TiffImagePlugin.ImageFileDirectory_v2()
         if metadata:
             header_text = _tif_header_text(metadata)
             if header_text:
-                tiffinfo = TiffImagePlugin.ImageFileDirectory_v2()
                 tiffinfo[270] = header_text
-                img.save(str(out_path), tiffinfo=tiffinfo)
-                return
-        img.save(str(out_path))
+            tag_id = _TIFF_MOTOR_TAG_BASE
+            raw_header = metadata.get("_array_data.header_contents")
+            if isinstance(raw_header, str) and raw_header.strip():
+                for line in raw_header.splitlines():
+                    line = line.strip()
+                    if line.startswith("# ") and len(line) > 2:
+                        content = line[2:]
+                        parts = content.split(" ", 1)
+                        if len(parts) == 2:
+                            tiffinfo[tag_id] = f"{parts[0]}:{parts[1]}"
+                            tag_id += 1
+            else:
+                for k, v in metadata.items():
+                    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                        continue
+                    tiffinfo[tag_id] = f"{k}:{v}"
+                    tag_id += 1
+        img.save(str(out_path), tiffinfo=tiffinfo)
         return
     import fabio
 
