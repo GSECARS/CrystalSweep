@@ -84,6 +84,16 @@ def post_scan(point: CollectionPoint, config: BeamlineConfig, test_mode: bool = 
     *test_mode* is True when the Test mode checkbox is checked in the UI.
     """
     pass
+
+
+def reset_detector(config: BeamlineConfig) -> None:
+    """Called when the user selects Detectors > Reset from the menu.
+
+    Use this to send PVs that restore the active detector to a known state,
+    e.g. clear error conditions, re-arm, or reload default settings.
+    The active detector config is available via config.active_detector_config.
+    """
+    pass
 '''
 
 

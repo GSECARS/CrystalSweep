@@ -43,6 +43,7 @@ class BeamlineConfigController:
         self._view.bind_open_general(self.open_general)
         self._view.bind_open_crysalis(self.open_crysalis)
         self._view.bind_open_detectors(self.open_detectors)
+        self._view.bind_reset_detector(self.reset_detector)
         self._view.bind_open_controllers(self.open_controllers)
         self._view.bind_open_positioners(self.open_positioners)
         self._view.bind_load_config(self.load_config)
@@ -117,6 +118,15 @@ class BeamlineConfigController:
 
         self._detectors_dlg.config_panel.load_config(self._model.beamline.active)
         self._show(self._detectors_dlg)
+
+    def reset_detector(self) -> None:
+        config = self._model.beamline.active
+        threading.Thread(
+            target=self._model.scripts.call,
+            args=("reset_detector", config),
+            daemon=True,
+            name="detector-reset",
+        ).start()
 
     def open_controllers(self) -> None:
         if self._controllers_dlg is None:

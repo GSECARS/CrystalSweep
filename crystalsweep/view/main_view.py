@@ -38,6 +38,7 @@ class MainView(wx.Frame):
         self._open_general_cb: Callable[[], None] | None = None
         self._open_crysalis_cb: Callable[[], None] | None = None
         self._open_detectors_cb: Callable[[], None] | None = None
+        self._reset_detector_cb: Callable[[], None] | None = None
         self._open_controllers_cb: Callable[[], None] | None = None
         self._open_positioners_cb: Callable[[], None] | None = None
         self._open_scripts_cb: Callable[[], None] | None = None
@@ -110,6 +111,9 @@ class MainView(wx.Frame):
 
     def bind_open_detectors(self, callback: Callable[[], None]) -> None:
         self._open_detectors_cb = callback
+
+    def bind_reset_detector(self, callback: Callable[[], None]) -> None:
+        self._reset_detector_cb = callback
 
     def bind_open_controllers(self, callback: Callable[[], None]) -> None:
         self._open_controllers_cb = callback
@@ -204,7 +208,8 @@ class MainView(wx.Frame):
             menu_bar.Append(crysalis_menu, "&CrysAlis")
 
             detectors_menu = wx.Menu()
-            detectors_item = detectors_menu.Append(wx.ID_ANY, "Detectors\tCtrl+3")
+            detectors_config_item = detectors_menu.Append(wx.ID_ANY, "Config")
+            detectors_reset_item = detectors_menu.Append(wx.ID_ANY, "Reset")
             menu_bar.Append(detectors_menu, "&Detectors")
 
             controllers_menu = wx.Menu()
@@ -228,7 +233,8 @@ class MainView(wx.Frame):
             self.Bind(wx.EVT_MENU, lambda _e: self._on_toggle_integration_plot(), self._menu_check_integration)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_general_cb), general_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_crysalis_cb), crysalis_item)
-            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_detectors_cb), detectors_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_detectors_cb), detectors_config_item)
+            self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._reset_detector_cb), detectors_reset_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_controllers_cb), controllers_item)
             self.Bind(wx.EVT_MENU, lambda _e: self._fire(self._open_positioners_cb), positioners_item)
             return None
@@ -254,7 +260,15 @@ class MainView(wx.Frame):
         )
         bar.AppendAction("General", lambda: self._fire(self._open_general_cb))
         bar.AppendAction("CrysAlis", lambda: self._fire(self._open_crysalis_cb))
-        bar.AppendAction("Detectors", lambda: self._fire(self._open_detectors_cb))
+        bar.AppendMenu(
+            title="Detectors",
+            items=["Config", "Reset"],
+            shortcuts=[None, None],
+            callbacks=[
+                lambda: self._fire(self._open_detectors_cb),
+                lambda: self._fire(self._reset_detector_cb),
+            ],
+        )
         bar.AppendAction("Controllers", lambda: self._fire(self._open_controllers_cb))
         bar.AppendAction("Positioners", lambda: self._fire(self._open_positioners_cb))
         bar.AppendAction("Scripts", lambda: self._fire(self._open_scripts_cb))
