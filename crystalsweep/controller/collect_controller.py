@@ -1199,13 +1199,13 @@ class CollectController:
             _log.warning("Failed to spawn map file copier: %s", exc)
 
     def _spawn_map_copy_to_target(self, flip_odd_rows: bool = False, row_shift_frames: int = 0) -> None:
-        """Copy all raw map row files to the target map raw folder."""
+        """Copy all raw map row files to the map output folder."""
         output = self._output_paths
         if output is None or output.raw_directory is None:
             return
         self._launch_map_copy_to_target(
             input_dir=str(output.map_source_dir()),
-            output_dir=str(output.map_raw_dir()),
+            output_dir=str(output.map_dir()),
             pattern=output.map_row_pattern(),
             flip_odd_rows=flip_odd_rows,
             row_shift_frames=row_shift_frames,
@@ -1287,7 +1287,7 @@ class CollectController:
             if point.scan_type != "step":
                 return
             src_dir = output.map_source_dir()
-            dst_dir = output.map_raw_dir()
+            dst_dir = output.map_dir()
             bn = output.basename(point, frame_number)
             ext = output.file_ext
 

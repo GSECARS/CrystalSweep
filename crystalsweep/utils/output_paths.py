@@ -107,7 +107,7 @@ class OutputPaths:
         """Directory where CrysAlis writes its output."""
         bn = self.basename(point, frame_number)
         if point.map_group:
-            return self._map_conversion_root() / "crysalis" / bn
+            return self.map_dir() / "crysalis" / bn
         return self.directory / bn / "crysalis"
 
     def expected_file(self, point, frame_number: int) -> Path:
@@ -145,11 +145,10 @@ class OutputPaths:
         parts = [p for p in [self.filename, suffix, f"{row1:0{w}d}"] if p]
         return f"{'_'.join(parts)}_*.{self.file_ext}"
 
-    def map_raw_dir(self) -> Path:
-        """Target subdirectory for raw files within the map output folder."""
-        return self.directory / self.map_folder_name() / "raw"
+    def map_dir(self) -> Path:
+        """Target directory for map output files."""
+        return self.directory / self.map_folder_name()
 
-    def _map_conversion_root(self) -> Path:
-        """Shared root for all extra-format conversions within a map."""
-        folder = self.map_folder_name()
-        return self.directory / folder
+    def map_raw_dir(self) -> Path:
+        """Target subdirectory for raw files within the map output folder (still+trajectory maps)."""
+        return self.map_dir() / "raw"

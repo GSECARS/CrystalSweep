@@ -435,16 +435,16 @@ class TestMapRawDir:
         assert output.map_raw_dir() == Path("/out/s_map/raw")
 
 
-class TestMapConversionRoot:
-    """Verify _map_conversion_root() returns the map folder inside the output directory."""
+class TestMapDir:
+    """Verify map_dir() returns the map folder inside the output directory."""
 
     def test_is_directory_folder(self):
         output = _make_output(directory="/out", filename="s", map_ext="map")
-        assert output._map_conversion_root() == Path("/out/s_map")
+        assert output.map_dir() == Path("/out/s_map")
 
     def test_custom_ext(self):
         output = _make_output(directory="/data", filename="run", map_ext="scan")
-        assert output._map_conversion_root() == Path("/data/run_scan")
+        assert output.map_dir() == Path("/data/run_scan")
 
 
 class TestFrozenDataclass:
