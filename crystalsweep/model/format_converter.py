@@ -85,7 +85,7 @@ def _ensure_dir(path: Path) -> Path:
 
 
 def _load_frames(path: Path):
-    """Yield (frame_index, ndarray) tuples for every frame in *path*."""
+    """Yield (frame_index, ndarray, metadata) tuples for every frame in *path*."""
     suffix = path.suffix.lower()
     if suffix in (".h5", ".hdf5"):
         yield from _load_hdf5_frames(path)
@@ -129,13 +129,23 @@ def _load_hdf5_frames(path: Path):
             primary = candidates[0][1]
             _log.info("hdf5: no canonical path found in %s, using largest dataset %r", path, primary)
 
+        nd_arrays: dict[str, np.ndarray] = {}
+        ndattr_grp = fh.get("entry/instrument/NDAttributes")
+        if ndattr_grp is not None:
+            for key in ndattr_grp:
+                node = ndattr_grp[key]
+                if isinstance(node, h5py.Dataset):
+                    nd_arrays[str(key)] = node[...]
+
         ds = fh[primary]
         data = ds[...]
         if data.ndim == 2:
-            yield 0, np.asarray(data)
+            meta = {k: float(v[0]) for k, v in nd_arrays.items() if len(v) > 0} if nd_arrays else {}
+            yield 0, np.asarray(data), meta
         else:
             for i in range(data.shape[0]):
-                yield i, np.asarray(data[i])
+                meta = {k: float(v[i] if i < len(v) else v[-1]) for k, v in nd_arrays.items()} if nd_arrays else {}
+                yield i, np.asarray(data[i]), meta
 
 
 def _load_fabio_frames(path: Path):
@@ -148,37 +158,52 @@ def _load_fabio_frames(path: Path):
     img = fabio.open(str(path))
     nframes = getattr(img, "nframes", 1) or 1
     if nframes <= 1:
-        yield 0, img.data
+        header = dict(img.header) if hasattr(img, "header") and img.header else {}
+        yield 0, img.data, header
         return
     for i in range(nframes):
-        yield i, img.getframe(i).data
+        frame = img.getframe(i)
+        header = dict(frame.header) if hasattr(frame, "header") and frame.header else {}
+        yield i, frame.data, header
 
 
-def _write_frame(target_format: str, out_path: Path, data) -> None:
+def _write_frame(target_format: str, out_path: Path, data, metadata: dict | None = None) -> None:
     if target_format == "hdf5":
-        _write_hdf5(out_path, data)
+        _write_hdf5(out_path, data, metadata)
     elif target_format == "cbf":
-        _write_fabio(out_path, data, "cbf")
+        _write_fabio(out_path, data, "cbf", metadata)
     elif target_format == "tif":
-        _write_fabio(out_path, data, "tif")
+        _write_fabio(out_path, data, "tif", metadata)
     else:
         raise ValueError(f"Unsupported target format: {target_format}")
 
 
-def _write_hdf5(out_path: Path, data) -> None:
+def _write_hdf5(out_path: Path, data, metadata: dict | None = None) -> None:
     import h5py
+    import numpy as np
 
     with h5py.File(str(out_path), "w") as fh:
         fh.create_dataset("entry/data/data", data=data, compression="gzip", compression_opts=4)
+        if metadata:
+            grp = fh.require_group("entry/instrument/NDAttributes")
+            for label, value in metadata.items():
+                grp.create_dataset(label, data=np.array([float(value)], dtype=np.float64))
 
 
-def _write_fabio(out_path: Path, data, target_format: str) -> None:
+def _write_fabio(out_path: Path, data, target_format: str, metadata: dict | None = None) -> None:
     if target_format == "tif":
+        import json as _json
         import numpy as np
-        from PIL import Image
+        from PIL import Image, TiffImagePlugin
 
         arr = np.asarray(data)
-        Image.fromarray(arr).save(str(out_path))
+        img = Image.fromarray(arr)
+        if metadata:
+            tiffinfo = TiffImagePlugin.ImageFileDirectory_v2()
+            tiffinfo[270] = _json.dumps({k: v for k, v in metadata.items()})
+            img.save(str(out_path), tiffinfo=tiffinfo)
+        else:
+            img.save(str(out_path))
         return
     import fabio
 
@@ -186,6 +211,8 @@ def _write_fabio(out_path: Path, data, target_format: str) -> None:
         image = fabio.cbfimage.CbfImage(data=data)
     else:
         image = fabio.tifimage.TifImage(data=data)
+    if metadata:
+        image.header.update({k: str(v) for k, v in metadata.items()})
     image.write(str(out_path))
 
 
@@ -211,10 +238,11 @@ def _convert_to(
             if out_path.exists():
                 _log.warning("Skipping existing file: %s", out_path)
                 continue
-            _write_frame(target_format, out_path, frames[0][1])
+            _, data, meta = frames[0]
+            _write_frame(target_format, out_path, data, meta or None)
             written += 1
             continue
-        for _, data in frames:
+        for _, data, meta in frames:
             global_index += 1
             frame_label = f"{global_index:0{max(1, file_number_width)}d}"
             out_path = target_dir / f"{basename}_{frame_label}{suffix}"
@@ -222,7 +250,7 @@ def _convert_to(
                 _log.warning("Skipping existing file: %s", out_path)
                 continue
             try:
-                _write_frame(target_format, out_path, data)
+                _write_frame(target_format, out_path, data, meta or None)
                 written += 1
             except Exception:
                 _log.exception("Failed writing frame %s", out_path)
