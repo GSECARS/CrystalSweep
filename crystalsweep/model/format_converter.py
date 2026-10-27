@@ -196,20 +196,36 @@ def _write_hdf5(out_path: Path, data, metadata: dict | None = None) -> None:
                 grp.create_dataset(label, data=np.array([float(value)], dtype=np.float64))
 
 
+def _tif_header_text(metadata: dict) -> str:
+    """Build a CBF-style mini-header string from metadata for embedding in TIFF tag."""
+    import math
+
+    raw = metadata.get("_array_data.header_contents")
+    if isinstance(raw, str) and raw.strip():
+        return raw
+    lines = []
+    for k, v in metadata.items():
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            continue
+        lines.append(f"# {k} {v}\r\n")
+    return "".join(lines)
+
+
 def _write_fabio(out_path: Path, data, target_format: str, metadata: dict | None = None) -> None:
     if target_format == "tif":
-        import json as _json
         import numpy as np
         from PIL import Image, TiffImagePlugin
 
         arr = np.asarray(data)
         img = Image.fromarray(arr)
         if metadata:
-            tiffinfo = TiffImagePlugin.ImageFileDirectory_v2()
-            tiffinfo[270] = _json.dumps({k: v for k, v in metadata.items()})
-            img.save(str(out_path), tiffinfo=tiffinfo)
-        else:
-            img.save(str(out_path))
+            header_text = _tif_header_text(metadata)
+            if header_text:
+                tiffinfo = TiffImagePlugin.ImageFileDirectory_v2()
+                tiffinfo[270] = header_text
+                img.save(str(out_path), tiffinfo=tiffinfo)
+                return
+        img.save(str(out_path))
         return
     import fabio
 
