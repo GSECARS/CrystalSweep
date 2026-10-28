@@ -1,18 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/utils/output_paths.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Resolves all output file and directory paths for a collection run. Built once
-# from the active file settings and beamline config, then queried by the spawn
-# helpers in CollectController to eliminate duplicated path-derivation logic.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 from __future__ import annotations
 
@@ -59,22 +45,16 @@ class OutputPaths:
     def basename(self, point, frame_number: int) -> str:
         """Full filename with zero-padded frame number.
 
-        For map points the frame number is parsed from the point label (which
-        encodes the row/col position as the IOC uses it). The supplied
-        frame_number is the fallback when parsing fails.
+        For map points the label is used directly as the filename component
+        and the frame number is always 1 (one acquisition per map position).
         """
         w = max(1, self.file_number_width)
         if point.map_group:
-            label = point.label.strip()
-            try:
-                label_parts = label.rsplit("_", 2)
-                if len(label_parts) < 3:
-                    raise ValueError
-                map_frame_str = label_parts[-2]
-                num = int(label_parts[-1])
-                return f"{self.stem(point)}_{map_frame_str}_{num:0{w}d}"
-            except (ValueError, IndexError):
-                return f"{self.stem(point)}_{frame_number:0{w}d}"
+            row = max(1, point.map_row + 1) if point.map_row >= 0 else 1
+            col = max(1, point.map_col + 1) if point.map_col >= 0 else frame_number
+            map_ext = self.map_ext or "map"
+            parts = [p for p in [self.filename, map_ext, f"{row:0{w}d}"] if p]
+            return f"{'_'.join(parts)}_{col:0{w}d}"
         num = frame_number
         return f"{self.stem(point)}_{int(num):0{w}d}"
 
@@ -127,7 +107,7 @@ class OutputPaths:
         """Directory where CrysAlis writes its output."""
         bn = self.basename(point, frame_number)
         if point.map_group:
-            return self._map_conversion_root() / "crysalis" / bn
+            return self.map_dir() / "crysalis" / bn
         return self.directory / bn / "crysalis"
 
     def expected_file(self, point, frame_number: int) -> Path:
@@ -148,23 +128,27 @@ class OutputPaths:
         """Directory for snake-flipped copies of map row files."""
         return self.map_source_dir() / "flipped"
 
-    def map_combined_path(self, is_step: bool = True) -> Path:
-        """Output path for the combined HDF5 map file.
-
-        Goes inside the map folder when there are extra formats, or when the
-        map is a step scan with crysalis enabled (so all output shares one
-        folder). Otherwise sits as a sibling to the map folder.
-        """
+    def map_combined_path(self) -> Path:
+        """Output path for the combined HDF5 map file, inside the map folder."""
         folder = self.map_folder_name()
-        if self.extras or (self.use_crysalis and is_step):
-            return self.directory / folder / f"{folder}.h5"
-        return self.directory / f"{folder}.h5"
+        return self.directory / folder / f"{folder}.h5"
 
     def map_row_pattern(self) -> str:
         """Glob pattern matching all row files written by the IOC."""
         return f"{self.map_folder_name()}_*.{self.file_ext}"
 
-    def _map_conversion_root(self) -> Path:
-        """Shared root for all extra-format conversions within a map."""
-        folder = self.map_folder_name()
-        return self.directory / folder
+    def map_row_file_pattern(self, row: int) -> str:
+        """Glob pattern matching files written by the IOC for a single map row (0-indexed)."""
+        w = max(1, self.file_number_width)
+        suffix = self.map_ext or "map"
+        row1 = max(1, row + 1)
+        parts = [p for p in [self.filename, suffix, f"{row1:0{w}d}"] if p]
+        return f"{'_'.join(parts)}_*.{self.file_ext}"
+
+    def map_dir(self) -> Path:
+        """Target directory for map output files."""
+        return self.directory / self.map_folder_name()
+
+    def map_raw_dir(self) -> Path:
+        """Target subdirectory for raw files within the map output folder (still+trajectory maps)."""
+        return self.map_dir() / "raw"

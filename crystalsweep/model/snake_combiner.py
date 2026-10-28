@@ -35,6 +35,7 @@
 #       "skip_flip":           false,                  # optional, assume flipped_dir already populated
 #       "flipped_dir":         "<folder>",             # optional, default <input>_flipped
 #       "data_path":           "entry/data/data",      # optional, for per-frame detection
+#       "snake_mode":          true,                   # optional, false = no row flipping (line-by-line)
 #   }
 # ----------------------------------------------------------------------------------
 # Author: Christofanis Skordas
@@ -304,6 +305,7 @@ def combine_snake_map(
     flipped_dir: Path | None = None,
     data_path: str = _DEFAULT_DATA_PATH,
     row_shift_frames: int = 0,
+    snake_mode: bool = True,
 ) -> None:
     """Flip per-row .h5 files according to the snake convention and combine
     them into a single map file. The combined output preserves the schema of a
@@ -312,6 +314,9 @@ def combine_snake_map(
     ``row_shift_frames`` shifts the frame sequence of each reversed (odd) row by
     that many positions, correcting for motor backlash or other physical offsets.
     Positive values shift right; negative values shift left.
+
+    When ``snake_mode`` is False no rows are flipped; files are concatenated in
+    order as collected (line-by-line acquisition).
     """
     if not input_dir.is_dir():
         raise RuntimeError(f"Input directory not found: {input_dir}")
@@ -327,9 +332,10 @@ def combine_snake_map(
         raise RuntimeError(f"No row files matching {pattern!r} in {input_dir}")
     frame_count = _detect_frame_count(row_files[0], data_path)
     _log.info(
-        "snake_combiner: %d row files, %d frames/row, flipped_dir=%s, output=%s, row_shift_frames=%d",
+        "snake_combiner: %d row files, %d frames/row, snake_mode=%s, flipped_dir=%s, output=%s, row_shift_frames=%d",
         len(row_files),
         frame_count,
+        snake_mode,
         target_flipped_dir,
         output_path,
         row_shift_frames,
@@ -338,7 +344,9 @@ def combine_snake_map(
     flipped_files: list[Path] = []
     for i, src in enumerate(row_files):
         row_one_based = i + 1
-        if first_row_reversed:
+        if not snake_mode:
+            reverse = False
+        elif first_row_reversed:
             reverse = row_one_based % 2 == 1
         else:
             reverse = row_one_based % 2 == 0
@@ -413,7 +421,11 @@ def run_copy_map(args: dict) -> None:
 
     _log.info(
         "run_copy_map: input_dir=%r output_dir=%r pattern=%r flip_odd_rows=%s row_shift_frames=%d",
-        input_dir, output_dir, pattern, flip_odd_rows, row_shift_frames,
+        input_dir,
+        output_dir,
+        pattern,
+        flip_odd_rows,
+        row_shift_frames,
     )
 
     if not input_dir or not output_dir:
@@ -441,9 +453,10 @@ def run_combine(args: dict) -> None:
     flipped_dir_raw = args.get("flipped_dir") or ""
     data_path = args.get("data_path") or _DEFAULT_DATA_PATH
     row_shift_frames = int(args.get("row_shift_frames", 0))
+    snake_mode = bool(args.get("snake_mode", True))
 
     _log.info(
-        "run_combine: input_dir=%r output_path=%r pattern=%r first_row_reversed=%s skip_flip=%s flipped_dir=%r row_shift_frames=%d",
+        "run_combine: input_dir=%r output_path=%r pattern=%r first_row_reversed=%s skip_flip=%s flipped_dir=%r row_shift_frames=%d snake_mode=%s",
         input_dir,
         output_path,
         pattern,
@@ -451,6 +464,7 @@ def run_combine(args: dict) -> None:
         skip_flip,
         flipped_dir_raw,
         row_shift_frames,
+        snake_mode,
     )
 
     if not input_dir or not output_path:
@@ -466,6 +480,7 @@ def run_combine(args: dict) -> None:
         flipped_dir=Path(flipped_dir_raw) if flipped_dir_raw else None,
         data_path=data_path,
         row_shift_frames=row_shift_frames,
+        snake_mode=snake_mode,
     )
 
 

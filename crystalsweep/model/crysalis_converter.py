@@ -85,8 +85,9 @@ def _create_crysalis_run(new_directory: str, basename: str, scan_info: dict) -> 
     run_name = os.path.join(new_directory, basename)
     run_file = []
 
+    rotation_axis = scan_info.get("rotation_axis", "omega").upper()
     dscr = crysalis.RunDscr(0)
-    dscr.axis = crysalis.SCAN_AXIS["OMEGA"]
+    dscr.axis = crysalis.SCAN_AXIS[rotation_axis]
     dscr.kappa = scan_info.get("kappa", 0.0)
     dscr.omegaphi = 0
     dscr.start = scan_info.get("omega_start", 0.0)
@@ -116,6 +117,7 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
     h5_path = os.path.join(filepath, f"{full_basename}.h5")
     _log.info("Converting HDF5 via eiger2crysalis: %s", h5_path)
 
+    rotation_axis = scan_info.get("rotation_axis", "omega")
     omega_start = scan_info.get("omega_start", 0.0)
     domega = scan_info.get("domega", 1.0)
     wavelength = scan_info.get("wavelength", 0.2952)
@@ -126,6 +128,10 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
     polarization = scan_info.get("mono", 0.99)
     pixel_size = scan_info.get("pixel_size", 0.075)
     exposure = scan_info.get("Exposure_time", 1.0)
+    reverse_frames = bool(scan_info.get("reverse_frames", False))
+    image_rotation = int(scan_info.get("image_rotation", 180))
+    image_flip_ud = bool(scan_info.get("image_flip_ud", False))
+    image_flip_lr = bool(scan_info.get("image_flip_lr", True))
 
     @dataclass
     class Options:
@@ -151,25 +157,35 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
         images: list = dc_field(default_factory=list)
         verbose: bool = dc_field(default=False)
 
+    if rotation_axis == "phi":
+        omega_option = "0.0"
+        phi_option = f"{omega_start} + {domega} * i"
+    else:
+        omega_option = f"{omega_start} + {domega} * i"
+        phi_option = str(scan_info.get("phi", 0.0))
+
     options = Options(
         output=os.path.join(new_directory, f"{full_basename}_1_{{index}}.esperanto"),
         wavelength=wavelength,
         distance=distance,
         beam=[center_x, center_y],
-        rotation=180,
+        rotation=image_rotation,
         transpose=False,
-        flip_ud=False,
-        flip_lr=True,
+        flip_ud=image_flip_ud,
+        flip_lr=image_flip_lr,
         alpha=alpha,
         kappa=str(scan_info.get("kappa", 0.0)),
         theta=str(scan_info.get("theta", 0.0)),
-        phi=str(scan_info.get("phi", 0.0)),
-        omega=f"{omega_start} + {domega} * i",
+        phi=phi_option,
+        omega=omega_option,
         polarization=polarization,
         images=[h5_path],
     )
 
     class _Converter(eiger2crysalis.Converter):
+        def geometry_transform(self, image):
+            return numpy.ascontiguousarray(super().geometry_transform(image))
+
         def common_headers(self):
             with h5py.File(h5_path, "r") as f:
                 shape = f["entry/data/data"].shape[1:]
@@ -177,8 +193,24 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
             self.mask = numpy.zeros(shape, dtype=dtype)
 
             cx, cy = self.new_beam_center(center_x, center_y, shape)
-            omega_expr = numexpr.NumExpr(self.options.omega)
-            self.scan_type = "omega"
+            self.scan_type = rotation_axis
+
+            if rotation_axis == "phi":
+                phi_expr = numexpr.NumExpr(self.options.phi)
+                axis_headers = {
+                    "dom_s": float(self.options.omega),
+                    "dom_e": float(self.options.omega),
+                    "dph_s": phi_expr,
+                    "dph_e": numexpr.NumExpr(f"{omega_start} + {domega} * (i + 1)"),
+                }
+            else:
+                omega_expr = numexpr.NumExpr(self.options.omega)
+                axis_headers = {
+                    "dom_s": omega_expr,
+                    "dom_e": numexpr.NumExpr(f"{omega_start} + {domega} * (i + 1)"),
+                    "dph_s": float(self.options.phi),
+                    "dph_e": float(self.options.phi),
+                }
 
             return {
                 "delectronsperadu": 1,
@@ -215,23 +247,98 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
                 "dbeta1": wavelength,
                 "dxorigininpix": cx,
                 "dyorigininpix": cy,
-                "dom_s": omega_expr,
-                "dom_e": numexpr.NumExpr(f"{omega_start} + {domega} * (i + 1)"),
+                **axis_headers,
                 "dth_s": float(self.options.theta),
                 "dth_e": float(self.options.theta),
                 "dka_s": float(self.options.kappa),
                 "dka_e": float(self.options.kappa),
-                "dph_s": float(self.options.phi),
-                "dph_e": float(self.options.phi),
             }
 
     try:
         converter = _Converter(options=options)
         converter.convert_all()
         converter.finish()
-        _log.info("HDF5 conversion complete: %s", full_basename)
+        if not converter.succeeded:
+            _log.error(
+                "HDF5 conversion failed for %s: fabio reported failure - "
+                "check that the HDF5 file is a supported format (EigerImage, LimaImage, SparseImage) "
+                "and that the output directory is writable",
+                full_basename,
+            )
+        else:
+            n = converter.processed_frames
+            if reverse_frames and n > 1:
+                frame_template = os.path.join(new_directory, full_basename + "_1_{}.esperanto")
+                for i in range(1, n // 2 + 1):
+                    j = n - i + 1
+                    a = frame_template.format(i)
+                    b = frame_template.format(j)
+                    tmp = a + ".tmp"
+                    os.rename(a, tmp)
+                    os.rename(b, a)
+                    os.rename(tmp, b)
+                _log.info("HDF5 conversion complete: %s (%d frames, reversed)", full_basename, n)
+            else:
+                _log.info("HDF5 conversion complete: %s (%d frames)", full_basename, n)
     except Exception:
-        _log.exception("HDF5 conversion failed")
+        _log.exception("HDF5 conversion failed for %s", full_basename)
+
+
+def _convert_hdf5_direct(filepath: str, basename: str, filenumber: int, new_directory: str, scan_info: dict) -> None:
+    try:
+        import h5py
+        import numpy as np
+        from cryio import esperanto as esp_mod
+    except ImportError:
+        _log.warning("h5py/cryio not available; skipping HDF5 direct conversion")
+        return
+
+    full_basename = f"{basename}_{filenumber:04d}"
+    h5_path = os.path.join(filepath, f"{full_basename}.h5")
+    _log.info("Converting HDF5 direct via cryio: %s", h5_path)
+
+    rotation_axis = scan_info.get("rotation_axis", "omega")
+    scan_start = scan_info.get("omega_start", 0.0)
+    dscan = scan_info.get("domega", 1.0)
+    image_rotation = int(scan_info.get("image_rotation", 180))
+    image_flip_ud = bool(scan_info.get("image_flip_ud", False))
+    image_flip_lr = bool(scan_info.get("image_flip_lr", True))
+    reverse_frames = bool(scan_info.get("reverse_frames", False))
+
+    try:
+        with h5py.File(h5_path, "r") as f:
+            data = f["entry/data/data"]
+            n_frames = data.shape[0]
+            _log.info("Found %d frames in %s", n_frames, h5_path)
+
+            for i in range(n_frames):
+                frame = data[i].astype(np.int32)
+
+                if image_rotation:
+                    frame = np.rot90(frame, k=image_rotation // 90)
+                if image_flip_ud:
+                    frame = np.flipud(frame)
+                if image_flip_lr:
+                    frame = np.fliplr(frame)
+
+                out_idx = (n_frames - i) if reverse_frames else (i + 1)
+                esp_file = os.path.join(new_directory, f"{full_basename}_1_{out_idx}.esperanto")
+
+                frame_scan = dict(scan_info)
+                if rotation_axis == "phi":
+                    frame_scan["phi"] = scan_start + dscan * i
+                    frame_scan["dphi"] = dscan
+                    frame_scan["omega"] = 0.0
+                    frame_scan["domega"] = 0.0
+                else:
+                    frame_scan["omega"] = scan_start + dscan * i
+
+                esp = esp_mod.EsperantoImage()
+                esp.save(esp_file, frame, **frame_scan)
+
+        _log.info("HDF5 direct conversion complete: %s (%d frames)", full_basename, n_frames)
+    except Exception:
+        _log.exception("HDF5 direct conversion failed for %s", full_basename)
 
 
 def _convert_cbf(filepath: str, basename: str, filenumber: int, new_directory: str, scan_info: dict) -> None:
@@ -296,7 +403,11 @@ def run_conversion(args: dict) -> None:
     _create_crysalis_run(new_directory, full_basename, scan_info)
 
     if file_format == "hdf5":
-        _convert_hdf5(filepath, basename, filenumber, new_directory, scan_info)
+        detector_type = scan_info.get("detector_type", "eiger")
+        if detector_type == "eiger":
+            _convert_hdf5(filepath, basename, filenumber, new_directory, scan_info)
+        else:
+            _convert_hdf5_direct(filepath, basename, filenumber, new_directory, scan_info)
     else:
         _convert_cbf(filepath, basename, filenumber, new_directory, scan_info)
 

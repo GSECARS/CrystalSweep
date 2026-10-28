@@ -43,7 +43,7 @@ class DetectorModel(Protocol):
     """Protocol for area detector models."""
 
     def frames_captured(self) -> int:
-        """Return the current value of NumImagesCounter_RBV — frames acquired so far."""
+        """Return the current value of NumImagesCounter_RBV - frames acquired so far."""
         ...
 
     def save_hdf5(self) -> None:
@@ -257,7 +257,7 @@ class ADEigerModel:
             self.save_cbf()
 
         time.sleep(0.2)
-        caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
+        caput(f"{p}cam1:Acquire", 1, wait=True, timeout=exposure + 60.0)
 
         print(f"[detector] Eiger {p} ({plugin}): still done (exposure={exposure:.4f}s)")
         _log.debug("ADEigerModel still: %s plugin=%s exposure=%.4f done", p, plugin, exposure)
@@ -450,7 +450,7 @@ class ADPilatusModel:
             self.save_cbf()
 
         self._snapshot_array_counter()
-        caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
+        caput(f"{p}cam1:Acquire", 1, wait=True, timeout=exposure + 60.0)
 
         print(f"[detector] Pilatus {p} ({plugin}): still done (exposure={exposure:.4f}s)")
         _log.debug("ADPilatusModel still: %s plugin=%s exposure=%.4f done", p, plugin, exposure)
@@ -622,7 +622,7 @@ class ADSpinnakerModel:
         else:
             self.save_cbf()
 
-        caput(f"{p}cam1:Acquire", 1, wait=True, timeout=300)
+        caput(f"{p}cam1:Acquire", 1, wait=True, timeout=exposure + 60.0)
 
         print(f"[detector] Spinnaker {p} ({plugin}): still done (exposure={exposure:.4f}s)")
         _log.debug("ADSpinnakerModel still: %s plugin=%s exposure=%.4f done", p, plugin, exposure)

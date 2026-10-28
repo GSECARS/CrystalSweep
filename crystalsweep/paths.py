@@ -1,18 +1,4 @@
-#!/usr/bin/python
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: crystalsweep/paths.py
-# ----------------------------------------------------------------------------------
-# Purpose:
-# Resolve per-user, writable application directories for CrystalSweep so that
-# configuration files and user scripts are stored somewhere every user account
-# can write to, regardless of where the app was launched from.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 import os
 import sys

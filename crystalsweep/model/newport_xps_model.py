@@ -16,9 +16,9 @@
 # ----------------------------------------------------------------------------------
 
 import logging
+import math
 from typing import Callable
 
-import numpy as np
 from epics import caget
 
 from crystalsweep.model.scan_model import ScanSpec
@@ -155,13 +155,18 @@ class NewportXPSModel:
         on_point: Callable[[int, float], None],
         n_points: int,
         on_at_start: Callable[[], None] | None = None,
+        save_gathering: bool = False,
+        gathering_output_file: str = "Gather.dat",
     ) -> None:
         if self._aborted:
             return
-        self._xps.arm_trajectory(name="forward", move_to_start=True)
-        if on_at_start is not None:
+        traj_name = "backward" if self._reverse else self._TRAJ_NAME
+        self._xps.arm_trajectory(name=traj_name, move_to_start=False)
+        if on_at_start is not None and not self._aborted:
             on_at_start()
-        self._xps.run_trajectory(name="forward", save=False, clean=True, move_to_start=False)
+        if self._aborted:
+            return
+        self._xps.run_trajectory(name=traj_name, save=save_gathering, output_file=gathering_output_file, clean=True, move_to_start=False)
         if not self._aborted:
             on_point(n_points - 1, 0.0)
 
@@ -181,6 +186,50 @@ class NewportXPSModel:
         delta = end - start
         return -delta if direction else delta
 
+    def _safe_accel(self, group_name: str, axis_name: str, stop_xps: float, step: float, scantime: float) -> float | None:
+        """Compute the largest acceleration that keeps the PVT ramp within the stage's limit."""
+        _MIN_RAMP_DIST = 5.0e-6
+
+        stages = getattr(self._xps, "stages", {})
+        stage_info = None
+        for variant in (axis_name, axis_name.upper(), axis_name.lower(), axis_name.title()):
+            key = f"{group_name}.{variant}"
+            if key in stages:
+                stage_info = stages[key]
+                break
+        if stage_info is None:
+            return None
+        max_accel = stage_info.get("max_accel")
+        max_velo = stage_info.get("max_velo")
+        if not max_accel or max_accel <= 0:
+            return None
+        abs_step = abs(step)
+        if abs_step <= 0:
+            return None
+
+        # Mirror define_line_trajectories: npulses shifts scantime slightly.
+        npulses = int((abs(stop_xps) + abs_step * 1.1) / abs_step)
+        if npulses > 1:
+            scantime_eff = (scantime / (npulses - 1)) * npulses
+        else:
+            scantime_eff = scantime
+        distance = abs(stop_xps) + abs_step
+        v = distance / scantime_eff
+        if max_velo and v > max_velo:
+            v = max_velo
+        if v <= 0:
+            return None
+
+        # unclamped rampdist. a_joint = 3*step/T^2 + V/T = max_accel.
+        T1 = 6.0 * abs_step / (math.sqrt(v * v + 12.0 * abs_step * max_accel) - v)
+        if 0.5 * v * T1 >= _MIN_RAMP_DIST:
+            return min(v / T1, max_accel)
+
+        # rampdist clamped. a_joint = 6*offset/T^2 - 2*V/T = max_accel.
+        offset = 0.5 * abs_step + _MIN_RAMP_DIST
+        T2 = 6.0 * offset / (v + math.sqrt(v * v + 6.0 * offset * max_accel))
+        return min(v / T2, max_accel)
+
     def _define_line_trajectory(
         self,
         group_name: str,
@@ -193,6 +242,7 @@ class NewportXPSModel:
         if self._xps is None:
             raise RuntimeError("XPS not connected.")
         self._xps.set_trajectory_group(group_name)
+        accel = self._safe_accel(group_name, axis_name, stop_xps, step, scantime)
         ret = self._xps.define_line_trajectories(
             axis=axis_name,
             group=group_name,
@@ -201,9 +251,10 @@ class NewportXPSModel:
             step=step,
             scantime=scantime,
             verbose=False,
+            accel=accel,
         )
         if ret is False:
-            raise RuntimeError(f"define_line_trajectories failed — check positioner '{axis_name}' in XPS group '{group_name}'.")
+            raise RuntimeError(f"define_line_trajectories failed - check positioner '{axis_name}' in XPS group '{group_name}'.")
         traj = self._xps.trajectories.get(self._TRAJ_NAME, {})
         if traj:
             _log.info(
@@ -227,29 +278,24 @@ class NewportXPSModel:
     ) -> None:
         if self._xps is None:
             raise RuntimeError("XPS not connected.")
+        if len(epics_positions) < 2:
+            raise ValueError("At least 2 positions required for array trajectory.")
         pv_base = motor_pv.removesuffix(".VAL")
-        try:
-            offset = float(caget(f"{pv_base}.OFF") or 0.0)
-        except Exception:
-            offset = 0.0
         try:
             direction = int(caget(f"{pv_base}.DIR") or 0)
         except Exception:
             direction = 0
-        if direction:
-            xps_positions = [(p - offset) * -1 for p in epics_positions]
-        else:
-            xps_positions = [p - offset for p in epics_positions]
+        epics_range = epics_positions[-1] - epics_positions[0]
+        xps_range = -epics_range if direction else epics_range
+        self._reverse = xps_range < 0
+        rng = abs(xps_range)
+        if rng == 0.0:
+            raise ValueError("Array trajectory requires a non-zero scan range.")
+        n = len(epics_positions)
+        step = rng / (n - 1)
+        scantime = exposure * n
         axis_name = self._axis_name(positioner_name, group_name)
-        self._xps.set_trajectory_group(group_name)
-        result = self._xps.define_array_trajectory(
-            positions={axis_name: np.array(xps_positions)},
-            dtime=exposure,
-            name="forward",
-            verbose=False,
-        )
-        if result is None:
-            raise RuntimeError(f"define_array_trajectory failed — check positioner name '{axis_name}' against XPS group '{group_name}' axes.")
+        self._define_line_trajectory(group_name, axis_name, 0.0, rng, step, scantime)
 
     def abort(self) -> None:
         self._aborted = True

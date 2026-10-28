@@ -1,16 +1,4 @@
-# ----------------------------------------------------------------------------------
-# Project: Crystalsweep
-# File: .gitignore
-# ----------------------------------------------------------------------------------
-# Purpose: 
-# This file is used by Git to determine which files and directories to ignore 
-# when committing changes.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -32,17 +20,12 @@ Thumbs.db
 Desktop.ini
 *~
 
-# Editors
-.idea/
-.vscode/
-*.code-workspace
-
 # Tools
 .ruff_cache/
 .pytest_cache/
 
-# MkDocs build output
-site/
+# Docs build output
+docs/_build/
 
 # Configuration files
 configs/

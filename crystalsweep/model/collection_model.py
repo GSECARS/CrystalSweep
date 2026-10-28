@@ -51,6 +51,7 @@ class CollectionPoint:
     map_group: str = ""
     map_row: int = -1
     map_col: int = -1
+    map_seq: int = -1
     map_motor1: str = ""
     map_motor2: str = ""
     map_row_shift: float = 0.0
@@ -73,7 +74,7 @@ class CollectionPoint:
             step = float(self.step)
             omega_start = float(self.rotation_start)
             omega_end = float(self.rotation_end)
-        except (ValueError, ZeroDivisionError):
+        except ValueError, ZeroDivisionError:
             return None
         if step <= 0 or omega_start == omega_end:
             return None
@@ -170,6 +171,17 @@ class CollectionTableModel:
     def update_time(self, index: int, value: str) -> None:
         if 0 <= index < len(self._points):
             self._points[index].time = value
+
+    def clear_map_fields(self, index: int) -> None:
+        if 0 <= index < len(self._points):
+            pt = self._points[index]
+            pt.map_group = ""
+            pt.map_row = -1
+            pt.map_col = -1
+            pt.map_seq = -1
+            pt.map_motor1 = ""
+            pt.map_motor2 = ""
+            pt.map_row_shift = 0.0
 
     def set_selected(self, index: int, selected: bool) -> None:
         if 0 <= index < len(self._points):

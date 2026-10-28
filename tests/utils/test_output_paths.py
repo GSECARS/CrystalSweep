@@ -144,20 +144,20 @@ class TestBasename:
         point = _still_point()
         assert output.basename(point, 5) == "x_5"
 
-    def test_map_parses_number_from_label(self):
+    def test_map_uses_row_and_col_from_point(self):
         output = _make_output(filename="sample", map_ext="map", file_number_width=4)
-        point = _map_point(label="map_0005_0007")
+        point = _map_point(row=4, col=6)
         assert output.basename(point, 999) == "sample_map_0005_0007"
 
-    def test_map_falls_back_to_frame_number_when_label_unparseable(self):
+    def test_map_col_zero_indexed(self):
         output = _make_output(filename="sample", map_ext="map", file_number_width=4)
-        point = _map_point(label="no_numeric_suffix_here_abc")
-        assert output.basename(point, 3) == "sample_map_0003"
+        point = _map_point(row=0, col=2)
+        assert output.basename(point, 999) == "sample_map_0001_0003"
 
-    def test_map_single_segment_label_falls_back(self):
+    def test_map_row_col_padded(self):
         output = _make_output(filename="s", map_ext="map", file_number_width=4)
-        point = _map_point(label="justlabel")
-        assert output.basename(point, 1) == "s_map_0001"
+        point = _map_point(row=0, col=0)
+        assert output.basename(point, 1) == "s_map_0001_0001"
 
     def test_width_clamped_to_at_least_one(self):
         output = _make_output(filename="s", use_ext=False, file_number_width=0)
@@ -221,15 +221,15 @@ class TestConversionDirs:
         output = _make_output(extras=())
         assert output.conversion_dirs(_still_point(), 1) == {}
 
-    def test_still_non_map_extras_are_flat_in_directory(self):
+    def test_still_non_map_extras_in_basename_subfolder(self):
         output = _make_output(directory="/out", extras=("cbf", "tif"))
         dirs = output.conversion_dirs(_still_point(), 1)
-        assert dirs == {"cbf": Path("/out"), "tif": Path("/out")}
+        assert dirs == {"cbf": Path("/out/sample_posA_0001"), "tif": Path("/out/sample_posA_0001")}
 
-    def test_wide_non_map_extras_are_flat(self):
+    def test_wide_non_map_extras_in_basename_subfolder(self):
         output = _make_output(directory="/out", extras=("cbf",))
         dirs = output.conversion_dirs(_wide_point(), 1)
-        assert dirs == {"cbf": Path("/out")}
+        assert dirs == {"cbf": Path("/out/sample_posC_0001")}
 
     def test_step_non_map_extras_in_basename_subfolder(self):
         output = _make_output(directory="/out", filename="s", use_ext=False, extras=("cbf",), file_number_width=4)
@@ -242,16 +242,16 @@ class TestConversionDirs:
         assert dirs["cbf"] == Path("/out/x_0001/cbf")
         assert dirs["tif"] == Path("/out/x_0001/tif")
 
-    def test_map_extras_go_into_conversion_root(self):
+    def test_map_extras_go_into_map_folder(self):
         output = _make_output(directory="/out", filename="s", map_ext="map", extras=("cbf",))
         dirs = output.conversion_dirs(_map_point(), 1)
-        assert dirs == {"cbf": Path("/out/s_map/s_map/cbf")}
+        assert dirs == {"cbf": Path("/out/s_map/cbf")}
 
     def test_map_multiple_formats(self):
         output = _make_output(directory="/out", filename="r", map_ext="scan", extras=("cbf", "tif"))
         dirs = output.conversion_dirs(_map_point(), 1)
-        assert dirs["cbf"] == Path("/out/r_scan/r_scan/cbf")
-        assert dirs["tif"] == Path("/out/r_scan/r_scan/tif")
+        assert dirs["cbf"] == Path("/out/r_scan/cbf")
+        assert dirs["tif"] == Path("/out/r_scan/tif")
 
 
 class TestCrysalisSourceDir:
@@ -269,9 +269,9 @@ class TestCrysalisSourceDir:
         output = _make_output(directory="/out", raw_directory=None)
         assert output.crysalis_source_dir(_step_point()) == Path("/out")
 
-    def test_map_appends_folder_name_to_directory(self):
+    def test_map_appends_folder_name_to_raw_directory(self):
         output = _make_output(directory="/out", raw_directory="/raw", filename="s", map_ext="map")
-        assert output.crysalis_source_dir(_map_point()) == Path("/out/s_map")
+        assert output.crysalis_source_dir(_map_point()) == Path("/raw/s_map")
 
     def test_map_no_raw_still_uses_directory(self):
         output = _make_output(directory="/out", raw_directory=None, filename="s", map_ext="map")
@@ -293,9 +293,9 @@ class TestCrysalisOutputDir:
 
     def test_map_is_inside_map_conversion_root(self):
         output = _make_output(directory="/out", filename="s", map_ext="map", file_number_width=4)
-        point = _map_point(label="map_0005_0007")
+        point = _map_point(row=4, col=6)
         result = output.crysalis_output_dir(point, 999)
-        assert result == Path("/out/s_map/s_map/crysalis/s_map_0005_0007")
+        assert result == Path("/out/s_map/crysalis/s_map_0005_0007")
 
 
 class TestExpectedFile:
@@ -318,7 +318,7 @@ class TestExpectedFile:
 
     def test_map_in_map_source_dir(self):
         output = _make_output(directory="/out", raw_directory=None, filename="s", map_ext="map", file_ext="h5", file_number_width=4)
-        point = _map_point(label="map_0005_0003")
+        point = _map_point(row=4, col=2)
         f = output.expected_file(point, 999)
         assert f == Path("/out/s_map/s_map_0005_0003.h5")
 
@@ -368,19 +368,19 @@ class TestMapFlippedDir:
 
 
 class TestMapCombinedPath:
-    """Verify map_combined_path() returns the merged HDF5 output path in the output directory."""
+    """Verify map_combined_path() returns the merged HDF5 output path inside the map folder."""
 
-    def test_is_in_output_directory(self):
+    def test_is_inside_map_folder(self):
         output = _make_output(directory="/out", filename="s", map_ext="map")
-        assert output.map_combined_path() == Path("/out/s_map.h5")
+        assert output.map_combined_path() == Path("/out/s_map/s_map.h5")
 
     def test_uses_file_ext_h5_always(self):
         output = _make_output(directory="/out", filename="s", map_ext="scan")
-        assert output.map_combined_path() == Path("/out/s_scan.h5")
+        assert output.map_combined_path() == Path("/out/s_scan/s_scan.h5")
 
     def test_without_filename(self):
         output = _make_output(directory="/out", filename="", map_ext="")
-        assert output.map_combined_path() == Path("/out/map.h5")
+        assert output.map_combined_path() == Path("/out/map/map.h5")
 
 
 class TestMapRowPattern:
@@ -399,16 +399,52 @@ class TestMapRowPattern:
         assert output.map_row_pattern() == "map_*.h5"
 
 
-class TestMapConversionRoot:
-    """Verify _map_conversion_root() nests the map folder twice inside the output directory."""
+class TestMapRowFilePattern:
+    """Verify map_row_file_pattern() returns a glob for a single row's files."""
 
-    def test_is_directory_folder_folder(self):
+    def test_row_zero_becomes_one_based(self):
+        output = _make_output(filename="s", map_ext="map", file_ext="h5", file_number_width=4)
+        assert output.map_row_file_pattern(0) == "s_map_0001_*.h5"
+
+    def test_row_four_becomes_five(self):
+        output = _make_output(filename="s", map_ext="map", file_ext="h5", file_number_width=4)
+        assert output.map_row_file_pattern(4) == "s_map_0005_*.h5"
+
+    def test_cbf_extension(self):
+        output = _make_output(filename="run", map_ext="scan", file_ext="cbf", file_number_width=4)
+        assert output.map_row_file_pattern(1) == "run_scan_0002_*.cbf"
+
+    def test_without_filename(self):
+        output = _make_output(filename="", map_ext="", file_ext="h5", file_number_width=4)
+        assert output.map_row_file_pattern(0) == "map_0001_*.h5"
+
+
+class TestMapRawDir:
+    """Verify map_raw_dir() returns the raw subdirectory within the map output folder."""
+
+    def test_is_raw_inside_map_folder(self):
         output = _make_output(directory="/out", filename="s", map_ext="map")
-        assert output._map_conversion_root() == Path("/out/s_map/s_map")
+        assert output.map_raw_dir() == Path("/out/s_map/raw")
+
+    def test_uses_custom_map_ext(self):
+        output = _make_output(directory="/data", filename="run", map_ext="scan")
+        assert output.map_raw_dir() == Path("/data/run_scan/raw")
+
+    def test_ignores_raw_directory(self):
+        output = _make_output(directory="/out", raw_directory="/raw", filename="s", map_ext="map")
+        assert output.map_raw_dir() == Path("/out/s_map/raw")
+
+
+class TestMapDir:
+    """Verify map_dir() returns the map folder inside the output directory."""
+
+    def test_is_directory_folder(self):
+        output = _make_output(directory="/out", filename="s", map_ext="map")
+        assert output.map_dir() == Path("/out/s_map")
 
     def test_custom_ext(self):
         output = _make_output(directory="/data", filename="run", map_ext="scan")
-        assert output._map_conversion_root() == Path("/data/run_scan/run_scan")
+        assert output.map_dir() == Path("/data/run_scan")
 
 
 class TestFrozenDataclass:

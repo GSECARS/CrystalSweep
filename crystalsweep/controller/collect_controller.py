@@ -1,0 +1,1877 @@
+# SPDX-License-Identifier: MIT
+
+import json
+import logging
+import multiprocessing
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
+import time as _time
+from pathlib import Path
+from typing import Callable
+
+import h5py
+import numpy as np
+
+import wx
+from epics import caget, caput, caput_many
+from wxutils import FlatConfirmDialog, FlatWaitDialog
+
+from crystalsweep.model import MainModel
+from crystalsweep.model.collection_model import CollectionPoint
+from crystalsweep.model.detector_model import get_detector_model
+from crystalsweep.controller.scan_engine import ScanEngine
+from crystalsweep.view import MainView
+from crystalsweep.view.custom.theme import app_theme
+from crystalsweep.utils import check_soft_limits, clear_limit_monitors, subscribe_limit_monitors
+from crystalsweep.utils.output_paths import OutputPaths
+
+__all__ = ["CollectController"]
+
+
+_log = logging.getLogger(__name__)
+
+_PROGRESS_INTERVAL_MS = 100
+_TRIGGERING_POLL_S = 0.05
+
+
+def _mkdir_safe(path: Path) -> None:
+    """Create path and any missing parents, skipping parents that already exist.
+
+    Windows returns ACCESS_DENIED when CreateDirectory is called on a network
+    share root (e.g. T:\\Data) even though it exists. .exists() also returns
+    False for that root when the process lacks enumeration rights, so the
+    walk-up can overshoot past the real root. Catching PermissionError in the
+    mkdir loop treats such a path as already present and lets subdirectory
+    creation continue normally.
+    """
+    missing: list[Path] = []
+    p = path
+    while True:
+        if p.exists():
+            break
+        missing.append(p)
+        parent = p.parent
+        if parent == p:
+            break
+        p = parent
+    for part in reversed(missing):
+        try:
+            part.mkdir(exist_ok=True)
+        except PermissionError:
+            pass
+
+
+class CollectController:
+    """Drives the collect panel: sequential collection loop with per-point hardware scans."""
+
+    def __init__(self, model: MainModel, view: MainView) -> None:
+        self._model = model
+        self._view = view
+        self._abort_event = threading.Event()
+        self._engine = ScanEngine(script_model=model.scripts, controllers=model.controllers)
+        self._engine._abort_event = self._abort_event
+        self._thread: threading.Thread | None = None
+        self._in_map_collection: bool = False
+        self._start_time: float = 0.0
+        self._on_collecting_changed: Callable[[bool], None] | None = None
+        self._on_post_scan: Callable[[], None] | None = None
+        self._elapsed_timer = wx.Timer()
+        self._elapsed_timer.Bind(wx.EVT_TIMER, self._on_elapsed_tick)
+
+        self._point_timer = wx.Timer()
+        self._point_timer.Bind(wx.EVT_TIMER, self._on_point_tick)
+        self._point_timer_start: float = 0.0
+        self._point_timer_duration: float = 1.0
+        self._point_timer_idx: int = 1
+        self._point_timer_total: int = 1
+        self._completed_weight: int = 0
+        self._point_weight: int = 1
+        self._total_weight: int = 1
+
+        self._restore_pv_snapshot: dict[str, object] = {}
+        self._monitored_limit_pvs: list[str] = []
+        self._aborting_dlg: FlatWaitDialog | None = None
+        self._output_paths: OutputPaths | None = None
+        self._combine_proc: subprocess.Popen | None = None
+
+        self._view.collect.bind_collect(self._on_collect)
+        self._view.collect.bind_abort(self._on_abort)
+        self._view.bind_abort(self._on_abort)
+        self.refresh_eta()
+
+    def bind_collecting_changed(self, callback: Callable[[bool], None]) -> None:
+        self._on_collecting_changed = callback
+
+    def bind_post_scan(self, callback: Callable[[], None]) -> None:
+        self._on_post_scan = callback
+
+    def on_config_applied(self) -> None:
+        """Re-subscribe soft-limit monitors for the newly active beamline config."""
+        clear_limit_monitors(self._monitored_limit_pvs)
+        config = self._model.beamline.active
+        pvs = [m.pv for m in config.motors if m.pv.strip()]
+        if config.rotation_motor and config.rotation_motor.pv.strip():
+            pvs.append(config.rotation_motor.pv)
+        self._monitored_limit_pvs = subscribe_limit_monitors(pvs, lambda **_: wx.CallAfter(self.validate_limits))
+        # Refresh button state for the new config so missing detectors/rotation
+        # motor / duplicate shorthands gate the Collect button immediately.
+        self.validate_limits()
+
+    def _config_readiness_error(self) -> str | None:
+        """Return a user-facing reason the active config is not ready for collection, or None."""
+        if not self._model.beamline.has_active:
+            return "No active beamline config."
+
+        config = self._model.beamline.active
+        if not config.detectors:
+            return "No detectors configured."
+        if config.active_detector_config is None:
+            return "No active detector selected."
+        if config.rotation_motor is None or not config.rotation_motor.pv.strip():
+            return "Rotation stage PV is required."
+
+        shorthands = [m.shorthand for m in config.motors if m.shorthand]
+        if len(shorthands) != len(set(shorthands)):
+            return "Motor shorthands must be unique."
+
+        return None
+
+    def _on_collect(self) -> None:
+        focused = self._view.FindFocus()
+        if focused is not None:
+            focused.Navigate()
+
+        points = [p for p in self._model.collection.points if p.selected]
+
+        if not points:
+            self._view.collect.set_status("No points selected.", wx.Colour(220, 160, 40))
+            return
+
+        reason = self._config_readiness_error()
+        if reason is not None:
+            self._view.collect.set_status(reason, wx.Colour(220, 80, 40))
+            return
+
+        conflicts = self._check_output_conflicts(points)
+        if conflicts:
+            lines = "\n".join(f"  {c}" for c in conflicts[:10])
+            if len(conflicts) > 10:
+                lines += f"\n  ... and {len(conflicts) - 10} more"
+            result = FlatConfirmDialog(
+                self._view,
+                f"The following output paths already exist and may be overwritten:\n\n{lines}\n\nProceed anyway?",
+                "Output already exists",
+                yes_scheme=app_theme.danger_scheme(),
+            ).ShowModal()
+            if result != wx.ID_YES:
+                return
+
+        self._abort_event.clear()
+        self._engine.test_mode = self._view.collect.test_mode
+        self._start_time = _time.monotonic()
+        if self._on_collecting_changed is not None:
+            self._on_collecting_changed(True)
+        self._view.collect.set_status_collecting()
+        self._elapsed_timer.Start(1000)
+        self._thread = threading.Thread(target=self._run, args=(points,), daemon=True, name="collect-loop")
+        self._thread.start()
+
+    def refresh_eta(self) -> None:
+        """Recompute and display the estimated collection time for selected points only."""
+        selected = [p for p in self._model.collection.points if p.selected]
+        if not selected:
+            self._view.collect.clear_eta()
+            return
+        self._view.collect.set_eta(self._estimate_total_seconds(selected))
+
+    def validate_limits(self) -> None:
+        """Check all collection points against motor soft limits in a background thread.
+
+        Marks rows with red outlines and disables the Collect button when violations
+        are found.  Clears all markers and re-enables the button when everything is OK.
+        Also gates the Collect button on overall config readiness so an incomplete
+        beamline config (no detector, no rotation stage, etc.) keeps Collect disabled.
+        """
+        if self._config_readiness_error() is not None:
+            self._view.collect.set_collect_enabled(False)
+            return
+
+        all_points = self._model.collection.points
+        config = self._model.beamline.active
+
+        def _worker() -> None:
+            rotation_cfg = config.rotation_motor
+            violations: set[int] = set()
+            field_errors: dict[int, tuple[dict[str, bool], bool, bool]] = {}
+
+            for idx, point in enumerate(all_points):
+                if not point.selected:
+                    continue
+
+                motor_errors: dict[str, bool] = {}
+                for motor_cfg in config.motors:
+                    raw = point.motor_positions.get(motor_cfg.shorthand)
+                    if raw is None:
+                        continue
+                    try:
+                        pos = float(raw)
+                    except ValueError, TypeError:
+                        continue
+                    motor_errors[motor_cfg.shorthand] = bool(check_soft_limits(motor_cfg.pv, pos))
+
+                rot_start_error = False
+                rot_end_error = False
+                if rotation_cfg is not None:
+                    if point.rotation_start:
+                        try:
+                            pos = float(point.rotation_start)
+                            rot_start_error = bool(check_soft_limits(rotation_cfg.pv, pos))
+                        except ValueError, TypeError:
+                            pass
+                    if point.rotation_end:
+                        try:
+                            pos = float(point.rotation_end)
+                            rot_end_error = bool(check_soft_limits(rotation_cfg.pv, pos))
+                        except ValueError, TypeError:
+                            pass
+
+                if any(motor_errors.values()) or rot_start_error or rot_end_error:
+                    violations.add(idx)
+                field_errors[idx] = (motor_errors, rot_start_error, rot_end_error)
+
+            wx.CallAfter(self._apply_limit_errors, violations, field_errors, len(all_points))
+
+        threading.Thread(target=_worker, daemon=True, name="limit-check").start()
+
+    def _apply_limit_errors(self, violations: set[int], field_errors: dict, total: int) -> None:
+        for idx in range(total):
+            in_violation = idx in violations
+            self._view.collection_table.set_row_limit_error(idx, in_violation)
+            motor_errors, rot_start_error, rot_end_error = field_errors.get(idx, ({}, False, False))
+            self._view.collection_table.set_row_field_limit_errors(idx, motor_errors, rot_start_error, rot_end_error)
+        ready = self._config_readiness_error() is None
+        self._view.collect.set_collect_enabled(ready and not violations)
+
+    @staticmethod
+    def _point_frame_weight(point: CollectionPoint) -> int:
+        """Return the number of frames for a point (1 for still/wide, n_frames for step)."""
+        if point.scan_type == "step":
+            params = point.parse_step_params()
+            return params.n_frames if params is not None else 1
+
+        return 1
+
+    def _estimate_total_seconds(self, points: list[CollectionPoint]) -> float:
+        shutter_delay = self._model.beamline.active.shutter_delay if self._model.beamline.has_active else 0.0
+        use_trajectory = self._view.collection_table.trajectory_scan
+
+        total = 0.0
+        consumed_groups: set[str] = set()
+        for point in points:
+            exposure = point.parse_exposure()
+            if exposure is None:
+                continue
+
+            if point.map_group:
+                if point.map_group in consumed_groups:
+                    continue
+                consumed_groups.add(point.map_group)
+                group_points = [p for p in points if p.map_group == point.map_group]
+                n_points = len(group_points)
+                n_rows = len({p.map_row for p in group_points})
+                overhead = shutter_delay + 1.0
+                if point.scan_type == "still" and use_trajectory:
+                    n_cols = len({p.map_col for p in group_points})
+                    total += exposure * n_cols * n_rows + overhead * n_rows
+                elif point.scan_type == "step":
+                    params = point.parse_step_params()
+                    if params is None:
+                        continue
+                    total += params.exposure * params.n_frames * n_points + overhead * n_points + 1.0 * n_rows
+                elif point.scan_type == "wide":
+                    wp = point.parse_wide_params()
+                    if wp is None:
+                        continue
+                    total += wp.exposure * n_points + overhead * n_points + 1.0 * n_rows
+                else:
+                    total += exposure * n_points + overhead * n_points + 1.0 * n_rows
+            else:
+                if point.scan_type == "step":
+                    params = point.parse_step_params()
+                    if params is None:
+                        continue
+                    total += params.exposure * params.n_frames + shutter_delay + 1.0
+                elif point.scan_type == "wide":
+                    wp = point.parse_wide_params()
+                    if wp is None:
+                        continue
+                    total += wp.exposure + shutter_delay + 1.0
+                else:
+                    total += exposure + 1.0
+        return total
+
+    def _show_aborting_dialog(self, elapsed_str: str) -> None:
+        if self._aborting_dlg is not None:
+            return
+        lines = [
+            "The collection was aborted. Motors are being restored,",
+            "the detector is being stopped, and abort PVs are being written.",
+        ]
+        if elapsed_str:
+            lines.append(f"\nElapsed time: {elapsed_str}")
+        self._aborting_dlg = FlatWaitDialog(
+            self._view,
+            title="Collection Aborted",
+            message="\n".join(lines),
+            status="Cleaning up, please wait\u2026",
+        )
+        self._aborting_dlg.Show()
+        self._aborting_dlg.Raise()
+        self._aborting_dlg.SetFocus()
+
+    def _ready_aborting_dialog(self) -> None:
+        if self._aborting_dlg is not None:
+            self._aborting_dlg.Ready("Abort complete.")
+        self._aborting_dlg = None
+
+    def _on_file_number_updated(self, file_number: int) -> None:
+        if self._in_map_collection:
+            return
+        self._model.file_settings.frame_number = file_number
+        wx.CallAfter(self._view.file_settings.set_frame_number, file_number)
+
+    def _on_abort(self) -> None:
+        if self._abort_event.is_set():
+            return
+
+        self._abort_event.set()
+        self._engine.abort()
+        wx.CallAfter(self._view.collect.set_status, "Aborting...", wx.Colour(220, 160, 40))
+        elapsed = _time.monotonic() - self._start_time
+        h, rem = divmod(int(elapsed), 3600)
+        m, s = divmod(rem, 60)
+        elapsed_str = f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+        wx.CallAfter(self._show_aborting_dialog, elapsed_str)
+
+        config = self._model.beamline.active
+        det = config.active_detector_config
+        abort_pvs = config.abort_pvs
+        snapshot = dict(self._restore_pv_snapshot)
+
+        def _do_abort() -> None:
+            if abort_pvs:
+                for pv, value in abort_pvs:
+                    try:
+                        caput(pv, value, wait=True)
+                    except Exception as exc:
+                        _log.warning("Failed to write abort PV %s: %s", pv, exc)
+            if det is not None and det.pv_prefix.strip():
+                try:
+                    get_detector_model(det.type, det.pv_prefix, det.file_format).abort()
+                except Exception as exc:
+                    _log.warning("Failed to abort detector: %s", exc)
+            if snapshot:
+                try:
+                    caput_many(list(snapshot.keys()), list(snapshot.values()))
+                    _log.info("Restored %d PV(s) on abort", len(snapshot))
+                except Exception as exc:
+                    _log.warning("Failed to restore PVs on abort: %s", exc)
+
+        threading.Thread(target=_do_abort, daemon=True, name="abort-sequence").start()
+        _log.info("Collection aborted by user")
+
+    def _on_elapsed_tick(self, _event: wx.TimerEvent) -> None:
+        elapsed = _time.monotonic() - self._start_time
+        self._view.collect.set_elapsed(elapsed)
+
+    def _on_point_tick(self, _event: wx.TimerEvent) -> None:
+        elapsed = _time.monotonic() - self._point_timer_start
+        inner = min(1.0, elapsed / self._point_timer_duration) if self._point_timer_duration > 0 else 1.0
+        weighted = (self._completed_weight + inner * self._point_weight) / self._total_weight
+        self._view.collect.set_progress(
+            self._point_timer_idx,
+            self._point_timer_total,
+            point_fraction=weighted,
+        )
+
+    def _start_point_timer(self, idx: int, total: int, duration: float, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1) -> None:
+        self._point_timer_start = _time.monotonic()
+        self._point_timer_duration = max(duration, 0.1)
+        self._point_timer_idx = idx
+        self._point_timer_total = total
+        self._completed_weight = completed_weight
+        self._point_weight = point_weight
+        self._total_weight = max(1, total_weight)
+        self._point_timer.Start(_PROGRESS_INTERVAL_MS)
+
+    def _stop_point_timer(self, idx: int, total: int) -> None:
+        self._point_timer.Stop()
+        weighted = (self._completed_weight + self._point_weight) / self._total_weight
+        self._view.collect.set_progress(idx, total, point_fraction=weighted)
+
+    def _stop_elapsed_timer(self) -> None:
+        self._elapsed_timer.Stop()
+        elapsed = _time.monotonic() - self._start_time
+        self._view.collect.set_elapsed(elapsed)
+
+    def _run(self, points: list[CollectionPoint]) -> None:
+        total = len(points)
+        config = self._model.beamline.active
+        file_settings = self._model.file_settings
+        all_points = self._model.collection.points
+        pre_scan_error: str | None = None
+        pre_collection_error: str | None = None
+        raw_dir = config.raw_directory.strip() if config else ""
+        self._engine.session_subdir = _time.strftime("%Y%m%d_%H%M%S") if raw_dir else None
+        self._output_paths = self._build_output_paths()
+
+        pre_collection_error = self._engine.pre_collection(points, config)
+        if pre_collection_error is not None:
+            _log.warning("Pre-collection failed: %s", pre_collection_error)
+            self._abort_event.set()
+
+        self._restore_pv_snapshot = {}
+        for pv in config.restore_pvs:
+            if not pv:
+                continue
+            try:
+                val = caget(pv)
+                if val is not None:
+                    self._restore_pv_snapshot[pv] = val
+            except Exception as exc:
+                _log.warning("Failed to read restore PV %s: %s", pv, exc)
+        if self._restore_pv_snapshot:
+            _log.info("Snapshotted %d restore PV(s) at collection start", len(self._restore_pv_snapshot))
+
+        rotation_cfg = config.rotation_motor
+        original_rotation: float | None = None
+        original_velocity: float | None = None
+        if rotation_cfg is not None:
+            try:
+                raw = caget(rotation_cfg.pv)
+                original_rotation = float(raw) if raw is not None else None
+            except Exception:
+                original_rotation = None
+            try:
+                pv_base = rotation_cfg.pv.removesuffix(".VAL")
+                raw_vel = caget(f"{pv_base}.VELO")
+                original_velocity = float(raw_vel) if raw_vel is not None else None
+            except Exception:
+                original_velocity = None
+
+        original_motor_positions: dict[str, float] = {}
+        for motor_cfg in config.motors:
+            try:
+                raw = caget(motor_cfg.pv)
+                if raw is not None:
+                    original_motor_positions[motor_cfg.shorthand] = float(raw)
+            except Exception:
+                pass
+
+        frame_weights = [self._point_frame_weight(p) for p in points]
+        total_weight = max(1, sum(frame_weights))
+        completed_weight = 0
+
+        consumed: set[int] = set()
+        idx = 0
+        while idx < len(points):
+            if self._abort_event.is_set():
+                break
+            if idx in consumed:
+                idx += 1
+                continue
+
+            point = points[idx]
+
+            if point.map_group:
+                group_id = point.map_group
+                group_points = [p for p in points if p.map_group == group_id]
+                group_indices = [i for i, p in enumerate(points) if p.map_group == group_id]
+                for gi in group_indices:
+                    consumed.add(gi)
+                group_weights = [frame_weights[gi] for gi in group_indices]
+                error = self._engine.pre_scan(point, config)
+                if error is not None:
+                    _log.warning("Pre-scan failed for map group %s: %s", group_id, error)
+                    pre_scan_error = error
+                    self._abort_event.set()
+                    break
+                self._run_map_group(group_points, idx + 1, total, config, file_settings, all_points, completed_weight, group_weights, total_weight)
+                completed_weight += sum(group_weights)
+                idx = max(group_indices) + 1
+                continue
+
+            idx += 1
+            model_index = all_points.index(point) if point in all_points else -1
+            wx.CallAfter(self._view.collection_table.set_active_row, model_index)
+
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label} - pre-scan…",
+                wx.Colour(99, 179, 237),
+            )
+
+            error = self._engine.pre_scan(point, config)
+            if error is not None:
+                _log.warning("Pre-scan failed for %s: %s", point.label, error)
+                pre_scan_error = error
+                self._abort_event.set()
+                break
+
+            if self._abort_event.is_set():
+                break
+
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label} - {point.scan_type}…",
+                wx.Colour(99, 179, 237),
+            )
+
+            if rotation_cfg is not None and original_velocity is not None:
+                try:
+                    pv_base = rotation_cfg.pv.removesuffix(".VAL")
+                    caput(f"{pv_base}.VELO", original_velocity, wait=True)
+                except Exception as exc:
+                    _log.warning("Failed to set rotation velocity before point %s: %s", point.label, exc)
+
+            for motor_cfg in config.motors:
+                raw = point.motor_positions.get(motor_cfg.shorthand)
+                if raw is None:
+                    continue
+                try:
+                    caput(motor_cfg.pv, float(raw), wait=True)
+                except Exception as exc:
+                    _log.warning("Failed to move motor %s before point %s: %s", motor_cfg.shorthand, point.label, exc)
+
+            if self._abort_event.is_set():
+                break
+
+            point_weight = frame_weights[idx - 1]
+            if point.scan_type == "still":
+                self._run_still(point, idx, total, config, file_settings, completed_weight, point_weight, total_weight)
+            elif point.scan_type == "wide":
+                self._run_wide(point, idx, total, config, file_settings, completed_weight, point_weight, total_weight)
+            elif point.scan_type == "step":
+                self._run_step(point, idx, total, config, file_settings, completed_weight, point_weight, total_weight)
+            else:
+                _log.info("Scan type %r not yet implemented, skipping point %s", point.scan_type, point.label)
+                wx.CallAfter(
+                    self._view.collect.set_status,
+                    f"[{idx}/{total}] {point.label}: scan type '{point.scan_type}' not yet supported",
+                    wx.Colour(220, 160, 40),
+                )
+
+            self._engine.post_scan(point, config)
+            completed_weight += point_weight
+
+        if rotation_cfg is not None:
+            pv_base = rotation_cfg.pv.removesuffix(".VAL")
+            if original_velocity is not None:
+                try:
+                    caput(f"{pv_base}.VELO", original_velocity)
+                    _log.debug("Restored rotation motor velocity to %.4f", original_velocity)
+                except Exception as exc:
+                    _log.warning("Failed to restore rotation motor velocity: %s", exc)
+            if original_rotation is not None:
+                try:
+                    caput(rotation_cfg.pv, original_rotation)
+                    _log.debug("Restored rotation motor to %.4f", original_rotation)
+                except Exception as exc:
+                    _log.warning("Failed to restore rotation motor position: %s", exc)
+
+        for motor_cfg in config.motors:
+            original = original_motor_positions.get(motor_cfg.shorthand)
+            if original is not None:
+                try:
+                    caput(motor_cfg.pv, original)
+                    _log.debug("Restored motor %s to %.4f", motor_cfg.shorthand, original)
+                except Exception as exc:
+                    _log.warning("Failed to restore motor %s: %s", motor_cfg.shorthand, exc)
+
+        if self._restore_pv_snapshot and not self._abort_event.is_set():
+            snapshot = self._restore_pv_snapshot
+            try:
+                caput_many(list(snapshot.keys()), list(snapshot.values()))
+                _log.info("Restored %d PV(s) at collection end", len(snapshot))
+            except Exception as exc:
+                _log.warning("Failed to restore PVs at collection end: %s", exc)
+        self._restore_pv_snapshot = {}
+
+        self._engine.post_collection(points, config)
+
+        if not self._abort_event.is_set() and pre_scan_error is None and pre_collection_error is None and self._model.file_settings.use_ext:
+            self._on_file_number_updated(self._model.file_settings.frame_number + 1)
+
+        wx.CallAfter(self._stop_elapsed_timer)
+        if self._on_collecting_changed is not None:
+            wx.CallAfter(self._on_collecting_changed, False)
+        wx.CallAfter(self._ready_aborting_dialog)
+        if pre_collection_error is not None:
+            wx.CallAfter(self._view.collect.set_status, f"Pre-collection error: {pre_collection_error}", wx.Colour(220, 80, 40))
+        elif pre_scan_error is not None:
+            wx.CallAfter(self._view.collect.set_status, f"Pre-scan error: {pre_scan_error}", wx.Colour(220, 80, 40))
+        elif self._abort_event.is_set():
+            wx.CallAfter(self._view.collect.set_status, "Aborted", wx.Colour(220, 160, 40))
+        else:
+            wx.CallAfter(self._view.collect.set_progress, total, total, point_fraction=1.0)
+            wx.CallAfter(self._view.collect.set_status, "Done", wx.Colour(99, 179, 237))
+
+        self._engine.session_subdir = None
+
+    def _run_map_group(
+        self,
+        group_points: list[CollectionPoint],
+        start_idx: int,
+        total: int,
+        config,
+        file_settings,
+        all_points: list[CollectionPoint],
+        completed_weight: int = 0,
+        group_weights: list[int] | None = None,
+        total_weight: int = 1,
+    ) -> None:
+        scan_type = group_points[0].scan_type
+        motor1 = group_points[0].map_motor1
+        motor2 = group_points[0].map_motor2
+        map_row_shift = round(group_points[0].map_row_shift) if group_points else 0
+        use_trajectory = self._view.collection_table.trajectory_scan
+        keep_shutter_open = self._view.collection_table.keep_shutter_open
+        if scan_type == "wide" and not self._model.collection_settings.wide_flip:
+            keep_shutter_open = False
+        original_shutter_mode: int = 1
+        weights = group_weights if group_weights is not None else [1] * len(group_points)
+        map_completed_weight = completed_weight
+        frame_before_map = self._model.file_settings.frame_number
+        self._in_map_collection = True
+        self._combine_proc = None
+
+        rows: dict[int, list[CollectionPoint]] = {}
+        for pt in group_points:
+            rows.setdefault(pt.map_row, []).append(pt)
+        sorted_rows = [rows[r] for r in sorted(rows.keys())]
+        n_rows = len(sorted_rows)
+
+        motor1_cfg = next((m for m in config.motors if m.shorthand == motor1), None) if motor1 else None
+        motor2_cfg = next((m for m in config.motors if m.shorthand == motor2), None) if motor2 else None
+        map_motor_shorthands = {s for s in (motor1, motor2) if s}
+        other_motors = [m for m in config.motors if m.shorthand not in map_motor_shorthands]
+
+        original_motor1: float | None = None
+        original_motor2: float | None = None
+        if motor1_cfg is not None:
+            try:
+                raw = caget(motor1_cfg.pv)
+                original_motor1 = float(raw) if raw is not None else None
+            except Exception:
+                pass
+        if motor2_cfg is not None:
+            try:
+                raw = caget(motor2_cfg.pv)
+                original_motor2 = float(raw) if raw is not None else None
+            except Exception:
+                pass
+
+        if keep_shutter_open:
+            original_shutter_mode = self._engine._disable_detector_shutter_control(config)
+
+        for row_num, row in enumerate(sorted_rows):
+            if self._abort_event.is_set():
+                break
+
+            sorted_cols = sorted(row, key=lambda p: p.map_col)
+            if use_trajectory:
+                use_snake = self._model.file_settings.use_snake_trajectory
+                snake_forward = (not use_snake) or (row_num % 2 == 0)
+                row_points = sorted_cols if snake_forward else list(reversed(sorted_cols))
+            else:
+                row_points = sorted_cols
+
+            first_pt = row_points[0]
+            if not use_trajectory:
+                model_index = all_points.index(first_pt) if first_pt in all_points else -1
+                wx.CallAfter(self._view.collection_table.set_active_row, model_index)
+
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[map {row_num + 1}/{n_rows}] row {row_num} - moving…",
+                wx.Colour(99, 179, 237),
+            )
+
+            pvs: list[str] = []
+            vals: list[float] = []
+            if motor2_cfg is not None:
+                try:
+                    pos2 = float(first_pt.motor_positions.get(motor2, "0") or "0")
+                    limit_err = check_soft_limits(motor2_cfg.pv, pos2)
+                    if limit_err:
+                        wx.CallAfter(wx.MessageBox, f"Soft limit violation - {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+                        self._abort_event.set()
+                        break
+                    pvs.append(motor2_cfg.pv)
+                    vals.append(pos2)
+                except Exception as exc:
+                    _log.warning("Failed to prepare motor2 move %s: %s", motor2, exc)
+            if self._abort_event.is_set():
+                break
+            if motor1_cfg is not None:
+                try:
+                    pos1_row = float(first_pt.motor_positions.get(motor1, "0") or "0")
+                    if use_trajectory and len(row_points) >= 2:
+                        second_pos = float(row_points[1].motor_positions.get(motor1, "0") or "0")
+                        pos1_row -= (second_pos - pos1_row) / 2.0
+                    limit_err = check_soft_limits(motor1_cfg.pv, pos1_row)
+                    if limit_err:
+                        wx.CallAfter(wx.MessageBox, f"Soft limit violation - {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+                        self._abort_event.set()
+                        break
+                    pvs.append(motor1_cfg.pv)
+                    vals.append(pos1_row)
+                except Exception as exc:
+                    _log.warning("Failed to prepare motor1 start move %s: %s", motor1, exc)
+            if self._abort_event.is_set():
+                break
+            if pvs:
+                try:
+                    caput_many(pvs, vals, wait=True)
+                except Exception as exc:
+                    _log.warning("Failed to move map motors to row start: %s", exc)
+
+            if self._abort_event.is_set():
+                break
+
+            if scan_type == "still" and use_trajectory:
+                row_start_idx = start_idx + row_num * len(row_points)
+                row_weight = sum(weights[group_points.index(pt)] for pt in row_points if pt in group_points)
+                self._run_map_row_trajectory(
+                    row_points,
+                    row_num,
+                    n_rows,
+                    row_start_idx,
+                    total,
+                    motor1,
+                    config,
+                    file_settings,
+                    all_points,
+                    keep_shutter_open=keep_shutter_open,
+                    completed_weight=map_completed_weight,
+                    row_weight=row_weight,
+                    total_weight=total_weight,
+                    snake_mode=use_snake,
+                )
+                map_completed_weight += row_weight
+            else:
+                for col_pt in row_points:
+                    if self._abort_event.is_set():
+                        break
+                    col_model_index = all_points.index(col_pt) if col_pt in all_points else -1
+                    wx.CallAfter(self._view.collection_table.set_active_row, col_model_index)
+
+                    if motor1_cfg is not None:
+                        try:
+                            pos1 = float(col_pt.motor_positions.get(motor1, "0") or "0")
+                            limit_err = check_soft_limits(motor1_cfg.pv, pos1)
+                            if limit_err:
+                                wx.CallAfter(wx.MessageBox, f"Soft limit violation - {limit_err}", "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+                                self._abort_event.set()
+                                break
+                            caput(motor1_cfg.pv, pos1, wait=True)
+                        except Exception as exc:
+                            _log.warning("Failed to move map motor1 %s: %s", motor1, exc)
+
+                    for motor_cfg in other_motors:
+                        raw = col_pt.motor_positions.get(motor_cfg.shorthand)
+                        if raw is None:
+                            continue
+                        try:
+                            caput(motor_cfg.pv, float(raw), wait=True)
+                        except Exception as exc:
+                            _log.warning("Failed to move non-map motor %s: %s", motor_cfg.shorthand, exc)
+
+                    if self._abort_event.is_set():
+                        break
+
+                    wx.CallAfter(
+                        self._view.collect.set_status,
+                        f"[map] {col_pt.label} - {col_pt.scan_type}…",
+                        wx.Colour(99, 179, 237),
+                    )
+
+                    gidx = group_points.index(col_pt)
+                    pt_idx = start_idx + gidx
+                    pt_weight = weights[gidx]
+                    if scan_type == "still":
+                        self._run_still(
+                            col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open
+                        )
+                    elif scan_type == "wide":
+                        self._run_wide(
+                            col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight, keep_shutter_open=keep_shutter_open
+                        )
+                        if not self._abort_event.is_set():
+                            _out = self._output_paths
+                            if _out is not None and _out.raw_directory is not None:
+                                wide_flip = self._model.collection_settings.wide_flip
+                                self._spawn_map_copy_to_target(flip_odd_rows=wide_flip, row_shift_frames=map_row_shift)
+                    elif scan_type == "step":
+                        self._run_step(col_pt, pt_idx, total, config, file_settings, map_completed_weight, pt_weight, total_weight)
+                    map_completed_weight += pt_weight
+
+            det = config.active_detector_config if config else None
+            if not self._abort_event.is_set() and det is not None and det.file_format == "hdf5":
+                if scan_type == "still":
+                    self._spawn_snake_combine_for_map(row_shift_frames=map_row_shift)
+
+        if keep_shutter_open:
+            self._engine._close_shutter(config)
+            self._engine._restore_detector_shutter_control(config, original_shutter_mode)
+
+        if original_motor1 is not None and motor1_cfg is not None:
+            try:
+                caput(motor1_cfg.pv, original_motor1, wait=True)
+                _log.debug("Restored map motor1 %s to %.4f", motor1, original_motor1)
+            except Exception as exc:
+                _log.warning("Failed to restore map motor1 %s: %s", motor1, exc)
+        if original_motor2 is not None and motor2_cfg is not None:
+            try:
+                caput(motor2_cfg.pv, original_motor2, wait=True)
+                _log.debug("Restored map motor2 %s to %.4f", motor2, original_motor2)
+            except Exception as exc:
+                _log.warning("Failed to restore map motor2 %s: %s", motor2, exc)
+
+        self._in_map_collection = False
+        self._model.file_settings.frame_number = frame_before_map
+        wx.CallAfter(self._view.file_settings.set_frame_number, frame_before_map)
+
+    def _run_map_row_trajectory(
+        self,
+        row_points: list[CollectionPoint],
+        row_num: int,
+        n_rows: int,
+        start_idx: int,
+        total: int,
+        motor1: str,
+        config,
+        file_settings,
+        all_points: list[CollectionPoint],
+        keep_shutter_open: bool = False,
+        completed_weight: int = 0,
+        row_weight: int = 1,
+        total_weight: int = 1,
+        snake_mode: bool = False,
+    ) -> None:
+        n_points = len(row_points)
+        exposure = row_points[0].parse_exposure()
+        if exposure is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[map row {row_num}]: exposure time is required",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
+
+        epics_positions = []
+        for pt in row_points:
+            try:
+                epics_positions.append(float(pt.motor_positions.get(motor1, "0") or "0"))
+            except ValueError:
+                epics_positions.append(0.0)
+
+        done_event = threading.Event()
+        error_holder: list[Exception] = []
+        frame_holder: list[tuple[int, int]] = [(0, n_points)]
+
+        det = config.active_detector_config
+        counter_pv = None
+        acquire_pv = None
+        if det is not None and det.pv_prefix.strip():
+            _pfx = det.pv_prefix.strip()
+            if not _pfx.endswith(":"):
+                _pfx += ":"
+            counter_pv = f"{_pfx}cam1:NumImagesCounter_RBV"
+            acquire_pv = f"{_pfx}cam1:Acquire"
+
+        def _poll_frames() -> None:
+            if counter_pv is None:
+                return
+            if acquire_pv is not None:
+                while not done_event.is_set():
+                    if int(caget(acquire_pv) or 0):
+                        break
+                    _time.sleep(0.02)
+            while not done_event.is_set():
+                val = int(caget(counter_pv) or 0)
+                if val == 0:
+                    break
+                _time.sleep(0.02)
+            last = 0
+            while not done_event.is_set():
+                current = int(caget(counter_pv) or 0)
+                if current > last:
+                    snake_reversed = snake_mode and (row_num % 2 == 1)
+                    for f in range(last + 1, current + 1):
+                        pt_idx = start_idx + (f - 1)
+                        pt_fraction = (completed_weight + row_weight * f / n_points) / max(1, total_weight)
+                        wx.CallAfter(self._view.collect.set_progress, pt_idx, total, point_fraction=pt_fraction)
+                        pt_pos = (n_points - f) if snake_reversed else (f - 1)
+                        if 0 <= pt_pos < len(row_points):
+                            model_index = all_points.index(row_points[pt_pos]) if row_points[pt_pos] in all_points else -1
+                            wx.CallAfter(self._view.collection_table.set_active_row, model_index)
+                    last = current
+                if last >= n_points:
+                    break
+                _time.sleep(0.05)
+
+        def on_frame(frame: int, total_frames: int) -> None:
+            frame_holder[0] = (frame, total_frames)
+
+        def on_done() -> None:
+            done_event.set()
+
+        def on_error(exc: Exception) -> None:
+            error_holder.append(exc)
+            done_event.set()
+
+        threading.Thread(target=_poll_frames, daemon=True, name="traj-frame-poll").start()
+
+        wx.CallAfter(
+            self._view.collect.set_status,
+            f"[map {row_num + 1}/{n_rows}] trajectory {n_points} pts…",
+            wx.Colour(99, 179, 237),
+        )
+
+        motor_cfg = next((m for m in config.motors if m.shorthand == motor1), None)
+        ctrl_name = motor_cfg.controller if motor_cfg else ""
+        ctrl_cfg = next((c for c in config.controllers if c.name == ctrl_name), None)
+        save_gathering = ctrl_cfg.save_xps_gathering if ctrl_cfg is not None else False
+        gathering_file = "Gather.dat"
+        if save_gathering and self._output_paths is not None and row_points:
+            ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
+            try:
+                gathering_file = str(self._output_paths.map_source_dir() / f"{ref.label}_gathering.dat")
+            except Exception:
+                pass
+
+        try:
+            self._engine.run_map_row_trajectory(
+                config=config,
+                map_motor_shorthand=motor1,
+                epics_positions=epics_positions,
+                exposure=exposure,
+                file_settings=file_settings,
+                row_points=row_points,
+                on_frame=on_frame,
+                on_done=on_done,
+                on_error=on_error,
+                on_file_number_updated=self._on_file_number_updated,
+                keep_shutter_open=keep_shutter_open,
+                save_xps_gathering=save_gathering,
+                gathering_output_file=gathering_file,
+            )
+        except RuntimeError as exc:
+            wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
+            return
+
+        det = config.active_detector_config
+        if det is not None and det.type == "eiger":
+            self._wait_for_eiger_triggering(det.pv_prefix, done_event)
+
+        wx.CallAfter(self._start_point_timer, start_idx, total, exposure * n_points, completed_weight, row_weight, total_weight)
+        done_event.wait()
+        if self._engine._thread is not None:
+            self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
+        wx.CallAfter(self._stop_point_timer, start_idx + n_points - 1, total)
+
+        if error_holder:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[map row {row_num}]: {error_holder[0]}",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+        else:
+            if save_gathering:
+                self._write_expected_positions(row_points, epics_positions, motor1, config)
+            self._write_map_row_metadata(row_points, epics_positions, motor1, config)
+            self._spawn_format_conversion_for_trajectory_row(row_points)
+            self._spawn_raw_map_row_copy(row_points)
+
+    def _wait_for_eiger_triggering(self, pv_prefix: str, done_event: threading.Event | None = None) -> None:
+        prefix = pv_prefix.strip()
+        if not prefix.endswith(":"):
+            prefix += ":"
+        status_pv = f"{prefix}cam1:StatusMessage_RBV"
+        seen_idle = None
+        while not self._abort_event.is_set() and (done_event is None or not done_event.is_set()):
+            try:
+                val = caget(status_pv, as_string=True, timeout=1.0)
+                if isinstance(val, str):
+                    normalised = val.strip().lower()
+                    if seen_idle is None:
+                        seen_idle = normalised == "idle"
+                    if seen_idle and normalised != "idle":
+                        seen_idle = False
+                    if not seen_idle and normalised == "triggering":
+                        return
+            except Exception:
+                pass
+            _time.sleep(_TRIGGERING_POLL_S)
+
+    def _handle_scan_error(self, exc: Exception, label: str) -> None:
+        msg = str(exc)
+        if "Soft limit violation" in msg:
+            wx.MessageBox(msg, "Soft Limit Violation", wx.OK | wx.ICON_ERROR)
+
+    def _selected_extras(self) -> tuple[str, list[str]] | None:
+        """Return (source_format, extras) when extra formats are enabled, else None."""
+        fs = self._model.file_settings
+        selected: list[str] = []
+        if fs.use_hdf5:
+            selected.append("hdf5")
+        if fs.use_cbf:
+            selected.append("cbf")
+        if fs.use_tif:
+            selected.append("tif")
+
+        config = self._model.beamline.active
+        det = config.active_detector_config if config else None
+        source_format = det.file_format if det else "hdf5"
+        extras = [fmt for fmt in selected if fmt != source_format]
+        if not extras:
+            return None
+        return source_format, extras
+
+    def _build_output_paths(self) -> OutputPaths:
+        """Snapshot the current file settings and config into an OutputPaths helper."""
+        fs = self._model.file_settings
+        config = self._model.beamline.active
+        det = config.active_detector_config if config else None
+        source_format = det.file_format if det else "hdf5"
+        file_ext = OutputPaths.ext_for_format(source_format)
+        result = self._selected_extras()
+        extras = tuple(result[1]) if result else ()
+        raw = config.raw_directory.strip() if config else ""
+        if raw and self._engine.session_subdir:
+            raw = raw.rstrip("/\\") + "/" + self._engine.session_subdir
+        crysalis_active = bool(fs.use_crysalis and fs.crysalis_calibration is not None)
+        fn_path = Path(fs.filename) if fs.filename else Path(".")
+        fn_parent = fn_path.parent
+        full_directory = Path(str(fs.directory)) / fn_parent if fn_parent != Path(".") else Path(str(fs.directory))
+        stem = fn_path.name if fs.filename else ""
+        _log.debug(
+            "_build_output_paths: fs.directory=%r fs.filename=%r -> full_directory=%r stem=%r raw=%r",
+            str(fs.directory),
+            fs.filename,
+            str(full_directory),
+            stem,
+            raw,
+        )
+        return OutputPaths(
+            directory=full_directory,
+            raw_directory=Path(raw) if raw else None,
+            filename=stem,
+            map_ext=fs.map_ext.strip(),
+            use_ext=fs.use_ext,
+            file_ext=file_ext,
+            file_number_width=det.file_number_width if det else 4,
+            source_format=source_format,
+            extras=extras,
+            use_crysalis=crysalis_active,
+        )
+
+    def _launch_format_converter(self, directory: str, basename: str, source_format: str, extras: list[str], width: int, output_dirs: dict[str, str]) -> None:
+        """Spawn the format converter as a detached subprocess."""
+        log_dir = Path(directory)
+        log_file = str(log_dir / "format_converter.log")
+        args = {
+            "directory": directory,
+            "basename": basename,
+            "source_format": source_format,
+            "target_formats": extras,
+            "file_number_width": width,
+            "output_dirs": output_dirs,
+            "log_file": log_file,
+        }
+        try:
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
+            try:
+                json.dump(args, tmp)
+            finally:
+                tmp.close()
+            subprocess.Popen(
+                [sys.executable, "-m", "crystalsweep.model.format_converter", tmp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception as exc:
+            _log.warning("Failed to spawn format conversion: %s", exc)
+
+    def _launch_snake_combiner(
+        self,
+        input_dir: str,
+        output_path: str,
+        pattern: str,
+        first_row_reversed: bool,
+        flipped_dir: str | None = None,
+        row_shift_frames: int = 0,
+        snake_mode: bool = True,
+    ) -> subprocess.Popen | None:
+        """Spawn the snake-map combiner as a detached subprocess."""
+        args = {
+            "input_dir": input_dir,
+            "output_path": output_path,
+            "pattern": pattern,
+            "first_row_reversed": first_row_reversed,
+            "flipped_dir": flipped_dir or "",
+            "row_shift_frames": row_shift_frames,
+            "snake_mode": snake_mode,
+        }
+        try:
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
+            try:
+                json.dump(args, tmp)
+            finally:
+                tmp.close()
+            return subprocess.Popen(
+                [sys.executable, "-m", "crystalsweep.model.snake_combiner", tmp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception as exc:
+            _log.warning("Failed to spawn snake combiner: %s", exc)
+            return None
+
+    def _spawn_snake_combine_for_map(self, row_shift_frames: int = 0) -> None:
+        """Spawn the snake combiner after a row completes.
+
+        Waits for any previously spawned combiner to finish before launching a
+        new one, ensuring rows are never appended to the combined file by two
+        concurrent processes. Snake convention matches _run_map_group: row 0
+        forward, row 1 reversed, etc., so first_row_reversed is False here.
+        """
+        if self._combine_proc is not None:
+            self._combine_proc.wait()
+            self._combine_proc = None
+        output = self._output_paths
+        if output is None:
+            return
+        use_snake = self._model.file_settings.use_snake_trajectory
+        self._combine_proc = self._launch_snake_combiner(
+            input_dir=str(output.map_source_dir()),
+            output_path=str(output.map_combined_path()),
+            pattern=output.map_row_pattern(),
+            first_row_reversed=False,
+            flipped_dir=str(output.map_flipped_dir()),
+            row_shift_frames=row_shift_frames,
+            snake_mode=use_snake,
+        )
+
+    def _launch_map_copy_to_target(self, input_dir: str, output_dir: str, pattern: str, flip_odd_rows: bool, row_shift_frames: int = 0) -> None:
+        """Spawn the map file copier as a detached subprocess."""
+        args = {
+            "mode": "copy",
+            "input_dir": input_dir,
+            "output_dir": output_dir,
+            "pattern": pattern,
+            "flip_odd_rows": flip_odd_rows,
+            "row_shift_frames": row_shift_frames,
+        }
+        try:
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
+            try:
+                json.dump(args, tmp)
+            finally:
+                tmp.close()
+            subprocess.Popen(
+                [sys.executable, "-m", "crystalsweep.model.snake_combiner", tmp.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception as exc:
+            _log.warning("Failed to spawn map file copier: %s", exc)
+
+    def _spawn_map_copy_to_target(self, flip_odd_rows: bool = False, row_shift_frames: int = 0) -> None:
+        """Copy all raw map row files to the map output folder."""
+        output = self._output_paths
+        if output is None or output.raw_directory is None:
+            return
+        self._launch_map_copy_to_target(
+            input_dir=str(output.map_source_dir()),
+            output_dir=str(output.map_dir()),
+            pattern=output.map_row_pattern(),
+            flip_odd_rows=flip_odd_rows,
+            row_shift_frames=row_shift_frames,
+        )
+
+    def _spawn_raw_map_row_copy(self, row_points: list[CollectionPoint]) -> None:
+        """Copy the just-completed trajectory row files to the target map raw folder."""
+        output = self._output_paths
+        if output is None or output.raw_directory is None:
+            return
+        if not row_points:
+            return
+        row = row_points[0].map_row
+        src_dir = output.map_source_dir()
+        dst_dir = output.map_raw_dir()
+        pattern = output.map_row_file_pattern(row)
+
+        def _copy() -> None:
+            try:
+                _mkdir_safe(dst_dir)
+                for f in sorted(src_dir.glob(pattern)):
+                    shutil.copy2(str(f), str(dst_dir / f.name))
+                    _log.debug("copied map row %d file %s -> %s", row, f, dst_dir)
+            except Exception as exc:
+                _log.warning("_spawn_raw_map_row_copy: %s", exc)
+
+        threading.Thread(target=_copy, daemon=True, name="file-copy").start()
+
+    def _check_output_conflicts(self, points: list) -> list[str]:
+        """Return a list of existing paths that collection would overwrite."""
+        output = self._build_output_paths()
+        fs = self._model.file_settings
+        conflicts: list[str] = []
+        seen: set[str] = set()
+
+        map_groups: set[str] = set()
+        for p in points:
+            if p.map_group:
+                map_groups.add(p.map_group)
+                continue
+            target_dir = output.output_dir(p, fs.frame_number)
+            target = target_dir / f"{output.basename(p, fs.frame_number)}.{output.file_ext}"
+            key = str(target)
+            if key not in seen:
+                seen.add(key)
+                if target.exists():
+                    conflicts.append(str(target))
+
+        for group in sorted(map_groups):
+            map_dir = output.directory / output.map_folder_name()
+            key = str(map_dir)
+            if key not in seen:
+                seen.add(key)
+                if map_dir.is_dir() and any(map_dir.iterdir()):
+                    conflicts.append(f"{map_dir}/ (directory not empty)")
+            combined = output.map_combined_path()
+            key = str(combined)
+            if key not in seen:
+                seen.add(key)
+                if combined.exists():
+                    conflicts.append(str(combined))
+
+        return conflicts
+
+    def _spawn_file_copy(self, point: CollectionPoint, frame_number: int) -> None:
+        """Copy the raw detector file to the output directory.
+
+        For non-map points: copies the point file from raw_directory immediately.
+        For still map points: copies the point file into the map raw/ subfolder
+        (alongside the combined file that is created at the end).
+        For step map points: copies the point file directly into the map folder
+        (no combined file, so no raw/ subfolder needed).
+        Wide map points are handled as a batch by _spawn_map_copy_to_target.
+        """
+        output = self._output_paths
+        if output is None or output.raw_directory is None:
+            return
+
+        if point.map_group:
+            if point.scan_type == "wide":
+                return
+            src_dir = output.map_source_dir()
+            dst_dir = output.map_raw_dir() if point.scan_type == "still" else output.map_dir()
+            bn = output.basename(point, frame_number)
+            ext = output.file_ext
+
+            def _copy_map() -> None:
+                try:
+                    _mkdir_safe(dst_dir)
+                    direct = src_dir / f"{bn}.{ext}"
+                    if direct.is_file():
+                        shutil.copy2(str(direct), str(dst_dir / direct.name))
+                        _log.debug("copied map point %s -> %s", direct, dst_dir)
+                    else:
+                        for f in sorted(src_dir.glob(f"{bn}*")):
+                            shutil.copy2(str(f), str(dst_dir / f.name))
+                            _log.debug("copied map point %s -> %s", f, dst_dir)
+                except Exception as exc:
+                    _log.warning("_spawn_file_copy (map point): %s", exc)
+
+            threading.Thread(target=_copy_map, daemon=True, name="file-copy").start()
+            return
+
+        raw = output.raw_directory
+        bn = output.basename(point, frame_number)
+        ext = output.file_ext
+        dst_dir = output.output_dir(point, frame_number)
+
+        def _copy() -> None:
+            try:
+                _mkdir_safe(dst_dir)
+                direct = raw / f"{bn}.{ext}"
+                if direct.is_file():
+                    shutil.copy2(str(direct), str(dst_dir / direct.name))
+                    _log.debug("copied %s -> %s", direct, dst_dir)
+                else:
+                    for f in sorted(raw.glob(f"{bn}*")):
+                        shutil.copy2(str(f), str(dst_dir / f.name))
+                        _log.debug("copied %s -> %s", f, dst_dir)
+            except Exception as exc:
+                _log.warning("_spawn_file_copy: %s", exc)
+
+        threading.Thread(target=_copy, daemon=True, name="file-copy").start()
+
+    def _spawn_format_conversion(self, point: CollectionPoint, frame_number: int) -> None:
+        """Spawn the format converter for a non-trajectory collection point."""
+        output = self._output_paths
+        if output is None or not output.extras:
+            return
+
+        bn = output.basename(point, frame_number)
+        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(point, frame_number).items()}
+
+        self._launch_format_converter(
+            directory=str(output.source_dir(point)),
+            basename=bn,
+            source_format=output.source_format,
+            extras=list(output.extras),
+            width=output.file_number_width,
+            output_dirs=output_dirs,
+        )
+
+    def _write_expected_positions(
+        self,
+        row_points: list[CollectionPoint],
+        epics_positions: list[float],
+        motor1: str,
+        config,
+    ) -> None:
+        """Write a tab-separated file of expected XPS trigger positions for this map row.
+
+        Saved alongside the gathering files as {label}_expected_positions.dat.
+        The scan axis gets midpoint positions; all other motors show their fixed value.
+        """
+        output = self._output_paths
+        if output is None:
+            return
+        ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
+        fallback_fn = self._model.file_settings.frame_number
+        bn = output.basename(ref, fallback_fn)
+        dest = output.map_source_dir() / f"{bn}_expected_positions.dat"
+
+        scan_positions = list(epics_positions)
+        n = len(row_points)
+
+        motor_cfgs = [m for m in config.motors if m.shorthand]
+        labels = [(m.shorthand, (m.description[:1].upper() + m.description[1:]) if m.description else m.shorthand) for m in motor_cfgs]
+
+        columns: dict[str, list[float]] = {}
+        for motor_cfg, (sh, label) in zip(motor_cfgs, labels):
+            if sh == motor1:
+                columns[label] = scan_positions
+            else:
+                vals = []
+                for pt in row_points:
+                    try:
+                        vals.append(float(pt.motor_positions.get(sh, "0") or "0"))
+                    except ValueError, AttributeError:
+                        vals.append(0.0)
+                columns[label] = vals
+
+        try:
+            col_names = list(columns.keys())
+            header = "Frame\t" + "\t".join(col_names)
+            lines = [header]
+            for i in range(n):
+                row = f"{i + 1}\t" + "\t".join(f"{columns[c][i]:.6f}" for c in col_names)
+                lines.append(row)
+            dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        except Exception:
+            _log.exception("Failed to write expected positions to %s", dest)
+
+    def _write_map_row_metadata(
+        self,
+        row_points: list[CollectionPoint],
+        epics_positions: list[float],
+        motor1: str,
+        config,
+    ) -> None:
+        """Write per-frame motor positions into entry/instrument/NDAttributes of the row HDF5 file.
+
+        For the scan axis (motor1) the recorded value is the midpoint between consecutive
+        commanded positions - the centre of the detector dwell. All other motors write
+        the actual position of each frame (constant within a row for motor2 and fixed motors).
+        """
+        output = self._output_paths
+        if output is None:
+            return
+        ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
+        fallback_fn = self._model.file_settings.frame_number
+        bn = output.basename(ref, fallback_fn)
+        src_path = output.map_source_dir() / f"{bn}.h5"
+        if not src_path.exists():
+            return
+
+        scan_positions = list(epics_positions)
+
+        motor_data: dict[str, np.ndarray] = {}
+        for motor_cfg in config.motors:
+            sh = motor_cfg.shorthand
+            desc = motor_cfg.description
+            label = (desc[:1].upper() + desc[1:]) if desc else sh
+            if sh == motor1:
+                motor_data[label] = np.array(scan_positions, dtype=np.float64)
+            else:
+                vals = []
+                for pt in row_points:
+                    try:
+                        vals.append(float(pt.motor_positions.get(sh, "0") or "0"))
+                    except ValueError:
+                        vals.append(0.0)
+                motor_data[label] = np.array(vals, dtype=np.float64)
+
+        try:
+            with h5py.File(src_path, "a") as f:
+                grp = f.require_group("entry/instrument/NDAttributes")
+                for label, data in motor_data.items():
+                    if label in grp:
+                        del grp[label]
+                    grp.create_dataset(label, data=data)
+        except Exception:
+            _log.exception("Failed to write map row metadata to %s", src_path)
+
+    def _write_point_metadata(
+        self,
+        point: CollectionPoint,
+        frame_number: int,
+        config,
+        rotation_positions: list[float] | None = None,
+    ) -> None:
+        """Write motor positions into entry/instrument/NDAttributes of a single-point HDF5 file.
+
+        For stills and wide scans each motor is a 1-element array of the actual position.
+        For step scans rotation_positions holds the per-frame omega values; all other motors
+        repeat their fixed position for each frame.
+        """
+        output = self._output_paths
+        if output is None:
+            return
+        src_dir = output.source_dir(point)
+        bn = output.basename(point, frame_number)
+        src_path = src_dir / f"{bn}.h5"
+        if not src_path.exists():
+            src_path = src_dir / f"{bn}_master.h5"
+        if not src_path.exists():
+            return
+
+        n_frames = len(rotation_positions) if rotation_positions is not None else 1
+        rotation_motor = getattr(config, "rotation_motor", None)
+        rotation_sh = rotation_motor.shorthand if rotation_motor is not None else None
+
+        motor_data: dict[str, np.ndarray] = {}
+        for motor_cfg in config.motors:
+            sh = motor_cfg.shorthand
+            desc = motor_cfg.description
+            label = (desc[:1].upper() + desc[1:]) if desc else sh
+            if sh == rotation_sh and rotation_positions is not None:
+                motor_data[label] = np.array(rotation_positions, dtype=np.float64)
+            else:
+                try:
+                    val = float(point.motor_positions.get(sh, "0") or "0")
+                except ValueError, AttributeError:
+                    val = 0.0
+                motor_data[label] = np.full(n_frames, val, dtype=np.float64)
+
+        try:
+            with h5py.File(src_path, "a") as f:
+                grp = f.require_group("entry/instrument/NDAttributes")
+                for label, data in motor_data.items():
+                    if label in grp:
+                        del grp[label]
+                    grp.create_dataset(label, data=data)
+        except Exception:
+            _log.exception("Failed to write point metadata to %s", src_path)
+
+    def _spawn_format_conversion_for_trajectory_row(
+        self,
+        row_points: list[CollectionPoint],
+    ) -> None:
+        """Spawn conversion for a still-trajectory map row.
+
+        The whole row is one multi-frame file named after the forward-direction
+        first point (lowest map_col), independent of snake direction.
+        """
+        if not row_points:
+            return
+        output = self._output_paths
+        if output is None or not output.extras:
+            return
+
+        ref = min(row_points, key=lambda p: getattr(p, "map_col", 0))
+        fallback_fn = self._model.file_settings.frame_number
+        bn = output.basename(ref, fallback_fn)
+        output_dirs = {fmt: str(d) for fmt, d in output.conversion_dirs(ref, fallback_fn).items()}
+
+        self._launch_format_converter(
+            directory=str(output.map_source_dir()),
+            basename=bn,
+            source_format=output.source_format,
+            extras=list(output.extras),
+            width=output.file_number_width,
+            output_dirs=output_dirs,
+        )
+
+    def _spawn_crysalis_conversion(self, point: CollectionPoint, frame_number: int, config) -> None:
+        if point.scan_type != "step":
+            return
+        output = self._output_paths
+        if output is None or not output.use_crysalis:
+            return
+
+        fs = self._model.file_settings
+        det = config.active_detector_config
+        file_format = det.file_format if det else "hdf5"
+
+        filepath = str(output.crysalis_source_dir(point))
+        crysalis_output_dir = str(output.crysalis_output_dir(point, frame_number))
+
+        step_p = point.parse_step_params()
+        wide_p = point.parse_wide_params()
+        exposure_time = point.parse_exposure() or 0.0
+        if step_p is not None:
+            omega_start = step_p.omega_start
+            omega_end = step_p.omega_end
+            step = step_p.step
+            count = step_p.n_frames
+        elif wide_p is not None:
+            omega_start = wide_p.omega_start
+            omega_end = wide_p.omega_end
+            step = abs(omega_end - omega_start)
+            count = 1
+        else:
+            omega_start = 0.0
+            omega_end = 0.0
+            step = 0.0
+            count = 1
+
+        wavelength = config.crysalis_wavelength
+        scan_info = {
+            "omega_start": omega_start,
+            "omega_end": omega_end,
+            "domega": step,
+            "count": count,
+            "kappa": 0.0,
+            "theta": 0.0,
+            "phi": 0.0,
+            "alpha": config.crysalis_alpha,
+            "dist": config.crysalis_distance,
+            "center_x": config.crysalis_center_x,
+            "center_y": config.crysalis_center_y,
+            "mono": config.crysalis_polarization,
+            "wavelength": wavelength,
+            "dtheta": 0.0,
+            "dkappa": 0.0,
+            "dphi": 0.0,
+            "Exposure_time": exposure_time,
+            "pixel_size": config.crysalis_pixel_size,
+            "rotation_axis": config.crysalis_rotation_axis,
+            "detector_type": det.type if det else "eiger",
+            "reverse_frames": config.crysalis_reverse_frames,
+            "image_rotation": config.crysalis_image_rotation,
+            "image_flip_ud": config.crysalis_image_flip_ud,
+            "image_flip_lr": config.crysalis_image_flip_lr,
+            "l1": wavelength,
+            "l2": wavelength,
+            "l12": wavelength,
+            "b": wavelength,
+            "monotype": "SYNCHROTRON",
+        }
+
+        if point.map_group:
+            w = output.file_number_width
+            row = max(1, point.map_row + 1) if point.map_row >= 0 else 1
+            crysalis_basename = f"{output.stem(point)}_{row:0{w}d}"
+            crysalis_filenumber = max(1, point.map_col + 1) if point.map_col >= 0 else 1
+        else:
+            crysalis_basename = output.stem(point)
+            crysalis_filenumber = frame_number
+
+        args = {
+            "filepath": filepath,
+            "basename": crysalis_basename,
+            "filenumber": crysalis_filenumber,
+            "par_file": str(fs.crysalis_calibration),
+            "set_file": str(fs.crysalis_set_file) if fs.crysalis_set_file is not None else "",
+            "ccd_file": str(fs.crysalis_ccd_file) if fs.crysalis_ccd_file is not None else "",
+            "scan_info": scan_info,
+            "file_format": file_format,
+            "output_dir": crysalis_output_dir,
+        }
+
+        try:
+            from crystalsweep.model.crysalis_converter import run_conversion
+
+            p = multiprocessing.Process(target=run_conversion, args=(args,), daemon=True)
+            p.start()
+        except Exception as exc:
+            _log.warning("Failed to spawn crysalis conversion: %s", exc)
+
+    def _run_still(
+        self,
+        point: CollectionPoint,
+        idx: int,
+        total: int,
+        config,
+        file_settings=None,
+        completed_weight: int = 0,
+        point_weight: int = 1,
+        total_weight: int = 1,
+        keep_shutter_open: bool = False,
+    ) -> None:
+        done_event = threading.Event()
+        error_holder: list[Exception] = []
+
+        exposure = point.parse_exposure()
+        if exposure is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: exposure time is required",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
+
+        def on_done() -> None:
+            print(f"[collect] [{idx}/{total}] {point.label}: still scan complete")
+            done_event.set()
+
+        def on_error(exc: Exception) -> None:
+            error_holder.append(exc)
+            print(f"[collect] [{idx}/{total}] {point.label}: ERROR - {exc}")
+            done_event.set()
+
+        def on_status(phase: str) -> None:
+            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} - {phase}", wx.Colour(99, 179, 237))
+
+        frame_number_before = self._model.file_settings.frame_number
+        wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
+
+        try:
+            self._engine.run_still(
+                point,
+                config,
+                on_done=on_done,
+                on_error=on_error,
+                file_settings=file_settings,
+                on_file_number_updated=self._on_file_number_updated,
+                on_status=on_status,
+                keep_shutter_open=keep_shutter_open,
+            )
+        except RuntimeError as exc:
+            wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
+            return
+
+        det = config.active_detector_config
+        if det is not None and det.type == "eiger":
+            self._wait_for_eiger_triggering(det.pv_prefix)
+
+        wx.CallAfter(self._start_point_timer, idx, total, exposure, completed_weight, point_weight, total_weight)
+        done_event.wait()
+        if self._engine._thread is not None:
+            self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
+        wx.CallAfter(self._stop_point_timer, idx, total)
+
+        if error_holder:
+            wx.CallAfter(self._handle_scan_error, error_holder[0], point.label)
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: {error_holder[0]}",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+        else:
+            self._write_point_metadata(point, frame_number_before, config)
+            self._spawn_file_copy(point, frame_number_before)
+            self._spawn_format_conversion(point, frame_number_before)
+            self._spawn_crysalis_conversion(point, frame_number_before, config)
+
+    def _run_step(
+        self, point: CollectionPoint, idx: int, total: int, config, file_settings=None, completed_weight: int = 0, point_weight: int = 1, total_weight: int = 1
+    ) -> None:
+        done_event = threading.Event()
+        error_holder: list[Exception] = []
+
+        params = point.parse_step_params()
+        if params is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: step size is required for step scans",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
+
+        n_frames = params.n_frames
+
+        frame_holder: list[tuple[int, int]] = [(0, n_frames)]
+
+        def on_status(phase: str) -> None:
+            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} - {phase}", wx.Colour(99, 179, 237))
+
+        def on_frame(frame: int, total_frames: int) -> None:
+            frame_holder[0] = (frame, total_frames)
+            inner = frame / total_frames if total_frames > 0 else 0.0
+            weighted = (completed_weight + inner * point_weight) / total_weight
+            wx.CallAfter(
+                self._view.collect.set_progress,
+                idx,
+                total,
+                frame,
+                total_frames,
+                weighted,
+            )
+
+        def on_done() -> None:
+            print(f"[collect] [{idx}/{total}] {point.label}: step scan complete ({n_frames} frames)")
+            done_event.set()
+
+        def on_error(exc: Exception) -> None:
+            error_holder.append(exc)
+            print(f"[collect] [{idx}/{total}] {point.label}: ERROR - {exc}")
+            done_event.set()
+
+        use_slew = point.map_group != "" or self._view.collection_table.slew_scan
+
+        frame_number_before = self._model.file_settings.frame_number
+
+        wx.CallAfter(self._view.collect.set_progress, idx, total, 0, n_frames, completed_weight / total_weight)
+
+        try:
+            self._engine.run_step(
+                point,
+                config,
+                on_frame=on_frame,
+                on_done=on_done,
+                on_error=on_error,
+                slew=use_slew,
+                file_settings=file_settings,
+                on_file_number_updated=self._on_file_number_updated,
+                on_status=on_status,
+            )
+        except RuntimeError as exc:
+            wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
+            return
+        done_event.wait()
+        if self._engine._thread is not None:
+            self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
+        wx.CallAfter(self._view.collect.set_progress, idx, total, n_frames, n_frames, (completed_weight + point_weight) / total_weight)
+
+        if error_holder:
+            wx.CallAfter(self._handle_scan_error, error_holder[0], point.label)
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: {error_holder[0]}",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+        else:
+            rotation_positions = [params.omega_start + i * params.step for i in range(params.n_frames)]
+            self._write_point_metadata(point, frame_number_before, config, rotation_positions=rotation_positions)
+            self._spawn_file_copy(point, frame_number_before)
+            self._spawn_format_conversion(point, frame_number_before)
+            self._spawn_crysalis_conversion(point, frame_number_before, config)
+
+    def _run_wide(
+        self,
+        point: CollectionPoint,
+        idx: int,
+        total: int,
+        config,
+        file_settings=None,
+        completed_weight: int = 0,
+        point_weight: int = 1,
+        total_weight: int = 1,
+        keep_shutter_open: bool = False,
+    ) -> None:
+        done_event = threading.Event()
+        error_holder: list[Exception] = []
+
+        exposure = point.parse_exposure()
+        if exposure is None:
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: exposure time is required",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+            return
+
+        def on_done() -> None:
+            print(f"[collect] [{idx}/{total}] {point.label}: wide scan complete")
+            done_event.set()
+
+        def on_error(exc: Exception) -> None:
+            error_holder.append(exc)
+            print(f"[collect] [{idx}/{total}] {point.label}: ERROR - {exc}")
+            done_event.set()
+
+        def on_status(phase: str) -> None:
+            wx.CallAfter(self._view.collect.set_status, f"[{idx}/{total}] {point.label} - {phase}", wx.Colour(99, 179, 237))
+
+        frame_number_before = self._model.file_settings.frame_number
+        wx.CallAfter(self._view.collect.set_progress, idx, total, point_fraction=completed_weight / total_weight)
+
+        try:
+            self._engine.run_wide(
+                point,
+                config,
+                on_done=on_done,
+                on_error=on_error,
+                file_settings=file_settings,
+                on_file_number_updated=self._on_file_number_updated,
+                on_status=on_status,
+                keep_shutter_open=keep_shutter_open,
+            )
+        except RuntimeError as exc:
+            wx.CallAfter(self._view.collect.set_status, str(exc), wx.Colour(220, 80, 40))
+            return
+
+        det = config.active_detector_config
+        if det is not None and det.type == "eiger":
+            self._wait_for_eiger_triggering(det.pv_prefix)
+
+        wx.CallAfter(self._start_point_timer, idx, total, exposure, completed_weight, point_weight, total_weight)
+        done_event.wait()
+        if self._engine._thread is not None:
+            self._engine._thread.join()
+        if self._on_post_scan is not None:
+            self._on_post_scan()
+        wx.CallAfter(self._stop_point_timer, idx, total)
+
+        if error_holder:
+            wx.CallAfter(self._handle_scan_error, error_holder[0], point.label)
+            wx.CallAfter(
+                self._view.collect.set_status,
+                f"[{idx}/{total}] {point.label}: {error_holder[0]}",
+                wx.Colour(220, 80, 40),
+            )
+            self._abort_event.set()
+
+        else:
+            self._write_point_metadata(point, frame_number_before, config)
+            self._spawn_file_copy(point, frame_number_before)
+            self._spawn_format_conversion(point, frame_number_before)
+            self._spawn_crysalis_conversion(point, frame_number_before, config)

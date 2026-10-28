@@ -1,88 +1,87 @@
-# ----------------------------------------------------------------------------------
-# Project: CrystalSweep
-# File: pyproject.toml
-# ----------------------------------------------------------------------------------
-# Purpose:
-# This file is used to specify the project configuration and dependencies.
-# ----------------------------------------------------------------------------------
-# Author: Christofanis Skordas
-#
-# Copyright (c) 2026 GSECARS, The University of Chicago, USA
-# Copyright (c) 2026 NSF SEES, USA
-# ----------------------------------------------------------------------------------
+# SPDX-License-Identifier: MIT
 
 [project]
 name = "crystalsweep"
-version = "0.1.4"
-authors = [
-    {name = "Christofanis Skordas", email = "55315750+skordaschristofanis@users.noreply.github.com"}
-]
-maintainers = [
-    {name = "Christofanis Skordas", email = "55315750+skordaschristofanis@users.noreply.github.com"}
-]
-description = "CrystalSweep is beamline control and data acquisition software for single-crystal X-ray diffraction experiments."
+dynamic = ["version"]
+authors = [ {name = "Christofanis Skordas", email = "skordasc@uchicago.edu"} ]
+maintainers = [ {name = "Christofanis Skordas", email = "skordasc@uchicago.edu"} ]
+description = "Beamline control and data acquisition software for single-crystal X-ray diffraction experiments."
 readme = {file = "README.md", content-type = "text/markdown"}
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE.txt"]
 classifiers = [
     "Intended Audience :: Education",
     "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.14",
-    "License :: OSI Approved :: MIT License"
+    "Topic :: Scientific/Engineering",
 ]
 requires-python = "==3.14.*"
 dependencies = [
-    "h5py>=3.12.1",
-    "numpy>=2.4.4",
-    "p4p>=4.2.2",
-    "fabio>=2023.10.0",
-    "pillow>=11.2.0",
-    "pyfai>=2026.3.0",
+    "h5py>=3.16.0",
+    "numpy>=2.5.4",
+    "p4p>=4.3.0",
+    "fabio>=2026.6.0",
+    "pillow>=12.3.0",
+    "pyfai>=2026.9.0",
     "pyopengl>=3.1.10",
     "pyopengl-accelerate>=3.1.10",
-    "pydantic>=2.0.0",
+    "pydantic>=2.14.1",
     "tomli-w>=1.2.0",
-    "vispy>=0.14.3",
-    "wxpython>=4.2.5",
+    "vispy>=0.17.0",
+    "wxpython>=4.3.1",
     "lz4>=4.4.5",
     "blosc>=1.11.4",
     "bitshuffle>=0.5.2",
-    "pyepics>=3.5.9",
+    "pyepics>=3.5.10",
     "pyautomation>=0.0.1",
     "newportxps>=2026.1.1",
     "cryio>=2018.5.30",
-    "wxmplot>=2026.2.1",
+    "wxmplot>=2026.2.3",
     "wxutils>=2026.3.0",
-    "pyshortcuts>=1.9.10",
-    "epicsapps",
+    "pyshortcuts>=1.9.11",
+    "epicsapps>=2026.2.0",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
-    "ruff>=0.15.6",
-    "ty>=0.0.23",
+    "pre-commit>=4.7.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+    "ty>=0.0.86",
 ]
 docs = [
-    "mkdocs-material>=9.7.7",
-    "mkdocstrings[python]>=1.0.6",
+    "myst-parser>=5.1.0",
+    "pydata-sphinx-theme>=0.23.0",
+    "sphinx>=9.1.0",
+    "sphinx-autoapi>=3.8.1",
+    "sphinx-autobuild>=2025.8.25",
+    "sphinx-design>=0.7.0",
 ]
 
 [project.scripts]
 crystalsweep = "crystalsweep:main"
 
 [project.urls]
-Homepage = "https://github.com/GSECARS/CrystalSweep"
-Issues = "https://github.com/GSECARS/CrystalSweep/issues"
+Homepage = "https://github.com/gsecars/crystalsweep"
+Issues = "https://github.com/gsecars/crystalsweep/issues"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["crystalsweep"]
-include = ["crystalsweep/assets/*.png", "crystalsweep/assets/*.svg"]
+include = ["crystalsweep/assets/**"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
 
 [tool.ruff]
 exclude = [
@@ -98,7 +97,7 @@ exclude = [
 ]
 line-length = 160
 indent-width = 4
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]

@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: MIT
+
+import threading
+
+import wx
+
+from crystalsweep.model import MainModel
+from crystalsweep.model.beamline_config_model import BeamlineConfig
+from crystalsweep.controller.ad_viewer_controller import ADViewerController
+from crystalsweep.controller.beamline_config_controller import BeamlineConfigController
+from crystalsweep.controller.collect_controller import CollectController
+from crystalsweep.controller.collection_settings_controller import CollectionSettingsController
+from crystalsweep.controller.collection_table_controller import CollectionTableController
+from crystalsweep.controller.file_settings_controller import FileSettingsController
+from crystalsweep.controller.preview_controller import PreviewController
+from crystalsweep.controller.script_editor_controller import ScriptEditorController
+from crystalsweep.view import MainView
+
+__all__ = ["MainController"]
+
+
+class MainController:
+    """Implements the main controller for the CrystalSweep application. Helps to bridge the gap between the model and view components."""
+
+    def __init__(self, view: MainView) -> None:
+        """Initializes the main controller."""
+
+        self._model = MainModel()
+        self._view = view
+
+        self._file_settings_controller = FileSettingsController(model=self._model, view=self._view)
+        self._collection_settings_controller = CollectionSettingsController(model=self._model, view=self._view)
+        # When the HDF5 file-settings toggle flips, the still-map combine
+        # toggle should appear/disappear accordingly.
+        self._file_settings_controller.add_hdf5_changed_listener(lambda _v: self._collection_settings_controller.refresh_dependent_toggles())
+        self._collection_controller = CollectionTableController(model=self._model, view=self._view.collection_table)
+        self._collect_controller = CollectController(model=self._model, view=self._view)
+        self._collect_controller.bind_collecting_changed(self._on_collecting_changed)
+        self._collect_controller.bind_post_scan(self._file_settings_controller.push_to_detector)
+        self._collection_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
+        self._collection_controller.add_points_changed_listener(self._collect_controller.validate_limits)
+        self._collection_settings_controller.add_points_changed_listener(self._collect_controller.refresh_eta)
+        self._collection_settings_controller.add_points_changed_listener(self._collect_controller.validate_limits)
+        self._ad_viewer_controller = ADViewerController(model=self._model, view=self._view)
+        self._beamline_config_controller = BeamlineConfigController(
+            model=self._model,
+            view=self._view,
+            on_config_applied=self._on_config_applied,
+        )
+        self._script_editor_controller = ScriptEditorController(
+            model=self._model.scripts,
+            view=self._view,
+        )
+        self._preview_controller = PreviewController(model=self._model, view=self._view.preview)
+
+        self._setup()
+
+    def _on_collecting_changed(self, collecting: bool) -> None:
+        self._view.set_ui_collecting(collecting)
+        self._beamline_config_controller.set_collecting(collecting)
+        if not collecting:
+            self._file_settings_controller.push_to_detector()
+
+    def _on_config_applied(self, cfg: BeamlineConfig) -> None:
+        self._ad_viewer_controller.resubscribe_detector()
+        self._collection_controller.on_config_applied(cfg)
+        self._collection_settings_controller.on_config_applied()
+        self._file_settings_controller.sync_from_detector()
+        self._file_settings_controller.push_to_detector()
+        self._file_settings_controller.apply_crysalis_from_config()
+        self._collect_controller.on_config_applied()
+        self._preview_controller.on_config_applied(cfg)
+        self._view.set_centering_tools_visible(cfg.centering_tools_enabled)
+        self._check_epics_status(cfg)
+
+    def _check_epics_status(self, cfg: BeamlineConfig | None = None) -> None:
+        if cfg is None:
+            cfg = self._model.beamline.active
+
+        def _worker() -> None:
+            pvs: list[str] = []
+            if cfg.rotation_motor and cfg.rotation_motor.pv.strip():
+                pvs.append(cfg.rotation_motor.pv.strip())
+            det = cfg.active_detector_config
+            if det and det.pv_prefix.strip():
+                prefix = det.pv_prefix.strip()
+                if not prefix.endswith(":"):
+                    prefix += ":"
+                pvs.append(f"{prefix}cam1:Acquire")
+            for motor in cfg.motors:
+                if motor.pv.strip():
+                    pvs.append(motor.pv.strip())
+            online = all(self._model.epics.is_online(pv) for pv in pvs) if pvs else True
+            wx.CallAfter(self._view.set_epics_online, online)
+
+        threading.Thread(target=_worker, daemon=True, name="epics-check").start()
+
+    def _setup(self) -> None:
+        """Setup configuration."""
+        if self._beamline_config_controller.has_active_config():
+            self._view.set_active_config_name(self._model.beamline.active.name)
+            self._file_settings_controller.apply_crysalis_from_config()
+            self._view.set_centering_tools_visible(self._model.beamline.active.centering_tools_enabled)
+            self._check_epics_status()
+        else:
+            wx.CallAfter(self._beamline_config_controller.open_general)
