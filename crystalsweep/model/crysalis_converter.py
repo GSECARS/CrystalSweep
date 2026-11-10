@@ -104,6 +104,7 @@ def _create_crysalis_run(new_directory: str, basename: str, scan_info: dict) -> 
 def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: str, scan_info: dict) -> None:
     try:
         from dataclasses import dataclass, field as dc_field
+        from fabio import esperantoimage as esp_mod
         from fabio.app import eiger2crysalis
         from fabio.nexus import get_isotime
         import h5py
@@ -201,13 +202,13 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
                     "dom_s": float(self.options.omega),
                     "dom_e": float(self.options.omega),
                     "dph_s": phi_expr,
-                    "dph_e": numexpr.NumExpr(f"{omega_start} + {domega} * (i + 1)"),
+                    "dph_e": phi_expr,
                 }
             else:
                 omega_expr = numexpr.NumExpr(self.options.omega)
                 axis_headers = {
                     "dom_s": omega_expr,
-                    "dom_e": numexpr.NumExpr(f"{omega_start} + {domega} * (i + 1)"),
+                    "dom_e": omega_expr,
                     "dph_s": float(self.options.phi),
                     "dph_e": float(self.options.phi),
                 }
@@ -255,6 +256,7 @@ def _convert_hdf5(filepath: str, basename: str, filenumber: int, new_directory: 
             }
 
     try:
+        esp_mod.EsperantoImage.DUMMY = -1
         converter = _Converter(options=options)
         converter.convert_all()
         converter.finish()
